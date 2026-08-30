@@ -315,6 +315,36 @@ fn reveal_in_explorer(filename: Option<String>) -> Result<(), String> {
                 .map_err(|e| e.to_string())?;
         }
     }
+
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+        if target.is_file() {
+            Command::new("open")
+                .args(["-R", &target.to_string_lossy()])
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        } else {
+            Command::new("open")
+                .arg(&target.to_string_lossy().as_ref())
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        use std::process::Command;
+        let dir = if target.is_file() {
+            target.parent().unwrap_or(&target)
+        } else {
+            &target
+        };
+        Command::new("xdg-open")
+            .arg(dir.to_string_lossy().as_ref())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
     Ok(())
 }
 

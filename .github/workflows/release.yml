@@ -16,6 +16,10 @@ jobs:
         include:
           - platform: "windows-latest"
             args: ""
+          - platform: "macos-latest"
+            args: ""
+          - platform: "ubuntu-22.04"
+            args: ""
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -35,8 +39,12 @@ jobs:
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-pc-windows-msvc
+
+      - name: Install Linux system dependencies (Ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
 
       - name: Install frontend dependencies
         run: pnpm install
@@ -48,7 +56,22 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: "Kenote v__VERSION__"
-          releaseBody: "See the assets below to download and install Kenote."
+          releaseBody: |
+            ## Kenote v__VERSION__
+
+            ### ✨ What's New
+            - **Live WYSIWYG Markdown Formatting**: In-place headings, bold, italics, strikethrough, checklists, blockquotes, and code blocks.
+            - **Always-On-Top Pinning**: Keep notes floating on top of all apps (`Ctrl + P` or top bar pin icon).
+            - **Local-First .md Storage**: Instant auto-saving to local `.md` markdown files.
+            - **Browse Notes Switcher**: Instant fuzzy search & quick note switching (`Ctrl + O`).
+            - **Command Actions Palette**: Quick command menu (`Ctrl + K`).
+            - **Custom Accent Themes**: Customizable `#0399F7` Electric Blue and gradients.
+            - **New Custom Icon**: Sleek glowing neon K notepad icon.
+
+            ### 📦 Download & Install
+            - **Windows**: Download the `.msi` or `-setup.exe` installer below.
+            - **macOS**: Download the `.dmg` installer.
+            - **Linux**: Download the `.AppImage` or `.deb` package.
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
