@@ -5,6 +5,7 @@ import { BottomToolbar } from "./components/BottomToolbar";
 import { NoteSwitcher } from "./components/NoteSwitcher";
 import { CommandPalette, ActionItem } from "./components/CommandPalette";
 import { SettingsModal } from "./components/SettingsModal";
+import { CustomInstaller } from "./components/CustomInstaller";
 import { NoteMetadata, AppSettings } from "./types/note";
 import { api } from "./utils/tauriBridge";
 import { applyAccentColor } from "./utils/theme";
@@ -39,6 +40,12 @@ export function App() {
   const [isNoteSwitcherOpen, setIsNoteSwitcherOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isInstallerOpen, setIsInstallerOpen] = useState(() => {
+    return (
+      new URLSearchParams(window.location.search).get("mode") === "install" ||
+      new URLSearchParams(window.location.search).get("installer") === "true"
+    );
+  });
 
   // Editor refs
   const editorRef = useRef<EditorHandle>(null);
@@ -362,7 +369,16 @@ export function App() {
         settings={settings}
         onUpdateSettings={handleUpdateSettings}
         notesDir={notesDir}
+        onOpenInstaller={() => setIsInstallerOpen(true)}
       />
+
+      {/* Custom Frameless Installer Wizard */}
+      {isInstallerOpen && (
+        <CustomInstaller
+          onClose={() => setIsInstallerOpen(false)}
+          onInstalled={() => setIsInstallerOpen(false)}
+        />
+      )}
     </div>
   );
 }

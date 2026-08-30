@@ -193,4 +193,44 @@ export const api = {
       console.log("Reveal in explorer", e);
     }
   },
+
+  async getDefaultInstallDir(): Promise<string> {
+    try {
+      return await invokeTauri<string>("get_default_install_dir");
+    } catch {
+      return "C:\\Users\\Default\\AppData\\Local\\Programs\\Kenote";
+    }
+  },
+
+  async isInstalled(): Promise<boolean> {
+    try {
+      return await invokeTauri<boolean>("is_installed");
+    } catch {
+      return true;
+    }
+  },
+
+  async performInstallation(
+    targetDir: string,
+    createDesktopShortcut: boolean,
+    createStartMenuShortcut: boolean
+  ): Promise<void> {
+    try {
+      await invokeTauri("perform_installation", {
+        targetDir,
+        createDesktopShortcut,
+        createStartMenuShortcut,
+      });
+    } catch (e) {
+      console.log("Perform installation", e);
+    }
+  },
+
+  async launchInstalledApp(targetDir: string): Promise<void> {
+    try {
+      await invokeTauri("launch_installed_app", { targetDir });
+    } catch (e) {
+      console.log("Launch installed app", e);
+    }
+  },
 };
