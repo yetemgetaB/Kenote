@@ -1,0 +1,203 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-main: #16191E;
+  --bg-subtle: #1B2028;
+  --bg-card: #1E242E;
+  --bg-hover: #262E3B;
+  --bg-active: #2D3747;
+  --border-color: #262D38;
+  --border-subtle: #1F252E;
+  --accent-color: #0399F7;
+  --accent-rgb: 3, 153, 247;
+  --accent-hover: rgba(3, 153, 247, 0.85);
+  --accent-muted: rgba(3, 153, 247, 0.15);
+  --accent-glow: rgba(3, 153, 247, 0.35);
+  --text-primary: #E2E8F0;
+  --text-secondary: #94A3B8;
+  --text-muted: #64748B;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Custom minimal scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #2D3748;
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #4A5568;
+}
+
+/* Tiptap Editor Prose Styling */
+.ProseMirror {
+  outline: none;
+  min-height: 100%;
+  color: #DDE3EA;
+  user-select: text;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #4B5565;
+  pointer-events: none;
+  height: 0;
+}
+
+.ProseMirror h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 1.25rem;
+  margin-bottom: 0.75rem;
+  color: #F8FAFC;
+}
+
+.ProseMirror h2 {
+  font-size: 1.35rem;
+  font-weight: 650;
+  line-height: 1.35;
+  margin-top: 1.1rem;
+  margin-bottom: 0.6rem;
+  color: #F1F5F9;
+}
+
+.ProseMirror h3 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-top: 0.9rem;
+  margin-bottom: 0.5rem;
+  color: #E2E8F0;
+}
+
+.ProseMirror p {
+  margin-top: 0.4rem;
+  margin-bottom: 0.4rem;
+  line-height: 1.65;
+}
+
+.ProseMirror blockquote {
+  border-left: 3px solid var(--accent-color, #0399F7);
+  padding-left: 1rem;
+  margin-left: 0;
+  margin-right: 0;
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  color: #94A3B8;
+  font-style: italic;
+  background: rgba(var(--accent-rgb, 3, 153, 247), 0.05);
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  border-radius: 0 6px 6px 0;
+}
+
+.ProseMirror code:not(pre code) {
+  font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+  font-size: 0.85em;
+  padding: 0.2em 0.45em;
+  border-radius: 6px;
+  background: #252C38;
+  color: #E2E8F0;
+  border: 1px solid #333C4D;
+}
+
+.ProseMirror ul[data-type="taskList"] {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0;
+}
+
+.ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 0.25rem;
+}
+
+.ProseMirror ul[data-type="taskList"] li > label {
+  margin-right: 0.6rem;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  margin-top: 0.25rem;
+}
+
+.ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"] {
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  border: 1.5px solid #4B5565;
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+  background: transparent;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"]:checked {
+  background-color: var(--accent-color, #0399F7);
+  border-color: var(--accent-color, #0399F7);
+}
+
+.ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.ProseMirror ul[data-type="taskList"] li > div {
+  flex: 1 1 auto;
+}
+
+.ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div {
+  text-decoration: line-through;
+  color: #64748B;
+}
+
+.ProseMirror ul:not([data-type="taskList"]) {
+  list-style-type: disc;
+  padding-left: 1.4rem;
+  margin: 0.5rem 0;
+}
+
+.ProseMirror ol {
+  list-style-type: decimal;
+  padding-left: 1.4rem;
+  margin: 0.5rem 0;
+}
+
+.ProseMirror hr {
+  border: none;
+  border-top: 1px solid #2B3340;
+  margin: 1.5rem 0;
+}
