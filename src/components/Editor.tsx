@@ -1,4 +1,4 @@
-import { useEffect, forwardRef, useImperativeHandle } from "react";
+import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { useEditor, EditorContent, ReactNodeViewRenderer } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -41,13 +41,15 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
     },
     ref
   ) => {
+    const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
     const editor = useEditor({
       extensions: [
         StarterKit.configure({
           heading: {
             levels: [1, 2, 3],
           },
-          codeBlock: false, // Replaced by CodeBlockLowlight
+          codeBlock: false,
         }),
         CodeBlockLowlight.extend({
           addNodeView() {
@@ -85,26 +87,39 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
           style: `font-size: ${fontSize}; line-height: ${lineHeight}; font-family: ${fontFamily};`,
         },
       },
-      onUpdate: ({ editor }) => {
-        // Extract markdown string
-        const markdown = (editor.storage as any).markdown.getMarkdown();
-        const text = editor.getText();
-        const charCount = text.length;
-
-        // Extract first line as title
-        let firstLineTitle = "Untitled";
-        const lines = text.split("\n");
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed.length > 0) {
-            firstLineTitle = trimmed;
-            break;
-          }
+      onUpdate: ({ editor: ed }) => {
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
         }
 
-        onChange(markdown, charCount, firstLineTitle);
+        debounceTimerRef.current = setTimeout(() => {
+          if (!ed || ed.isDestroyed) return;
+          const markdown = (ed.storage as any).markdown?.getMarkdown() || "";
+          const text = ed.getText();
+          const charCount = text.length;
+
+          let firstLineTitle = "Untitled";
+          const lines = text.split("\n");
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.length > 0) {
+              firstLineTitle = trimmed;
+              break;
+            }
+          }
+
+          onChange(markdown, charCount, firstLineTitle);
+        }, 150);
       },
     });
+
+    useEffect(() => {
+      return () => {
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+        }
+      };
+    }, []);
 
     useEffect(() => {
       if (editor && onEditorReady) {
