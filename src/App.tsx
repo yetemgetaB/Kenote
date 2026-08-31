@@ -10,6 +10,7 @@ import { WelcomeModal } from "./components/WelcomeModal";
 import { NoteMetadata, AppSettings } from "./types/note";
 import { api } from "./utils/tauriBridge";
 import { applyAccentColor } from "./utils/theme";
+import { trackAppLaunch } from "./utils/analytics";
 import {
   PlusIcon,
   NoteSwitcherIcon,
@@ -66,6 +67,8 @@ export function App() {
         if (!loadedSettings.has_completed_onboarding) {
           setIsWelcomeOpen(true);
         }
+
+        trackAppLaunch("0.2.0");
 
         const dir = await api.getNotesDirectory();
         setNotesDir(dir);
