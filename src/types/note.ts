@@ -21,6 +21,8 @@ export interface AppSettings {
   window_height?: number;
   window_x?: number;
   window_y?: number;
+  has_completed_onboarding?: boolean;
+  discovery_source?: string | null;
 }
 
 export interface ColorPreset {

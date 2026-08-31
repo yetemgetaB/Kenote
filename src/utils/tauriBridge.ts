@@ -241,4 +241,13 @@ export const api = {
       console.log("Save window state", e);
     }
   },
+
+  async downloadAndRunInstaller(downloadUrl: string): Promise<void> {
+    try {
+      await invokeTauri("download_and_run_installer", { downloadUrl });
+    } catch (e) {
+      console.log("Download and run installer", e);
+      window.open(downloadUrl, "_blank");
+    }
+  },
 };

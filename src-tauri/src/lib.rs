@@ -29,6 +29,8 @@ pub struct AppSettings {
     pub window_height: Option<f64>,
     pub window_x: Option<i32>,
     pub window_y: Option<i32>,
+    pub has_completed_onboarding: bool,
+    pub discovery_source: Option<String>,
 }
 
 impl Default for AppSettings {
@@ -45,6 +47,8 @@ impl Default for AppSettings {
             window_height: Some(720.0),
             window_x: None,
             window_y: None,
+            has_completed_onboarding: false,
+            discovery_source: None,
         }
     }
 }
@@ -471,6 +475,49 @@ fn save_window_state(window: WebviewWindow) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+async fn download_and_run_installer(
+    download_url: String,
+    window: WebviewWindow,
+) -> Result<(), String> {
+    let temp_dir = std::env::temp_dir();
+    let installer_path = temp_dir.join("Kenote-Update-Setup.exe");
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        let ps_cmd = format!(
+            "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object System.Net.WebClient).DownloadFile('{}', '{}')",
+            download_url,
+            installer_path.to_string_lossy()
+        );
+        let status = Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &ps_cmd])
+            .status()
+            .map_err(|e| format!("Failed to download update: {}", e))?;
+
+        if !status.success() {
+            return Err("Failed to download update installer".to_string());
+        }
+
+        // Spawn installer and close current instance
+        let _ = Command::new(&installer_path).spawn();
+        let _ = window.close();
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        use std::process::Command;
+        let _ = Command::new("curl")
+            .args(["-L", "-o", &installer_path.to_string_lossy(), &download_url])
+            .status();
+        let _ = open::that(&installer_path);
+        let _ = window.close();
+    }
+
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -493,7 +540,8 @@ pub fn run() {
             is_installed,
             perform_installation,
             launch_installed_app,
-            save_window_state
+            save_window_state,
+            download_and_run_installer
         ])
         .setup(|app| {
             // Restore window size and position from settings

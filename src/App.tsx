@@ -6,6 +6,7 @@ import { NoteSwitcher } from "./components/NoteSwitcher";
 import { CommandPalette, ActionItem } from "./components/CommandPalette";
 import { SettingsModal } from "./components/SettingsModal";
 import { CustomInstaller } from "./components/CustomInstaller";
+import { WelcomeModal } from "./components/WelcomeModal";
 import { NoteMetadata, AppSettings } from "./types/note";
 import { api } from "./utils/tauriBridge";
 import { applyAccentColor } from "./utils/theme";
@@ -40,6 +41,7 @@ export function App() {
   const [isNoteSwitcherOpen, setIsNoteSwitcherOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
   const [isInstallerOpen, setIsInstallerOpen] = useState(() => {
     return (
       new URLSearchParams(window.location.search).get("mode") === "install" ||
@@ -60,6 +62,10 @@ export function App() {
         setSettings(loadedSettings);
         setIsAlwaysOnTop(loadedSettings.always_on_top);
         applyAccentColor(loadedSettings.accent_color);
+
+        if (!loadedSettings.has_completed_onboarding) {
+          setIsWelcomeOpen(true);
+        }
 
         const dir = await api.getNotesDirectory();
         setNotesDir(dir);
@@ -370,6 +376,14 @@ export function App() {
         onUpdateSettings={handleUpdateSettings}
         notesDir={notesDir}
         onOpenInstaller={() => setIsInstallerOpen(true)}
+      />
+
+      {/* First-Run Welcome Screen */}
+      <WelcomeModal
+        isOpen={isWelcomeOpen}
+        onClose={() => setIsWelcomeOpen(false)}
+        settings={settings}
+        onUpdateSettings={handleUpdateSettings}
       />
 
       {/* Custom Frameless Installer Wizard */}

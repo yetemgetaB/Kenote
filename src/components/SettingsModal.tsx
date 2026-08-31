@@ -20,6 +20,7 @@ interface ReleaseInfo {
   name: string;
   body: string;
   url: string;
+  installerUrl?: string;
   publishedAt: string;
 }
 
@@ -39,6 +40,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // Update check states
   const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [isDownloadingUpdate, setIsDownloadingUpdate] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<"idle" | "up_to_date" | "available" | "error">("idle");
   const [latestRelease, setLatestRelease] = useState<ReleaseInfo | null>(null);
   const currentVersion = "0.2.0";
@@ -79,7 +81,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       );
       if (!response.ok) {
         if (response.status === 404) {
-          // No releases yet
           setUpdateStatus("up_to_date");
           return;
         }
@@ -90,11 +91,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       const latestVer = tagName.replace(/^v/, "").trim();
 
       if (latestVer && latestVer !== currentVersion) {
+        const setupAsset = Array.isArray(data.assets)
+          ? data.assets.find(
+              (a: any) =>
+                a.name?.endsWith("-setup.exe") ||
+                a.name?.endsWith(".exe") ||
+                a.name?.endsWith(".msi") ||
+                a.name?.endsWith(".dmg") ||
+                a.name?.endsWith(".AppImage")
+            )
+          : null;
+
         setLatestRelease({
           version: latestVer,
           name: data.name || `Version ${latestVer}`,
           body: data.body || "New features and performance improvements.",
           url: data.html_url || "https://github.com/yetemgetaB/Kenote/releases",
+          installerUrl: setupAsset?.browser_download_url || data.html_url,
           publishedAt: data.published_at ? new Date(data.published_at).toLocaleDateString() : "",
         });
         setUpdateStatus("available");
@@ -102,9 +115,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         setUpdateStatus("up_to_date");
       }
     } catch {
-      setUpdateStatus("up_to_date"); // Fallback for offline / before first release
+      setUpdateStatus("up_to_date");
     } finally {
       setCheckingUpdate(false);
+    }
+  };
+
+  const handleDownloadAndInstall = async (installerUrl?: string) => {
+    if (!installerUrl) return;
+    setIsDownloadingUpdate(true);
+    try {
+      await api.downloadAndRunInstaller(installerUrl);
+    } catch (e) {
+      console.error("Update error:", e);
+      setIsDownloadingUpdate(false);
     }
   };
 
@@ -400,10 +424,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       {latestRelease.body}
                     </p>
                     <button
-                      onClick={() => handleOpenLink(latestRelease.url)}
-                      className="w-full py-1.5 bg-[var(--accent-color,#0399F7)] hover:bg-[var(--accent-hover,#0284c7)] text-white text-xs font-semibold rounded-md shadow-sm transition-all focus:outline-none"
+                      onClick={() => handleDownloadAndInstall(latestRelease.installerUrl || latestRelease.url)}
+                      disabled={isDownloadingUpdate}
+                      className="w-full py-2 bg-[var(--accent-color,#0399F7)] hover:bg-[var(--accent-hover,#0284c7)] disabled:opacity-75 text-white text-xs font-semibold rounded-lg shadow-md transition-all focus:outline-none flex items-center justify-center space-x-2"
                     >
-                      Download & Update Now
+                      {isDownloadingUpdate ? (
+                        <>
+                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>Downloading & Launching Installer...</span>
+                        </>
+                      ) : (
+                        <span>Download & Install Update Now</span>
+                      )}
                     </button>
                   </div>
                 )}
