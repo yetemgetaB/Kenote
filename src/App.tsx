@@ -5,7 +5,6 @@ import { BottomToolbar } from "./components/BottomToolbar";
 import { NoteSwitcher } from "./components/NoteSwitcher";
 import { CommandPalette, ActionItem } from "./components/CommandPalette";
 import { SettingsModal } from "./components/SettingsModal";
-import { CustomInstaller } from "./components/CustomInstaller";
 import { WelcomeModal } from "./components/WelcomeModal";
 import { NoteMetadata, AppSettings } from "./types/note";
 import { api } from "./utils/tauriBridge";
@@ -43,12 +42,6 @@ export function App() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
-  const [isInstallerOpen, setIsInstallerOpen] = useState(() => {
-    return (
-      new URLSearchParams(window.location.search).get("mode") === "install" ||
-      new URLSearchParams(window.location.search).get("installer") === "true"
-    );
-  });
 
   // Editor refs
   const editorRef = useRef<EditorHandle>(null);
@@ -378,7 +371,6 @@ export function App() {
         settings={settings}
         onUpdateSettings={handleUpdateSettings}
         notesDir={notesDir}
-        onOpenInstaller={() => setIsInstallerOpen(true)}
       />
 
       {/* First-Run Welcome Screen */}
@@ -389,13 +381,13 @@ export function App() {
         onUpdateSettings={handleUpdateSettings}
       />
 
-      {/* Custom Frameless Installer Wizard */}
-      {isInstallerOpen && (
+      {/* Custom Frameless Installer Wizard (temporarily disabled) */}
+      {/* {isInstallerOpen && (
         <CustomInstaller
           onClose={() => setIsInstallerOpen(false)}
           onInstalled={() => setIsInstallerOpen(false)}
         />
-      )}
+      )} */}
     </div>
   );
 }

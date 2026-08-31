@@ -10,7 +10,6 @@ interface SettingsModalProps {
   settings: AppSettings;
   onUpdateSettings: (newSettings: AppSettings) => void;
   notesDir: string;
-  onOpenInstaller?: () => void;
 }
 
 type TabType = "appearance" | "storage" | "about";
@@ -30,7 +29,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   settings,
   onUpdateSettings,
   notesDir,
-  onOpenInstaller,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>("appearance");
   const [accentColor, setAccentColor] = useState(settings.accent_color);
@@ -444,11 +442,44 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {/* Developer & Links */}
               <section className="space-y-2 border-t border-[#2A3240] pt-4 text-[11px]">
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-400">Developer</span>
-                  <span className="text-gray-200 font-medium">yetemgetaB</span>
+                  <span className="text-gray-400">Creator</span>
+                  <span className="text-gray-200 font-medium">Yetemgeta Bekele</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-400">GitHub Repository</span>
+                  <span className="text-gray-400">GitHub</span>
+                  <button
+                    onClick={() =>
+                      handleOpenLink("https://github.com/yetemgetaB")
+                    }
+                    className="text-[var(--accent-color,#0399F7)] hover:underline focus:outline-none"
+                  >
+                    @yetemgetaB
+                  </button>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-400">Email</span>
+                  <button
+                    onClick={() =>
+                      handleOpenLink("mailto:yetemgetabekele@gmail.com")
+                    }
+                    className="text-[var(--accent-color,#0399F7)] hover:underline focus:outline-none"
+                  >
+                    yetemgetabekele@gmail.com
+                  </button>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-400">Instagram</span>
+                  <button
+                    onClick={() =>
+                      handleOpenLink("https://www.instagram.com/_.yetem._/")
+                    }
+                    className="text-[var(--accent-color,#0399F7)] hover:underline focus:outline-none"
+                  >
+                    @_.yetem._
+                  </button>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-400">Repository</span>
                   <button
                     onClick={() =>
                       handleOpenLink("https://github.com/yetemgetaB/Kenote")
@@ -462,20 +493,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <span className="text-gray-400">License</span>
                   <span className="text-gray-300">MIT</span>
                 </div>
-                {onOpenInstaller && (
-                  <div className="pt-2 border-t border-[#2A3240]">
-                    <button
-                      onClick={() => {
-                        onClose();
-                        onOpenInstaller();
-                      }}
-                      className="w-full py-1.5 bg-[#252C38] hover:bg-[#323C4D] text-gray-300 hover:text-white rounded-lg text-[11px] transition-colors focus:outline-none flex items-center justify-center space-x-1.5"
-                    >
-                      <span>⚡</span>
-                      <span>Run Kenote Setup Wizard & Shortcuts</span>
-                    </button>
-                  </div>
-                )}
               </section>
             </div>
           )}

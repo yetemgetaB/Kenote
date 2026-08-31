@@ -492,22 +492,20 @@ async fn download_and_run_installer(
     #[cfg(target_os = "windows")]
     {
         use std::process::Command;
-        let ps_cmd = format!(
-            "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object System.Net.WebClient).DownloadFile('{}', '{}')",
-            download_url,
-            installer_path.to_string_lossy()
-        );
-        let status = Command::new("powershell")
-            .args(["-NoProfile", "-NonInteractive", "-Command", &ps_cmd])
+        // Use curl.exe with -L to properly follow GitHub Releases 302 redirects
+        let status = Command::new("curl.exe")
+            .args(["-L", "-f", "-s", "-S", "-o", &installer_path.to_string_lossy(), &download_url])
             .status()
             .map_err(|e| format!("Failed to download update: {}", e))?;
 
         if !status.success() {
-            return Err("Failed to download update installer".to_string());
+            return Err("Failed to download valid update installer binary".to_string());
         }
 
         // Spawn installer and close current instance
-        let _ = Command::new(&installer_path).spawn();
+        let _ = Command::new("cmd.exe")
+            .args(["/c", "start", "", &installer_path.to_string_lossy()])
+            .spawn();
         let _ = window.close();
     }
 
