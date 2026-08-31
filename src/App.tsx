@@ -362,6 +362,8 @@ export function App() {
         isOpen={isCommandPaletteOpen}
         onClose={() => setIsCommandPaletteOpen(false)}
         actions={actions}
+        notes={notes}
+        onSelectNote={handleSelectNote}
       />
 
       {/* Settings Modal */}
