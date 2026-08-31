@@ -331,6 +331,7 @@ export function App() {
       <main className="flex-1 flex flex-col min-h-0 bg-[#16191E] relative">
         <Editor
           ref={editorRef}
+          noteId={activeNote?.id || null}
           initialContent={activeNote?.content || ""}
           onChange={handleEditorChange}
           fontSize={settings.font_size}

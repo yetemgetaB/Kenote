@@ -21,6 +21,7 @@ export interface EditorHandle {
 }
 
 interface EditorProps {
+  noteId?: string | null;
   initialContent: string;
   onChange: (markdown: string, charCount: number, firstLineTitle: string) => void;
   fontSize?: string;
@@ -32,6 +33,7 @@ interface EditorProps {
 export const Editor = forwardRef<EditorHandle, EditorProps>(
   (
     {
+      noteId,
       initialContent,
       onChange,
       fontSize = "15px",
@@ -129,15 +131,16 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
       }
     }, [editor, onEditorReady]);
 
-    // Handle content updates when switching notes
+    // Only set content when actually switching to a different note
+    const prevNoteIdRef = useRef<string | null | undefined>(noteId);
     useEffect(() => {
-      if (editor && initialContent !== undefined) {
-        const currentMd = (editor.storage as any).markdown?.getMarkdown();
-        if (currentMd !== initialContent) {
-          editor.commands.setContent(initialContent, false);
-        }
+      if (!editor || !noteId) return;
+
+      if (prevNoteIdRef.current !== noteId) {
+        prevNoteIdRef.current = noteId;
+        editor.commands.setContent(initialContent || "", false);
       }
-    }, [initialContent, editor]);
+    }, [noteId, initialContent, editor]);
 
     useImperativeHandle(ref, () => ({
       getMarkdown: () => {
