@@ -386,8 +386,8 @@ fn is_installed() -> bool {
 #[tauri::command]
 fn perform_installation(
     target_dir: String,
-    create_desktop_shortcut: bool,
-    create_start_menu_shortcut: bool,
+    _create_desktop_shortcut: bool,
+    _create_start_menu_shortcut: bool,
 ) -> Result<(), String> {
     let target_path = PathBuf::from(&target_dir);
     fs::create_dir_all(&target_path).map_err(|e| e.to_string())?;
@@ -406,7 +406,7 @@ fn perform_installation(
         use std::process::Command;
         let exe_str = dest_exe.to_string_lossy();
 
-        if create_desktop_shortcut {
+        if _create_desktop_shortcut {
             if let Some(desktop) = dirs::desktop_dir() {
                 let lnk_path = desktop.join("Kenote.lnk");
                 let ps_cmd = format!(
@@ -421,7 +421,7 @@ fn perform_installation(
             }
         }
 
-        if create_start_menu_shortcut {
+        if _create_start_menu_shortcut {
             if let Some(roaming) = dirs::data_dir() {
                 let start_menu = roaming.join("Microsoft").join("Windows").join("Start Menu").join("Programs");
                 let _ = fs::create_dir_all(&start_menu);
@@ -445,12 +445,18 @@ fn perform_installation(
 #[tauri::command]
 fn launch_installed_app(target_dir: String, window: WebviewWindow) -> Result<(), String> {
     let target_path = PathBuf::from(&target_dir);
-    let dest_exe = target_path.join("kenote.exe");
 
     #[cfg(target_os = "windows")]
     {
         use std::process::Command;
+        let dest_exe = target_path.join("kenote.exe");
         let _ = Command::new(&dest_exe).spawn();
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        use std::process::Command;
+        let _ = Command::new(&target_path).spawn();
     }
 
     let _ = window.close();
@@ -505,13 +511,23 @@ async fn download_and_run_installer(
         let _ = window.close();
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
     {
         use std::process::Command;
         let _ = Command::new("curl")
             .args(["-L", "-o", &installer_path.to_string_lossy(), &download_url])
             .status();
-        let _ = open::that(&installer_path);
+        let _ = Command::new("open").arg(&installer_path).spawn();
+        let _ = window.close();
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        use std::process::Command;
+        let _ = Command::new("curl")
+            .args(["-L", "-o", &installer_path.to_string_lossy(), &download_url])
+            .status();
+        let _ = Command::new("xdg-open").arg(&installer_path).spawn();
         let _ = window.close();
     }
 
