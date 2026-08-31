@@ -17,6 +17,10 @@ export interface AppSettings {
   line_height: string;
   auto_save_interval: number;
   always_on_top: boolean;
+  window_width?: number;
+  window_height?: number;
+  window_x?: number;
+  window_y?: number;
 }
 
 export interface ColorPreset {

@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
-use tauri::WebviewWindow;
+use tauri::{LogicalPosition, LogicalSize, Manager, WebviewWindow, WindowEvent};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NoteMetadata {
@@ -25,6 +25,10 @@ pub struct AppSettings {
     pub line_height: String,
     pub auto_save_interval: u32,
     pub always_on_top: bool,
+    pub window_width: Option<f64>,
+    pub window_height: Option<f64>,
+    pub window_x: Option<i32>,
+    pub window_y: Option<i32>,
 }
 
 impl Default for AppSettings {
@@ -37,6 +41,10 @@ impl Default for AppSettings {
             line_height: "1.6".to_string(),
             auto_save_interval: 500,
             always_on_top: false,
+            window_width: Some(520.0),
+            window_height: Some(720.0),
+            window_x: None,
+            window_y: None,
         }
     }
 }
@@ -445,6 +453,24 @@ fn launch_installed_app(target_dir: String, window: WebviewWindow) -> Result<(),
     Ok(())
 }
 
+#[tauri::command]
+fn save_window_state(window: WebviewWindow) -> Result<(), String> {
+    if let (Ok(pos), Ok(size)) = (window.outer_position(), window.inner_size()) {
+        let scale = window.scale_factor().unwrap_or(1.0);
+        let logical_pos = pos.to_logical::<i32>(scale);
+        let logical_size = size.to_logical::<f64>(scale);
+        if logical_size.width >= 300.0 && logical_size.height >= 300.0 {
+            let mut s = get_settings();
+            s.window_x = Some(logical_pos.x);
+            s.window_y = Some(logical_pos.y);
+            s.window_width = Some(logical_size.width);
+            s.window_height = Some(logical_size.height);
+            let _ = save_settings(s);
+        }
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -466,11 +492,49 @@ pub fn run() {
             get_default_install_dir,
             is_installed,
             perform_installation,
-            launch_installed_app
+            launch_installed_app,
+            save_window_state
         ])
-        .setup(|_app| {
-            // Initial seed note if empty
+        .setup(|app| {
+            // Restore window size and position from settings
             let settings = get_settings();
+            if let Some(win) = app.get_webview_window("main") {
+                if let (Some(w), Some(h)) = (settings.window_width, settings.window_height) {
+                    if w >= 300.0 && h >= 300.0 {
+                        let _ = win.set_size(LogicalSize::new(w, h));
+                    }
+                }
+                if let (Some(x), Some(y)) = (settings.window_x, settings.window_y) {
+                    let _ = win.set_position(LogicalPosition::new(x, y));
+                }
+
+                let win_clone = win.clone();
+                win.on_window_event(move |event| {
+                    match event {
+                        WindowEvent::Moved(pos) => {
+                            let scale = win_clone.scale_factor().unwrap_or(1.0);
+                            let logical_pos = pos.to_logical::<i32>(scale);
+                            let mut s = get_settings();
+                            s.window_x = Some(logical_pos.x);
+                            s.window_y = Some(logical_pos.y);
+                            let _ = save_settings(s);
+                        }
+                        WindowEvent::Resized(size) => {
+                            let scale = win_clone.scale_factor().unwrap_or(1.0);
+                            let logical_size = size.to_logical::<f64>(scale);
+                            if logical_size.width >= 300.0 && logical_size.height >= 300.0 {
+                                let mut s = get_settings();
+                                s.window_width = Some(logical_size.width);
+                                s.window_height = Some(logical_size.height);
+                                let _ = save_settings(s);
+                            }
+                        }
+                        _ => {}
+                    }
+                });
+            }
+
+            // Initial seed note if empty
             let notes_dir = get_resolved_notes_dir(settings.custom_notes_dir.as_deref());
             if let Ok(entries) = fs::read_dir(&notes_dir) {
                 let count = entries.count();

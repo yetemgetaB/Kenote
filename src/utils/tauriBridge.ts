@@ -233,4 +233,12 @@ export const api = {
       console.log("Launch installed app", e);
     }
   },
+
+  async saveWindowState(): Promise<void> {
+    try {
+      await invokeTauri("save_window_state");
+    } catch (e) {
+      console.log("Save window state", e);
+    }
+  },
 };
