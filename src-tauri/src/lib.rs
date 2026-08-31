@@ -469,7 +469,7 @@ fn save_window_state(window: WebviewWindow) -> Result<(), String> {
         let scale = window.scale_factor().unwrap_or(1.0);
         let logical_pos = pos.to_logical::<i32>(scale);
         let logical_size = size.to_logical::<f64>(scale);
-        if logical_size.width >= 300.0 && logical_size.height >= 300.0 {
+        if logical_size.width >= 300.0 && logical_size.height >= 300.0 && logical_pos.x > -10000 && logical_pos.y > -10000 {
             let mut s = get_settings();
             s.window_x = Some(logical_pos.x);
             s.window_y = Some(logical_pos.y);
@@ -567,7 +567,10 @@ pub fn run() {
                     }
                 }
                 if let (Some(x), Some(y)) = (settings.window_x, settings.window_y) {
-                    let _ = win.set_position(LogicalPosition::new(x, y));
+                    // Only restore if valid on-screen coordinate (Windows minimize sets to -32000)
+                    if x > -10000 && y > -10000 {
+                        let _ = win.set_position(LogicalPosition::new(x, y));
+                    }
                 }
 
                 let win_clone = win.clone();
@@ -576,10 +579,13 @@ pub fn run() {
                         WindowEvent::Moved(pos) => {
                             let scale = win_clone.scale_factor().unwrap_or(1.0);
                             let logical_pos = pos.to_logical::<i32>(scale);
-                            let mut s = get_settings();
-                            s.window_x = Some(logical_pos.x);
-                            s.window_y = Some(logical_pos.y);
-                            let _ = save_settings(s);
+                            // Only save valid normal window positions, ignore minimized coordinates (-32000)
+                            if logical_pos.x > -10000 && logical_pos.y > -10000 {
+                                let mut s = get_settings();
+                                s.window_x = Some(logical_pos.x);
+                                s.window_y = Some(logical_pos.y);
+                                let _ = save_settings(s);
+                            }
                         }
                         WindowEvent::Resized(size) => {
                             let scale = win_clone.scale_factor().unwrap_or(1.0);

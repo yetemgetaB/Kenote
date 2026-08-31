@@ -128,7 +128,7 @@ export const CustomInstaller: React.FC<CustomInstallerProps> = ({
                   <h1 className="text-lg font-bold text-white tracking-tight flex items-center space-x-2">
                     <span>Install Kenote</span>
                     <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-[#0399F7]/15 text-[#0399F7] border border-[#0399F7]/30">
-                      v0.3.1
+                      v0.3.2
                     </span>
                   </h1>
                   <p className="text-xs text-gray-400">
