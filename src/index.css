@@ -128,34 +128,47 @@ body {
 .ProseMirror ul[data-type="taskList"] {
   list-style: none;
   padding: 0;
-  margin: 0.5rem 0;
+  margin: 0.35rem 0;
 }
 
 .ProseMirror ul[data-type="taskList"] li {
   display: flex;
   align-items: flex-start;
-  margin-bottom: 0.25rem;
+  margin: 0.2rem 0;
+  line-height: 1.5;
 }
 
 .ProseMirror ul[data-type="taskList"] li > label {
-  margin-right: 0.6rem;
+  margin-right: 0.5rem;
   user-select: none;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  margin-top: 0.25rem;
+  justify-content: center;
+  margin-top: 0.2rem;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
 .ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"] {
   appearance: none;
-  width: 15px;
-  height: 15px;
-  border: 1.5px solid #4B5565;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid #475569;
   border-radius: 4px;
   outline: none;
   cursor: pointer;
-  background: transparent;
-  transition: all 0.15s ease;
+  background: rgba(255, 255, 255, 0.03);
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
+  margin: 0;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"]:hover {
+  border-color: var(--accent-color, #0399F7);
+  background: rgba(var(--accent-rgb, 3, 153, 247), 0.1);
 }
 
 .ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"]:checked {
@@ -166,22 +179,29 @@ body {
 .ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"]:checked::after {
   content: "";
   position: absolute;
-  left: 4px;
+  left: 3.5px;
   top: 1px;
-  width: 4px;
-  height: 8px;
+  width: 3.5px;
+  height: 7px;
   border: solid white;
-  border-width: 0 2px 2px 0;
+  border-width: 0 1.75px 1.75px 0;
   transform: rotate(45deg);
 }
 
 .ProseMirror ul[data-type="taskList"] li > div {
   flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ProseMirror ul[data-type="taskList"] li > div > p {
+  margin: 0 !important;
+  line-height: 1.5;
 }
 
 .ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div {
   text-decoration: line-through;
   color: #64748B;
+  opacity: 0.75;
 }
 
 .ProseMirror ul:not([data-type="taskList"]) {
