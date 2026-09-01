@@ -6,6 +6,19 @@
   <img src="src/assets/app-icon.png" width="128" height="128" alt="Kenote Icon" style="border-radius: 24px;" />
 </p>
 
+<p align="center">
+  <img src="docs/screenshots/editor-preview.png" width="850" alt="Kenote Editor Preview" />
+</p>
+
+---
+
+## 📸 Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/note-switcher.png" width="48%" alt="Note Switcher & Fast Search" />
+  <img src="docs/screenshots/settings-theme.png" width="48%" alt="Settings Accent & Theme" />
+</p>
+
 ---
 
 ## ✨ Features
