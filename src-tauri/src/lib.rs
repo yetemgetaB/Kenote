@@ -617,32 +617,60 @@ async fn download_and_run_installer(
     let temp_dir = std::env::temp_dir();
     let installer_path = temp_dir.join("Kenote-Update-Setup.exe");
 
+    let url = download_url.clone();
+    let path = installer_path.clone();
+
+    // Run blocking download on a background OS thread
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let res: Result<(), String> = (|| {
+            let client = reqwest::blocking::Client::builder()
+                .user_agent("Kenote-Updater")
+                .build()
+                .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+
+            let mut response = client
+                .get(&url)
+                .send()
+                .map_err(|e| format!("Failed to download update file: {}", e))?;
+
+            if !response.status().is_success() {
+                return Err(format!("Download failed with status: {}", response.status()));
+            }
+
+            let mut dest = fs::File::create(&path)
+                .map_err(|e| format!("Failed to create temporary installer file: {}", e))?;
+
+            std::io::copy(&mut response, &mut dest)
+                .map_err(|e| format!("Failed to save installer data: {}", e))?;
+
+            Ok(())
+        })();
+        let _ = tx.send(res);
+    });
+
+    rx.recv()
+        .map_err(|_| "Download worker disconnected".to_string())??;
+
     #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
         use std::process::Command;
-        // Use curl.exe with -L to properly follow GitHub Releases 302 redirects
-        let status = Command::new("curl.exe")
-            .args(["-L", "-f", "-s", "-S", "-o", &installer_path.to_string_lossy(), &download_url])
-            .status()
-            .map_err(|e| format!("Failed to download update: {}", e))?;
 
-        if !status.success() {
-            return Err("Failed to download valid update installer binary".to_string());
-        }
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
 
-        // Spawn installer and close current instance
-        let _ = Command::new("cmd.exe")
-            .args(["/c", "start", "", &installer_path.to_string_lossy()])
+        // Run NSIS setup silently (/S) so it updates files and restarts without terminal prompts
+        let _ = Command::new(&installer_path)
+            .arg("/S")
+            .creation_flags(CREATE_NO_WINDOW)
             .spawn();
+
         let _ = window.close();
     }
 
     #[cfg(target_os = "macos")]
     {
         use std::process::Command;
-        let _ = Command::new("curl")
-            .args(["-L", "-o", &installer_path.to_string_lossy(), &download_url])
-            .status();
         let _ = Command::new("open").arg(&installer_path).spawn();
         let _ = window.close();
     }
@@ -650,9 +678,6 @@ async fn download_and_run_installer(
     #[cfg(target_os = "linux")]
     {
         use std::process::Command;
-        let _ = Command::new("curl")
-            .args(["-L", "-o", &installer_path.to_string_lossy(), &download_url])
-            .status();
         let _ = Command::new("xdg-open").arg(&installer_path).spawn();
         let _ = window.close();
     }
