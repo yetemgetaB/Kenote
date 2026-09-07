@@ -19,4 +19,24 @@ export default defineConfig({
     strictPort: true,
     host: false,
   },
+  build: {
+    chunkSizeWarningLimit: 800,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (id.includes("highlight.js") || id.includes("lowlight")) {
+              return "vendor-highlight";
+            }
+            if (id.includes("@tiptap") || id.includes("prosemirror") || id.includes("tiptap-markdown")) {
+              return "vendor-editor";
+            }
+            if (id.includes("react") || id.includes("posthog")) {
+              return "vendor-core";
+            }
+          }
+        },
+      },
+    },
+  },
 });

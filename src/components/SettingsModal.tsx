@@ -58,7 +58,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isDownloadingUpdate, setIsDownloadingUpdate] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<"idle" | "up_to_date" | "available" | "error">("idle");
   const [latestRelease, setLatestRelease] = useState<ReleaseInfo | null>(null);
-  const currentVersion = "0.3.3";
+  const currentVersion = "0.3.4";
 
   if (!isOpen) return null;
 
