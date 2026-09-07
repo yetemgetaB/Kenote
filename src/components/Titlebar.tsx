@@ -12,11 +12,13 @@ import {
 interface TitlebarProps {
   title: string;
   isAlwaysOnTop: boolean;
+  isSettingsOpen?: boolean;
   onToggleAlwaysOnTop: () => void;
   onOpenCommandPalette: () => void;
   onOpenNoteSwitcher: () => void;
   onNewNote: () => void;
   onOpenSettings: () => void;
+  onCloseSettings?: () => void;
   onMinimize: () => void;
   onClose: () => void;
 }
@@ -24,11 +26,13 @@ interface TitlebarProps {
 export const Titlebar: React.FC<TitlebarProps> = ({
   title,
   isAlwaysOnTop,
+  isSettingsOpen = false,
   onToggleAlwaysOnTop,
   onOpenCommandPalette,
   onOpenNoteSwitcher,
   onNewNote,
   onOpenSettings,
+  onCloseSettings,
   onMinimize,
   onClose,
 }) => {
@@ -39,46 +43,61 @@ export const Titlebar: React.FC<TitlebarProps> = ({
     >
       {/* Left side actions */}
       <div className="flex items-center space-x-1">
-        <button
-          onClick={onOpenCommandPalette}
-          title="Command Menu (Ctrl+K)"
-          className="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-[#2A313D] transition-colors focus:outline-none"
-        >
-          <ActionTriggerIcon size={15} />
-        </button>
-        <button
-          onClick={onOpenNoteSwitcher}
-          title="Browse Notes (Ctrl+O)"
-          className="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-[#2A313D] transition-colors focus:outline-none"
-        >
-          <NoteSwitcherIcon size={15} />
-        </button>
-        <button
-          onClick={onNewNote}
-          title="New Note (Ctrl+N)"
-          className="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-[#2A313D] transition-colors focus:outline-none"
-        >
-          <PlusIcon size={15} />
-        </button>
+        {isSettingsOpen ? (
+          <button
+            onClick={onCloseSettings}
+            title="Back to Editor (Esc)"
+            className="flex items-center space-x-1.5 px-2 py-1 rounded-md text-gray-300 hover:text-white hover:bg-[#2A313D] transition-colors focus:outline-none text-xs font-semibold"
+          >
+            <span>←</span>
+            <span>Editor</span>
+          </button>
+        ) : (
+          <>
+            <button
+              onClick={onOpenCommandPalette}
+              title="Command Menu (Ctrl+K)"
+              className="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-[#2A313D] transition-colors focus:outline-none"
+            >
+              <ActionTriggerIcon size={15} />
+            </button>
+            <button
+              onClick={onOpenNoteSwitcher}
+              title="Browse Notes (Ctrl+O)"
+              className="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-[#2A313D] transition-colors focus:outline-none"
+            >
+              <NoteSwitcherIcon size={15} />
+            </button>
+            <button
+              onClick={onNewNote}
+              title="New Note (Ctrl+N)"
+              className="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-[#2A313D] transition-colors focus:outline-none"
+            >
+              <PlusIcon size={15} />
+            </button>
+          </>
+        )}
       </div>
 
-      {/* Center dynamic note title */}
+      {/* Center dynamic note title / Settings title */}
       <div
         data-tauri-drag-region
         className="flex-1 text-center text-xs font-medium text-gray-300 px-4 truncate pointer-events-none"
       >
-        {title || "Untitled"}
+        {isSettingsOpen ? "Settings & Preferences" : (title || "Untitled")}
       </div>
 
       {/* Right side window controls */}
       <div className="flex items-center space-x-1">
-        <button
-          onClick={onOpenSettings}
-          title="Settings (Ctrl+,)"
-          className="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-[#2A313D] transition-colors focus:outline-none"
-        >
-          <SettingsIcon size={14} />
-        </button>
+        {!isSettingsOpen && (
+          <button
+            onClick={onOpenSettings}
+            title="Settings (Ctrl+,)"
+            className="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-[#2A313D] transition-colors focus:outline-none"
+          >
+            <SettingsIcon size={14} />
+          </button>
+        )}
 
         {/* Pin Always on Top Toggle */}
         <button

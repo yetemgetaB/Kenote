@@ -5,7 +5,7 @@ import { BottomToolbar } from "./components/BottomToolbar";
 import { NoteSwitcher } from "./components/NoteSwitcher";
 import { QuickSwitcherOverlay } from "./components/QuickSwitcherOverlay";
 import { CommandPalette, ActionItem } from "./components/CommandPalette";
-import { SettingsModal } from "./components/SettingsModal";
+import { SettingsView } from "./components/SettingsView";
 import { WelcomeModal } from "./components/WelcomeModal";
 import { NoteMetadata, AppSettings } from "./types/note";
 import { api } from "./utils/tauriBridge";
@@ -401,17 +401,25 @@ export function App() {
         return;
       }
 
-      // 2. Escape cancels quick switcher overlay
-      if (e.key === "Escape" && isQuickSwitcherOpenRef.current) {
-        e.preventDefault();
-        isQuickSwitcherOpenRef.current = false;
-        setIsQuickSwitcherOpen(false);
-        return;
+      // 2. Escape cancels quick switcher overlay or closes Settings
+      if (e.key === "Escape") {
+        if (isQuickSwitcherOpenRef.current) {
+          e.preventDefault();
+          isQuickSwitcherOpenRef.current = false;
+          setIsQuickSwitcherOpen(false);
+          return;
+        }
+        if (isSettingsOpen) {
+          e.preventDefault();
+          setIsSettingsOpen(false);
+          return;
+        }
       }
 
       // Other Standard Shortcuts
       if (isCmdOrCtrl && e.key.toLowerCase() === "n") {
         e.preventDefault();
+        setIsSettingsOpen(false);
         handleNewNote();
       } else if (isCmdOrCtrl && e.key.toLowerCase() === "o") {
         e.preventDefault();
@@ -538,34 +546,50 @@ export function App() {
       <Titlebar
         title={activeTitle}
         isAlwaysOnTop={isAlwaysOnTop}
+        isSettingsOpen={isSettingsOpen}
         onToggleAlwaysOnTop={handleToggleAlwaysOnTop}
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
         onOpenNoteSwitcher={() => setIsNoteSwitcherOpen(true)}
         onNewNote={handleNewNote}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onCloseSettings={() => setIsSettingsOpen(false)}
         onMinimize={() => api.minimizeWindow()}
         onClose={() => api.closeWindow()}
       />
 
-      {/* Editor Body */}
-      <main className="flex-1 flex flex-col min-h-0 bg-[#16191E] relative">
-        <Editor
-          ref={editorRef}
-          noteId={activeNote?.id || null}
-          initialContent={activeNote?.content || ""}
-          onChange={handleEditorChange}
-          fontSize={settings.font_size}
-          lineHeight={settings.line_height}
-          fontFamily={settings.font_family}
-          onEditorReady={(editor) => setTiptapInstance(editor)}
+      {/* Main View Area: Either SettingsView or Editor + Toolbar */}
+      {isSettingsOpen ? (
+        <SettingsView
+          settings={settings}
+          onUpdateSettings={handleUpdateSettings}
+          notesDir={notesDir}
+          notes={notes}
+          onClose={() => setIsSettingsOpen(false)}
+          onRestoreNote={handleRestoreNote}
         />
-      </main>
+      ) : (
+        <>
+          {/* Editor Body */}
+          <main className="flex-1 flex flex-col min-h-0 bg-[#16191E] relative">
+            <Editor
+              ref={editorRef}
+              noteId={activeNote?.id || null}
+              initialContent={activeNote?.content || ""}
+              onChange={handleEditorChange}
+              fontSize={settings.font_size}
+              lineHeight={settings.line_height}
+              fontFamily={settings.font_family}
+              onEditorReady={(editor) => setTiptapInstance(editor)}
+            />
+          </main>
 
-      {/* Bottom Formatting Toolbar */}
-      <BottomToolbar
-        editor={tiptapInstance}
-        characterCount={characterCount}
-      />
+          {/* Bottom Formatting Toolbar */}
+          <BottomToolbar
+            editor={tiptapInstance}
+            characterCount={characterCount}
+          />
+        </>
+      )}
 
       {/* Quick Switcher HUD / Overlay */}
       <QuickSwitcherOverlay
@@ -628,16 +652,6 @@ export function App() {
         actions={actions}
         notes={notes}
         onSelectNote={handleSelectNote}
-      />
-
-      {/* Settings Modal */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        settings={settings}
-        onUpdateSettings={handleUpdateSettings}
-        notesDir={notesDir}
-        notes={notes}
       />
 
       {/* First-Run Welcome Screen */}
