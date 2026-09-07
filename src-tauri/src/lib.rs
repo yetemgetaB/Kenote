@@ -97,6 +97,13 @@ fn get_resolved_notes_dir(custom_dir: Option<&str>) -> PathBuf {
     notes_dir
 }
 
+fn get_trash_dir(custom_dir: Option<&str>) -> PathBuf {
+    let notes_dir = get_resolved_notes_dir(custom_dir);
+    let trash_dir = notes_dir.join(".trash");
+    let _ = fs::create_dir_all(&trash_dir);
+    trash_dir
+}
+
 #[tauri::command]
 fn get_settings() -> AppSettings {
     let path = get_settings_path();
@@ -295,9 +302,112 @@ fn save_note(mut filename: String, content: String, is_pinned: bool) -> Result<N
 fn delete_note(filename: String) -> Result<(), String> {
     let settings = get_settings();
     let notes_dir = get_resolved_notes_dir(settings.custom_notes_dir.as_deref());
-    let path = notes_dir.join(&filename);
+    let trash_dir = get_trash_dir(settings.custom_notes_dir.as_deref());
+    let src_path = notes_dir.join(&filename);
+
+    if src_path.exists() {
+        let dest_path = trash_dir.join(&filename);
+        if dest_path.exists() {
+            let _ = fs::remove_file(&dest_path);
+        }
+        fs::rename(&src_path, &dest_path).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn list_trashed_notes() -> Result<Vec<NoteMetadata>, String> {
+    let settings = get_settings();
+    let trash_dir = get_trash_dir(settings.custom_notes_dir.as_deref());
+    let mut notes = Vec::new();
+
+    if let Ok(entries) = fs::read_dir(&trash_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("md") {
+                let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+                let id = filename.trim_end_matches(".md").to_string();
+                let is_pinned = filename.starts_with("pin_");
+
+                if let Ok(content) = fs::read_to_string(&path) {
+                    let title = extract_title_from_content(&content);
+                    let (updated_at, created_at) = get_file_timestamps(&path);
+                    let character_count = content.chars().count();
+
+                    notes.push(NoteMetadata {
+                        id,
+                        filename,
+                        title,
+                        content,
+                        updated_at,
+                        created_at,
+                        character_count,
+                        is_pinned,
+                    });
+                }
+            }
+        }
+    }
+
+    notes.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+    Ok(notes)
+}
+
+#[tauri::command]
+fn restore_note(filename: String) -> Result<NoteMetadata, String> {
+    let settings = get_settings();
+    let notes_dir = get_resolved_notes_dir(settings.custom_notes_dir.as_deref());
+    let trash_dir = get_trash_dir(settings.custom_notes_dir.as_deref());
+    let src_path = trash_dir.join(&filename);
+    let dest_path = notes_dir.join(&filename);
+
+    if !src_path.exists() {
+        return Err("Trashed note not found".to_string());
+    }
+
+    fs::rename(&src_path, &dest_path).map_err(|e| e.to_string())?;
+
+    let content = fs::read_to_string(&dest_path).map_err(|e| e.to_string())?;
+    let title = extract_title_from_content(&content);
+    let (updated_at, created_at) = get_file_timestamps(&dest_path);
+    let character_count = content.chars().count();
+    let id = filename.trim_end_matches(".md").to_string();
+    let is_pinned = filename.starts_with("pin_");
+
+    Ok(NoteMetadata {
+        id,
+        filename,
+        title,
+        content,
+        updated_at,
+        created_at,
+        character_count,
+        is_pinned,
+    })
+}
+
+#[tauri::command]
+fn permanently_delete_note(filename: String) -> Result<(), String> {
+    let settings = get_settings();
+    let trash_dir = get_trash_dir(settings.custom_notes_dir.as_deref());
+    let path = trash_dir.join(&filename);
     if path.exists() {
         fs::remove_file(path).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn empty_trash() -> Result<(), String> {
+    let settings = get_settings();
+    let trash_dir = get_trash_dir(settings.custom_notes_dir.as_deref());
+    if let Ok(entries) = fs::read_dir(&trash_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() {
+                let _ = fs::remove_file(path);
+            }
+        }
     }
     Ok(())
 }
@@ -564,6 +674,10 @@ pub fn run() {
             read_note,
             save_note,
             delete_note,
+            list_trashed_notes,
+            restore_note,
+            permanently_delete_note,
+            empty_trash,
             set_window_always_on_top,
             minimize_window,
             close_window,

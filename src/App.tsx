@@ -57,6 +57,14 @@ export function App() {
   const quickSwitcherIndexRef = useRef(0);
   const quickSwitcherNotesRef = useRef<NoteMetadata[]>([]);
 
+  // Toast / Undo notification state
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    message: string;
+    undoNote?: NoteMetadata | null;
+  }>({ visible: false, message: "", undoNote: null });
+  const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Editor refs
   const editorRef = useRef<EditorHandle>(null);
   const [tiptapInstance, setTiptapInstance] = useState<any>(null);
@@ -224,9 +232,9 @@ export function App() {
     }
   };
 
-  // Delete Note
-  const handleDeleteNote = async (note: NoteMetadata, e: React.MouseEvent) => {
-    e.stopPropagation();
+  // Delete Note (move to trash)
+  const handleDeleteNote = async (note: NoteMetadata, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     try {
       await api.deleteNote(note.filename);
       const remaining = notes.filter((n) => n.filename !== note.filename);
@@ -240,8 +248,48 @@ export function App() {
           handleNewNote();
         }
       }
+
+      // Show Undo Toast
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current);
+      }
+      setToast({
+        visible: true,
+        message: `Moved "${note.title || "Untitled"}" to Trash`,
+        undoNote: note,
+      });
+      toastTimeoutRef.current = setTimeout(() => {
+        setToast({ visible: false, message: "", undoNote: null });
+      }, 5000);
     } catch (err) {
       console.error("Failed to delete note:", err);
+    }
+  };
+
+  // Restore Note from Trash
+  const handleRestoreNote = (restoredNote: NoteMetadata) => {
+    setNotes((prev) => {
+      const exists = prev.some((n) => n.id === restoredNote.id);
+      if (exists) return prev;
+      const updated = [restoredNote, ...prev];
+      return updated.sort(
+        (a, b) =>
+          (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0) ||
+          b.updated_at - a.updated_at
+      );
+    });
+    handleSelectNote(restoredNote);
+  };
+
+  // Undo Delete
+  const handleUndoDelete = async () => {
+    if (!toast.undoNote) return;
+    try {
+      const restored = await api.restoreNote(toast.undoNote.filename);
+      handleRestoreNote(restored);
+      setToast({ visible: false, message: "", undoNote: null });
+    } catch (err) {
+      console.error("Failed to undo delete:", err);
     }
   };
 
@@ -548,8 +596,30 @@ export function App() {
         onSelectNote={handleSelectNote}
         onTogglePin={handleTogglePinNote}
         onDeleteNote={handleDeleteNote}
+        onRestoreNote={handleRestoreNote}
         onClose={() => setIsNoteSwitcherOpen(false)}
       />
+
+      {/* Undo Toast Notification */}
+      {toast.visible && (
+        <div className="fixed bottom-12 right-6 z-50 animate-in slide-in-from-bottom-3 duration-150 flex items-center space-x-3 bg-[#1E2532] border border-[#2F3949] text-white px-4 py-2.5 rounded-xl shadow-2xl">
+          <span className="text-xs text-gray-200">{toast.message}</span>
+          {toast.undoNote && (
+            <button
+              onClick={handleUndoDelete}
+              className="text-xs font-semibold text-[var(--accent-color,#0399F7)] hover:underline focus:outline-none"
+            >
+              Undo
+            </button>
+          )}
+          <button
+            onClick={() => setToast({ visible: false, message: "", undoNote: null })}
+            className="text-gray-400 hover:text-white p-0.5 ml-1 focus:outline-none text-xs"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Command Actions Palette Modal */}
       <CommandPalette

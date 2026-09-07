@@ -157,8 +157,63 @@ export const api = {
       await invokeTauri("delete_note", { filename });
     } catch {
       let list = await this.listNotes();
+      const trashed = list.find((n) => n.filename === filename);
       list = list.filter((n) => n.filename !== filename);
       localStorage.setItem(STORAGE_KEY_NOTES, JSON.stringify(list));
+
+      if (trashed) {
+        const trashKey = "kenote_trash_mock";
+        const trashList = JSON.parse(localStorage.getItem(trashKey) || "[]");
+        trashList.unshift(trashed);
+        localStorage.setItem(trashKey, JSON.stringify(trashList));
+      }
+    }
+  },
+
+  async listTrashedNotes(): Promise<NoteMetadata[]> {
+    try {
+      return await invokeTauri<NoteMetadata[]>("list_trashed_notes");
+    } catch {
+      const trashKey = "kenote_trash_mock";
+      return JSON.parse(localStorage.getItem(trashKey) || "[]");
+    }
+  },
+
+  async restoreNote(filename: string): Promise<NoteMetadata> {
+    try {
+      return await invokeTauri<NoteMetadata>("restore_note", { filename });
+    } catch {
+      const trashKey = "kenote_trash_mock";
+      let trashList: NoteMetadata[] = JSON.parse(localStorage.getItem(trashKey) || "[]");
+      const note = trashList.find((n) => n.filename === filename);
+      if (!note) throw new Error("Trashed note not found");
+
+      trashList = trashList.filter((n) => n.filename !== filename);
+      localStorage.setItem(trashKey, JSON.stringify(trashList));
+
+      let list = await this.listNotes();
+      list.unshift(note);
+      localStorage.setItem(STORAGE_KEY_NOTES, JSON.stringify(list));
+      return note;
+    }
+  },
+
+  async permanentlyDeleteNote(filename: string): Promise<void> {
+    try {
+      await invokeTauri("permanently_delete_note", { filename });
+    } catch {
+      const trashKey = "kenote_trash_mock";
+      let trashList: NoteMetadata[] = JSON.parse(localStorage.getItem(trashKey) || "[]");
+      trashList = trashList.filter((n) => n.filename !== filename);
+      localStorage.setItem(trashKey, JSON.stringify(trashList));
+    }
+  },
+
+  async emptyTrash(): Promise<void> {
+    try {
+      await invokeTauri("empty_trash");
+    } catch {
+      localStorage.setItem("kenote_trash_mock", "[]");
     }
   },
 
