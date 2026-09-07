@@ -43,6 +43,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
     },
     ref
   ) => {
+    const cursorSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     const editor = useEditor({
@@ -89,29 +90,41 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
           style: `font-size: ${fontSize}; line-height: ${lineHeight}; font-family: ${fontFamily};`,
         },
       },
+      onSelectionUpdate: ({ editor: ed }) => {
+        if (!noteId || !ed) return;
+        if (cursorSaveTimeoutRef.current) {
+          clearTimeout(cursorSaveTimeoutRef.current);
+        }
+        cursorSaveTimeoutRef.current = setTimeout(() => {
+          try {
+            const { from, to } = ed.state.selection;
+            const key = "kenote_cursor_positions";
+            const current = JSON.parse(localStorage.getItem(key) || "{}");
+            current[noteId] = { from, to };
+            localStorage.setItem(key, JSON.stringify(current));
+          } catch {}
+        }, 150);
+      },
       onUpdate: ({ editor: ed }) => {
-        if (debounceTimerRef.current) {
-          clearTimeout(debounceTimerRef.current);
+        if (!ed || ed.isDestroyed) return;
+
+        // Immediate live text and character count updates for responsive UI
+        const text = ed.getText();
+        const charCount = text.length;
+
+        let firstLineTitle = "Untitled";
+        const lines = text.split("\n");
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.length > 0) {
+            firstLineTitle = trimmed;
+            break;
+          }
         }
 
-        debounceTimerRef.current = setTimeout(() => {
-          if (!ed || ed.isDestroyed) return;
-          const markdown = (ed.storage as any).markdown?.getMarkdown() || "";
-          const text = ed.getText();
-          const charCount = text.length;
-
-          let firstLineTitle = "Untitled";
-          const lines = text.split("\n");
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (trimmed.length > 0) {
-              firstLineTitle = trimmed;
-              break;
-            }
-          }
-
-          onChange(markdown, charCount, firstLineTitle);
-        }, 150);
+        // Immediately update character count & title in UI
+        const currentMarkdown = (ed.storage as any).markdown?.getMarkdown() || "";
+        onChange(currentMarkdown, charCount, firstLineTitle);
       },
     });
 
@@ -120,25 +133,63 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
         if (debounceTimerRef.current) {
           clearTimeout(debounceTimerRef.current);
         }
+        if (cursorSaveTimeoutRef.current) {
+          clearTimeout(cursorSaveTimeoutRef.current);
+        }
       };
     }, []);
 
+    // Function to restore cursor position for note
+    const restoreCursor = (currentNoteId: string, ed: any) => {
+      if (!ed || ed.isDestroyed) return;
+      try {
+        const key = "kenote_cursor_positions";
+        const savedMap = JSON.parse(localStorage.getItem(key) || "{}");
+        const savedPos = savedMap[currentNoteId];
+        const docSize = ed.state.doc.content.size;
+
+        if (savedPos && typeof savedPos.from === "number") {
+          const from = Math.min(Math.max(1, savedPos.from), docSize);
+          const to = Math.min(Math.max(from, savedPos.to ?? from), docSize);
+          ed.commands.setTextSelection({ from, to });
+          ed.commands.scrollIntoView();
+        }
+      } catch {}
+    };
+
+    // Restore cursor position when editor is initialized
+    useEffect(() => {
+      if (editor && noteId) {
+        const timer = setTimeout(() => {
+          restoreCursor(noteId, editor);
+        }, 20);
+        return () => clearTimeout(timer);
+      }
+    }, [editor, noteId]);
+
     useEffect(() => {
       if (editor && onEditorReady) {
-        queueMicrotask(() => {
+        const timer = setTimeout(() => {
           onEditorReady(editor);
-        });
+        }, 0);
+        return () => clearTimeout(timer);
       }
     }, [editor, onEditorReady]);
 
-    // Only set content when actually switching to a different note
+    // Only set content and restore cursor when actually switching to a different note
     const prevNoteIdRef = useRef<string | null | undefined>(noteId);
     useEffect(() => {
       if (!editor || !noteId) return;
 
       if (prevNoteIdRef.current !== noteId) {
         prevNoteIdRef.current = noteId;
-        editor.commands.setContent(initialContent || "", false);
+        const timer = setTimeout(() => {
+          if (!editor.isDestroyed) {
+            editor.commands.setContent(initialContent || "", false);
+            restoreCursor(noteId, editor);
+          }
+        }, 0);
+        return () => clearTimeout(timer);
       }
     }, [noteId, initialContent, editor]);
 

@@ -1,3 +1,4 @@
+
 # Kenote 🚀
 
 > A minimal, lightning-fast, local-first Raycast-inspired markdown note-taking app for Windows, macOS, and Linux built with **Tauri v2**, **React**, **TypeScript**, and **Tailwind CSS**.
@@ -36,15 +37,15 @@
 
 ## ⌨️ Keyboard Shortcuts
 
-| Shortcut | Action |
-| --- | --- |
-| `Ctrl + N` | Create New Note |
-| `Ctrl + O` | Browse Notes Switcher |
-| `Ctrl + K` | Open Actions / Command Palette |
-| `Ctrl + P` | Toggle Pin Always On Top |
-| `Ctrl + ,` | Open Settings |
-| `Ctrl + Shift + C` | Copy Note as Markdown |
-| `Esc` | Close any open modal |
+| Shortcut             | Action                         |
+| -------------------- | ------------------------------ |
+| `Ctrl + N`         | Create New Note                |
+| `Ctrl + O`         | Browse Notes Switcher          |
+| `Ctrl + K`         | Open Actions / Command Palette |
+| `Ctrl + P`         | Toggle Pin Always On Top       |
+| `Ctrl + ,`         | Open Settings                  |
+| `Ctrl + Shift + C` | Copy Note as Markdown          |
+| `Esc`              | Close any open modal           |
 
 ---
 
@@ -61,20 +62,24 @@
 ## 🚀 Development & Build
 
 ### Prerequisites
+
 - [Node.js](https://nodejs.org) (v18+) & [pnpm](https://pnpm.io)
 - [Rust](https://rustup.rs)
 
 ### Install Dependencies
+
 ```bash
 pnpm install
 ```
 
 ### Run in Development
+
 ```bash
 pnpm tauri dev
 ```
 
 ### Build Production Executable / Installer
+
 ```bash
 pnpm tauri build
 ```

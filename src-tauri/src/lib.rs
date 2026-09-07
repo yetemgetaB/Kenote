@@ -25,6 +25,18 @@ pub struct AppSettings {
     pub line_height: String,
     pub auto_save_interval: u32,
     pub always_on_top: bool,
+    #[serde(default)]
+    pub startup_behavior: Option<String>,
+    #[serde(default)]
+    pub startup_specific_note_id: Option<String>,
+    #[serde(default)]
+    pub last_active_note_id: Option<String>,
+    #[serde(default)]
+    pub quick_switcher_mode: Option<String>,
+    #[serde(default)]
+    pub quick_switcher_order: Option<String>,
+    #[serde(default)]
+    pub quick_switcher_shortcut: Option<String>,
     pub window_width: Option<f64>,
     pub window_height: Option<f64>,
     pub window_x: Option<i32>,
@@ -43,6 +55,12 @@ impl Default for AppSettings {
             line_height: "1.6".to_string(),
             auto_save_interval: 500,
             always_on_top: false,
+            startup_behavior: Some("last".to_string()),
+            startup_specific_note_id: None,
+            last_active_note_id: None,
+            quick_switcher_mode: Some("overlay".to_string()),
+            quick_switcher_order: Some("mru".to_string()),
+            quick_switcher_shortcut: Some("ctrl_tab".to_string()),
             window_width: Some(520.0),
             window_height: Some(720.0),
             window_x: None,

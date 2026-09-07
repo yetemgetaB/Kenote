@@ -17,6 +17,12 @@ export interface AppSettings {
   line_height: string;
   auto_save_interval: number;
   always_on_top: boolean;
+  startup_behavior?: "last" | "new" | "specific";
+  startup_specific_note_id?: string | null;
+  last_active_note_id?: string | null;
+  quick_switcher_mode?: "overlay" | "instant" | "disabled";
+  quick_switcher_order?: "mru" | "pinned_updated";
+  quick_switcher_shortcut?: "ctrl_tab" | "alt_tab" | "ctrl_pagedown";
   window_width?: number;
   window_height?: number;
   window_x?: number;

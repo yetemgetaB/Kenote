@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { AppSettings, COLOR_PRESETS } from "../types/note";
+import { AppSettings, COLOR_PRESETS, NoteMetadata } from "../types/note";
 import { CloseIcon, FolderIcon, CheckIcon } from "./Icons";
 import { api } from "../utils/tauriBridge";
 import appIconUrl from "../assets/app-icon.png";
@@ -10,6 +10,7 @@ interface SettingsModalProps {
   settings: AppSettings;
   onUpdateSettings: (newSettings: AppSettings) => void;
   notesDir: string;
+  notes?: NoteMetadata[];
 }
 
 type TabType = "appearance" | "storage" | "about";
@@ -29,12 +30,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   settings,
   onUpdateSettings,
   notesDir,
+  notes = [],
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>("appearance");
   const [accentColor, setAccentColor] = useState(settings.accent_color);
   const [fontSize, setFontSize] = useState(settings.font_size);
   const [lineHeight, setLineHeight] = useState(settings.line_height);
   const [fontFamily, setFontFamily] = useState(settings.font_family);
+  const [startupBehavior, setStartupBehavior] = useState<"last" | "new" | "specific">(
+    settings.startup_behavior || "last"
+  );
+  const [startupSpecificNoteId, setStartupSpecificNoteId] = useState<string | null>(
+    settings.startup_specific_note_id || null
+  );
+  const [quickSwitcherMode, setQuickSwitcherMode] = useState<"overlay" | "instant" | "disabled">(
+    settings.quick_switcher_mode || "overlay"
+  );
+  const [quickSwitcherOrder, setQuickSwitcherOrder] = useState<"mru" | "pinned_updated">(
+    settings.quick_switcher_order || "mru"
+  );
+  const [quickSwitcherShortcut, setQuickSwitcherShortcut] = useState<"ctrl_tab" | "alt_tab" | "ctrl_pagedown">(
+    settings.quick_switcher_shortcut || "ctrl_tab"
+  );
 
   // Update check states
   const [checkingUpdate, setCheckingUpdate] = useState(false);
@@ -44,6 +61,39 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const currentVersion = "0.3.3";
 
   if (!isOpen) return null;
+
+  const handleSaveStartupBehavior = (
+    behavior: "last" | "new" | "specific",
+    specificNoteId: string | null = startupSpecificNoteId
+  ) => {
+    setStartupBehavior(behavior);
+    setStartupSpecificNoteId(specificNoteId);
+    const updated: AppSettings = {
+      ...settings,
+      startup_behavior: behavior,
+      startup_specific_note_id: specificNoteId,
+    };
+    onUpdateSettings(updated);
+    api.saveSettings(updated);
+  };
+
+  const handleSaveQuickSwitcher = (
+    mode: "overlay" | "instant" | "disabled",
+    order: "mru" | "pinned_updated",
+    shortcut: "ctrl_tab" | "alt_tab" | "ctrl_pagedown"
+  ) => {
+    setQuickSwitcherMode(mode);
+    setQuickSwitcherOrder(order);
+    setQuickSwitcherShortcut(shortcut);
+    const updated: AppSettings = {
+      ...settings,
+      quick_switcher_mode: mode,
+      quick_switcher_order: order,
+      quick_switcher_shortcut: shortcut,
+    };
+    onUpdateSettings(updated);
+    api.saveSettings(updated);
+  };
 
   const handleSaveColor = (color: string) => {
     setAccentColor(color);
@@ -284,6 +334,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <kbd className="font-mono bg-[#161B22] px-1.5 py-0.5 rounded border border-[#2B3340] text-gray-300">Ctrl + K</kbd>
                   </div>
                   <div className="flex justify-between py-0.5">
+                    <span className="text-gray-400">Next / Previous Note</span>
+                    <kbd className="font-mono bg-[#161B22] px-1.5 py-0.5 rounded border border-[#2B3340] text-gray-300">Ctrl + (Shift) + Tab</kbd>
+                  </div>
+                  <div className="flex justify-between py-0.5">
                     <span className="text-gray-400">Toggle Always on Top</span>
                     <kbd className="font-mono bg-[#161B22] px-1.5 py-0.5 rounded border border-[#2B3340] text-gray-300">Ctrl + P</kbd>
                   </div>
@@ -356,6 +410,114 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <option value="1.8">1.8 - Relaxed</option>
                     </select>
                   </div>
+                </div>
+              </section>
+
+              {/* Startup & Launch Behavior */}
+              <section className="space-y-3 border-t border-[#2A3240] pt-4">
+                <label className="text-xs font-semibold text-white uppercase tracking-wider">
+                  Startup Note Behavior
+                </label>
+                <div className="space-y-2">
+                  <div>
+                    <span className="text-[11px] text-gray-400 block mb-1">When Kenote starts</span>
+                    <select
+                      value={startupBehavior}
+                      onChange={(e) => {
+                        const val = e.target.value as "last" | "new" | "specific";
+                        const targetId = val === "specific" && !startupSpecificNoteId && notes.length > 0 ? notes[0].id : startupSpecificNoteId;
+                        handleSaveStartupBehavior(val, targetId);
+                      }}
+                      className="w-full bg-[#171C24] border border-[#2B3340] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none"
+                    >
+                      <option value="last">Open Last Active Note (Default)</option>
+                      <option value="new">Always Create a New Scratch Note</option>
+                      <option value="specific">Always Open a Specific Note</option>
+                    </select>
+                  </div>
+
+                  {startupBehavior === "specific" && (
+                    <div className="pt-1">
+                      <span className="text-[11px] text-gray-400 block mb-1">Choose note to open</span>
+                      <select
+                        value={startupSpecificNoteId || (notes[0]?.id || "")}
+                        onChange={(e) => handleSaveStartupBehavior("specific", e.target.value)}
+                        className="w-full bg-[#171C24] border border-[#2B3340] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none"
+                      >
+                        {notes.map((note) => (
+                          <option key={note.id} value={note.id}>
+                            {note.title || "Untitled"}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* Quick Note Switcher Configuration */}
+              <section className="space-y-3 border-t border-[#2A3240] pt-4">
+                <label className="text-xs font-semibold text-white uppercase tracking-wider">
+                  Quick Note Switcher
+                </label>
+                <div className="space-y-3">
+                  <div>
+                    <span className="text-[11px] text-gray-400 block mb-1">Switcher Shortcut Key</span>
+                    <select
+                      value={quickSwitcherShortcut}
+                      onChange={(e) =>
+                        handleSaveQuickSwitcher(
+                          quickSwitcherMode,
+                          quickSwitcherOrder,
+                          e.target.value as "ctrl_tab" | "alt_tab" | "ctrl_pagedown"
+                        )
+                      }
+                      className="w-full bg-[#171C24] border border-[#2B3340] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none"
+                    >
+                      <option value="ctrl_tab">Ctrl + Tab (Default / Browser Standard)</option>
+                      <option value="alt_tab">Alt + Tab (Windows HUD Style)</option>
+                      <option value="ctrl_pagedown">Ctrl + PageDown / PageUp</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <span className="text-[11px] text-gray-400 block mb-1">Switching Behavior</span>
+                    <select
+                      value={quickSwitcherMode}
+                      onChange={(e) =>
+                        handleSaveQuickSwitcher(
+                          e.target.value as "overlay" | "instant" | "disabled",
+                          quickSwitcherOrder,
+                          quickSwitcherShortcut
+                        )
+                      }
+                      className="w-full bg-[#171C24] border border-[#2B3340] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none"
+                    >
+                      <option value="overlay">Visual Preview Overlay (Alt+Tab Card Deck)</option>
+                      <option value="instant">Instant Direct Switch (No Popup)</option>
+                      <option value="disabled">Disabled</option>
+                    </select>
+                  </div>
+
+                  {quickSwitcherMode !== "disabled" && (
+                    <div>
+                      <span className="text-[11px] text-gray-400 block mb-1">Cycle Order</span>
+                      <select
+                        value={quickSwitcherOrder}
+                        onChange={(e) =>
+                          handleSaveQuickSwitcher(
+                            quickSwitcherMode,
+                            e.target.value as "mru" | "pinned_updated",
+                            quickSwitcherShortcut
+                          )
+                        }
+                        className="w-full bg-[#171C24] border border-[#2B3340] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none"
+                      >
+                        <option value="mru">Most Recently Used (MRU)</option>
+                        <option value="pinned_updated">Default List Order (Pinned & Date)</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
               </section>
             </div>

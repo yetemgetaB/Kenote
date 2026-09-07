@@ -3,6 +3,7 @@ import { Titlebar } from "./components/Titlebar";
 import { Editor, EditorHandle } from "./components/Editor";
 import { BottomToolbar } from "./components/BottomToolbar";
 import { NoteSwitcher } from "./components/NoteSwitcher";
+import { QuickSwitcherOverlay } from "./components/QuickSwitcherOverlay";
 import { CommandPalette, ActionItem } from "./components/CommandPalette";
 import { SettingsModal } from "./components/SettingsModal";
 import { WelcomeModal } from "./components/WelcomeModal";
@@ -33,15 +34,28 @@ export function App() {
     line_height: "1.6",
     auto_save_interval: 500,
     always_on_top: false,
+    quick_switcher_mode: "overlay",
+    quick_switcher_order: "mru",
+    quick_switcher_shortcut: "ctrl_tab",
   });
   const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(false);
   const [notesDir, setNotesDir] = useState("");
+
+  // MRU Note history
+  const [recentNoteIds, setRecentNoteIds] = useState<string[]>([]);
 
   // Modals state
   const [isNoteSwitcherOpen, setIsNoteSwitcherOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
+
+  // Quick Switcher HUD state
+  const [isQuickSwitcherOpen, setIsQuickSwitcherOpen] = useState(false);
+  const [quickSwitcherIndex, setQuickSwitcherIndex] = useState(0);
+  const isQuickSwitcherOpenRef = useRef(false);
+  const quickSwitcherIndexRef = useRef(0);
+  const quickSwitcherNotesRef = useRef<NoteMetadata[]>([]);
 
   // Editor refs
   const editorRef = useRef<EditorHandle>(null);
@@ -69,11 +83,33 @@ export function App() {
         const loadedNotes = await api.listNotes();
         setNotes(loadedNotes);
 
+        const startupMode = loadedSettings.startup_behavior || "last";
+
         if (loadedNotes.length > 0) {
-          const firstNote = loadedNotes[0];
-          setActiveNote(firstNote);
-          setActiveTitle(firstNote.title);
-          setCharacterCount(firstNote.character_count);
+          let targetNote: NoteMetadata | undefined;
+
+          if (startupMode === "new") {
+            // User requested to open a brand new note on launch
+            await handleNewNote();
+            return;
+          } else if (startupMode === "specific" && loadedSettings.startup_specific_note_id) {
+            targetNote = loadedNotes.find(
+              (n) => n.id === loadedSettings.startup_specific_note_id
+            );
+          } else if (startupMode === "last" && loadedSettings.last_active_note_id) {
+            targetNote = loadedNotes.find(
+              (n) => n.id === loadedSettings.last_active_note_id
+            );
+          }
+
+          // Fallback to first available note if specific/last wasn't found
+          if (!targetNote) {
+            targetNote = loadedNotes[0];
+          }
+
+          setActiveNote(targetNote);
+          setActiveTitle(targetNote.title);
+          setCharacterCount(targetNote.character_count);
         } else {
           // Create initial empty note
           handleNewNote();
@@ -138,6 +174,12 @@ export function App() {
       setActiveNote(newNote);
       setActiveTitle("Untitled");
       setCharacterCount(0);
+
+      // Track last active note in settings
+      const updated = { ...settings, last_active_note_id: newNote.id };
+      setSettings(updated);
+      api.saveSettings(updated);
+
       setTimeout(() => editorRef.current?.focus(), 50);
     } catch (e) {
       console.error("Failed to create new note:", e);
@@ -149,6 +191,15 @@ export function App() {
     setActiveNote(note);
     setActiveTitle(note.title);
     setCharacterCount(note.character_count);
+
+    // Update MRU list
+    setRecentNoteIds((prev) => [note.id, ...prev.filter((id) => id !== note.id)]);
+
+    // Track last active note in settings
+    const updated = { ...settings, last_active_note_id: note.id };
+    setSettings(updated);
+    api.saveSettings(updated);
+
     setTimeout(() => editorRef.current?.focus(), 50);
   };
 
@@ -180,6 +231,7 @@ export function App() {
       await api.deleteNote(note.filename);
       const remaining = notes.filter((n) => n.filename !== note.filename);
       setNotes(remaining);
+      setRecentNoteIds((prev) => prev.filter((id) => id !== note.id));
 
       if (activeNote?.filename === note.filename) {
         if (remaining.length > 0) {
@@ -209,12 +261,107 @@ export function App() {
     applyAccentColor(newSettings.accent_color);
   };
 
-  // Global Keyboard Shortcuts
+  // Prepare ordered notes for Quick Switcher (MRU or Default list order)
+  const getOrderedNotes = useCallback(() => {
+    if (settings.quick_switcher_order === "pinned_updated") {
+      return notes;
+    }
+    // MRU Order
+    const mruNotes: NoteMetadata[] = [];
+    const notesMap = new Map(notes.map((n) => [n.id, n]));
+
+    for (const id of recentNoteIds) {
+      const note = notesMap.get(id);
+      if (note) {
+        mruNotes.push(note);
+        notesMap.delete(id);
+      }
+    }
+    // Add any remaining notes not yet in MRU history
+    for (const remaining of notesMap.values()) {
+      mruNotes.push(remaining);
+    }
+    return mruNotes;
+  }, [notes, recentNoteIds, settings.quick_switcher_order]);
+
+  // Global Keyboard Shortcuts & Quick Switcher modifier release
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Check if Ctrl or Cmd is pressed
       const isCmdOrCtrl = e.ctrlKey || e.metaKey;
+      const isAlt = e.altKey;
+      const shortcutConfig = settings.quick_switcher_shortcut || "ctrl_tab";
+      const switcherMode = settings.quick_switcher_mode || "overlay";
 
+      // 1. Check if quick switcher shortcut key is pressed
+      let isSwitcherShortcut = false;
+      if (switcherMode !== "disabled") {
+        if (shortcutConfig === "ctrl_tab" && isCmdOrCtrl && e.key === "Tab") {
+          isSwitcherShortcut = true;
+        } else if (shortcutConfig === "alt_tab" && isAlt && e.key === "Tab") {
+          isSwitcherShortcut = true;
+        } else if (
+          shortcutConfig === "ctrl_pagedown" &&
+          isCmdOrCtrl &&
+          (e.key === "PageDown" || e.key === "PageUp")
+        ) {
+          isSwitcherShortcut = true;
+        }
+      }
+
+      if (isSwitcherShortcut && notes.length > 1) {
+        e.preventDefault();
+
+        const ordered = getOrderedNotes();
+        quickSwitcherNotesRef.current = ordered;
+
+        if (switcherMode === "instant") {
+          const currentIndex = ordered.findIndex((n) => n.id === activeNote?.id);
+          const isReverse = e.shiftKey || e.key === "PageUp";
+          let nextIdx = 0;
+          if (isReverse) {
+            nextIdx = currentIndex > 0 ? currentIndex - 1 : ordered.length - 1;
+          } else {
+            nextIdx = currentIndex >= 0 && currentIndex < ordered.length - 1 ? currentIndex + 1 : 0;
+          }
+          if (ordered[nextIdx]) {
+            handleSelectNote(ordered[nextIdx]);
+          }
+          return;
+        }
+
+        // Overlay Mode
+        const isReverse = e.shiftKey || e.key === "PageUp";
+        if (!isQuickSwitcherOpenRef.current) {
+          // Open overlay, start at second item (the last visited note in MRU) or first
+          isQuickSwitcherOpenRef.current = true;
+          setIsQuickSwitcherOpen(true);
+          const startIdx = isReverse ? ordered.length - 1 : Math.min(1, ordered.length - 1);
+          quickSwitcherIndexRef.current = startIdx;
+          setQuickSwitcherIndex(startIdx);
+        } else {
+          // Cycle index
+          const cur = quickSwitcherIndexRef.current;
+          let nextIdx: number;
+          if (isReverse) {
+            nextIdx = (cur - 1 + ordered.length) % ordered.length;
+          } else {
+            nextIdx = (cur + 1) % ordered.length;
+          }
+          quickSwitcherIndexRef.current = nextIdx;
+          setQuickSwitcherIndex(nextIdx);
+        }
+        return;
+      }
+
+      // 2. Escape cancels quick switcher overlay
+      if (e.key === "Escape" && isQuickSwitcherOpenRef.current) {
+        e.preventDefault();
+        isQuickSwitcherOpenRef.current = false;
+        setIsQuickSwitcherOpen(false);
+        return;
+      }
+
+      // Other Standard Shortcuts
       if (isCmdOrCtrl && e.key.toLowerCase() === "n") {
         e.preventDefault();
         handleNewNote();
@@ -239,9 +386,34 @@ export function App() {
       }
     };
 
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (!isQuickSwitcherOpenRef.current) return;
+
+      const shortcutConfig = settings.quick_switcher_shortcut || "ctrl_tab";
+      const isModifierReleased =
+        (shortcutConfig === "ctrl_tab" && (e.key === "Control" || e.key === "Meta")) ||
+        (shortcutConfig === "alt_tab" && e.key === "Alt") ||
+        (shortcutConfig === "ctrl_pagedown" && (e.key === "Control" || e.key === "Meta"));
+
+      if (isModifierReleased) {
+        isQuickSwitcherOpenRef.current = false;
+        setIsQuickSwitcherOpen(false);
+
+        const currentList = quickSwitcherNotesRef.current;
+        const targetNote = currentList[quickSwitcherIndexRef.current];
+        if (targetNote) {
+          handleSelectNote(targetNote);
+        }
+      }
+    };
+
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isAlwaysOnTop, notes, activeNote, settings]);
+    window.addEventListener("keyup", handleKeyUp);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, [isAlwaysOnTop, notes, activeNote, settings, getOrderedNotes]);
 
   // Actions for Command Palette
   const actions: ActionItem[] = [
@@ -347,6 +519,27 @@ export function App() {
         characterCount={characterCount}
       />
 
+      {/* Quick Switcher HUD / Overlay */}
+      <QuickSwitcherOverlay
+        isOpen={isQuickSwitcherOpen}
+        notes={quickSwitcherNotesRef.current.length > 0 ? quickSwitcherNotesRef.current : notes}
+        selectedIndex={quickSwitcherIndex}
+        onSelectIndex={(idx) => {
+          setQuickSwitcherIndex(idx);
+          quickSwitcherIndexRef.current = idx;
+          const targetNote = (quickSwitcherNotesRef.current.length > 0 ? quickSwitcherNotesRef.current : notes)[idx];
+          if (targetNote) {
+            handleSelectNote(targetNote);
+          }
+          setIsQuickSwitcherOpen(false);
+          isQuickSwitcherOpenRef.current = false;
+        }}
+        onClose={() => {
+          setIsQuickSwitcherOpen(false);
+          isQuickSwitcherOpenRef.current = false;
+        }}
+      />
+
       {/* Note Switcher Modal */}
       <NoteSwitcher
         isOpen={isNoteSwitcherOpen}
@@ -374,6 +567,7 @@ export function App() {
         settings={settings}
         onUpdateSettings={handleUpdateSettings}
         notesDir={notesDir}
+        notes={notes}
       />
 
       {/* First-Run Welcome Screen */}
