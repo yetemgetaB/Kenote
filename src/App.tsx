@@ -113,10 +113,11 @@ export function App() {
       clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = null;
     }
-    if (pendingSaveRef.current) {
-      const { filename, markdown, isPinned } = pendingSaveRef.current;
+    const current = activeNoteRef.current;
+    if (hasUnsavedChangesRef.current && current) {
+      const markdown = editorRef.current?.getMarkdown() ?? current.content ?? "";
       try {
-        const saved = await api.saveNote(filename, markdown, isPinned);
+        const saved = await api.saveNote(current.filename, markdown, current.is_pinned);
         pendingSaveRef.current = null;
         hasUnsavedChangesRef.current = false;
         setSaveStatus("saved");
@@ -175,7 +176,7 @@ export function App() {
 
   // Save current note changes with debounce
   const handleEditorChange = useCallback(
-    (markdown: string, charCount: number, firstLineTitle: string) => {
+    (charCount: number, firstLineTitle: string) => {
       setActiveTitle(firstLineTitle);
       setCharacterCount(charCount);
       hasUnsavedChangesRef.current = true;
@@ -185,7 +186,7 @@ export function App() {
       if (current) {
         pendingSaveRef.current = {
           filename: current.filename,
-          markdown,
+          markdown: "",
           isPinned: current.is_pinned,
         };
       }
@@ -198,6 +199,7 @@ export function App() {
         const target = activeNoteRef.current;
         if (!target) return;
 
+        const markdown = editorRef.current?.getMarkdown() ?? target.content ?? "";
         try {
           const saved = await api.saveNote(
             target.filename,
@@ -450,9 +452,10 @@ export function App() {
   // Beforeunload handler to flush saves and persist window state
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (pendingSaveRef.current) {
-        const { filename, markdown, isPinned } = pendingSaveRef.current;
-        api.saveNote(filename, markdown, isPinned).catch(() => {});
+      const current = activeNoteRef.current;
+      if (hasUnsavedChangesRef.current && current) {
+        const markdown = editorRef.current?.getMarkdown() ?? current.content ?? "";
+        api.saveNote(current.filename, markdown, current.is_pinned).catch(() => {});
       }
       api.saveWindowState().catch(() => {});
     };

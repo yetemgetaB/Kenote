@@ -69,6 +69,7 @@ body {
   min-height: 100%;
   color: #DDE3EA;
   user-select: text;
+  caret-color: var(--accent-color, #0399F7);
 }
 
 .ProseMirror p.is-editor-empty:first-child::before {
@@ -110,6 +111,7 @@ body {
   margin-top: 0.4rem;
   margin-bottom: 0.4rem;
   line-height: 1.65;
+  min-height: 1.5em;
 }
 
 .ProseMirror blockquote {

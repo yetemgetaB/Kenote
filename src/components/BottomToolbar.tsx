@@ -7,6 +7,7 @@ import {
   LinkIcon,
   ListIcon,
 } from "./Icons";
+import { toggleSmartBold } from "./Editor";
 
 interface BottomToolbarProps {
   editor: TiptapEditor | null;
@@ -148,7 +149,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
             <div className="absolute bottom-9 left-0 w-36 py-1 bg-[#1E242E] border border-[#2B3340] rounded-lg shadow-xl z-50 animate-in fade-in zoom-in-95 duration-100">
               <button
                 onClick={() => {
-                  editor.chain().focus().toggleBold().run();
+                  toggleSmartBold(editor);
                   setShowTextMenu(false);
                 }}
                 className={`w-full px-3 py-1.5 text-left text-xs hover:bg-[#2A3240] hover:text-white flex items-center justify-between ${
