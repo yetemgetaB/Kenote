@@ -104,6 +104,44 @@ fn get_trash_dir(custom_dir: Option<&str>) -> PathBuf {
     trash_dir
 }
 
+#[derive(Debug, Serialize, Deserialize, Default, Clone)]
+pub struct NotesMetadataIndex {
+    #[serde(default)]
+    pub pinned: std::collections::HashMap<String, bool>,
+}
+
+fn get_metadata_index_path(notes_dir: &Path) -> PathBuf {
+    notes_dir.join(".metadata.json")
+}
+
+fn load_metadata_index(notes_dir: &Path) -> NotesMetadataIndex {
+    let path = get_metadata_index_path(notes_dir);
+    if path.exists() {
+        if let Ok(content) = fs::read_to_string(&path) {
+            if let Ok(index) = serde_json::from_str::<NotesMetadataIndex>(&content) {
+                return index;
+            }
+        }
+    }
+    NotesMetadataIndex::default()
+}
+
+fn save_metadata_index(notes_dir: &Path, index: &NotesMetadataIndex) -> Result<(), String> {
+    let path = get_metadata_index_path(notes_dir);
+    let json = serde_json::to_string_pretty(index).map_err(|e| e.to_string())?;
+    fs::write(path, json).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn is_note_pinned(filename: &str, index: &NotesMetadataIndex) -> bool {
+    if let Some(&pinned) = index.pinned.get(filename) {
+        pinned
+    } else {
+        // Fallback / migration for legacy filenames
+        filename.starts_with("pin_")
+    }
+}
+
 #[tauri::command]
 fn get_settings() -> AppSettings {
     let path = get_settings_path();
@@ -175,6 +213,7 @@ fn get_file_timestamps(path: &Path) -> (u64, u64) {
 fn list_notes() -> Result<Vec<NoteMetadata>, String> {
     let settings = get_settings();
     let notes_dir = get_resolved_notes_dir(settings.custom_notes_dir.as_deref());
+    let metadata_index = load_metadata_index(&notes_dir);
     let mut notes = Vec::new();
 
     if let Ok(entries) = fs::read_dir(&notes_dir) {
@@ -183,7 +222,7 @@ fn list_notes() -> Result<Vec<NoteMetadata>, String> {
             if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("md") {
                 let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
                 let id = filename.trim_end_matches(".md").to_string();
-                let is_pinned = filename.starts_with("pin_");
+                let is_pinned = is_note_pinned(&filename, &metadata_index);
 
                 if let Ok(content) = fs::read_to_string(&path) {
                     let title = extract_title_from_content(&content);
@@ -223,12 +262,13 @@ fn read_note(filename: String) -> Result<NoteMetadata, String> {
         return Err("Note not found".to_string());
     }
 
+    let metadata_index = load_metadata_index(&notes_dir);
     let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
     let title = extract_title_from_content(&content);
     let (updated_at, created_at) = get_file_timestamps(&path);
     let character_count = content.chars().count();
     let id = filename.trim_end_matches(".md").to_string();
-    let is_pinned = filename.starts_with("pin_");
+    let is_pinned = is_note_pinned(&filename, &metadata_index);
 
     Ok(NoteMetadata {
         id,
@@ -243,43 +283,46 @@ fn read_note(filename: String) -> Result<NoteMetadata, String> {
 }
 
 #[tauri::command]
+fn set_note_pinned(filename: String, is_pinned: bool) -> Result<(), String> {
+    let settings = get_settings();
+    let notes_dir = get_resolved_notes_dir(settings.custom_notes_dir.as_deref());
+    let path = notes_dir.join(&filename);
+
+    if !path.exists() {
+        return Err("Note not found".to_string());
+    }
+
+    let mut metadata_index = load_metadata_index(&notes_dir);
+    if is_pinned {
+        metadata_index.pinned.insert(filename, true);
+    } else {
+        metadata_index.pinned.remove(&filename);
+    }
+    save_metadata_index(&notes_dir, &metadata_index)?;
+    Ok(())
+}
+
+#[tauri::command]
 fn save_note(mut filename: String, content: String, is_pinned: bool) -> Result<NoteMetadata, String> {
     let settings = get_settings();
     let notes_dir = get_resolved_notes_dir(settings.custom_notes_dir.as_deref());
 
     if filename.is_empty() {
         let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S_%3f").to_string();
-        filename = if is_pinned {
-            format!("pin_note_{}.md", timestamp)
-        } else {
-            format!("note_{}.md", timestamp)
-        };
-    } else {
-        // Adjust filename if pin status changed
-        let base_name = if filename.starts_with("pin_") {
-            filename[4..].to_string()
-        } else {
-            filename.clone()
-        };
-
-        let new_filename = if is_pinned {
-            format!("pin_{}", base_name)
-        } else {
-            base_name
-        };
-
-        if new_filename != filename {
-            let old_path = notes_dir.join(&filename);
-            let new_path = notes_dir.join(&new_filename);
-            if old_path.exists() {
-                let _ = fs::rename(&old_path, &new_path);
-            }
-            filename = new_filename;
-        }
+        filename = format!("note_{}.md", timestamp);
     }
 
     let path = notes_dir.join(&filename);
     fs::write(&path, &content).map_err(|e| e.to_string())?;
+
+    // Update metadata index for pin status without renaming the file
+    let mut metadata_index = load_metadata_index(&notes_dir);
+    if is_pinned {
+        metadata_index.pinned.insert(filename.clone(), true);
+    } else {
+        metadata_index.pinned.remove(&filename);
+    }
+    let _ = save_metadata_index(&notes_dir, &metadata_index);
 
     let title = extract_title_from_content(&content);
     let (updated_at, created_at) = get_file_timestamps(&path);
@@ -318,7 +361,9 @@ fn delete_note(filename: String) -> Result<(), String> {
 #[tauri::command]
 fn list_trashed_notes() -> Result<Vec<NoteMetadata>, String> {
     let settings = get_settings();
+    let notes_dir = get_resolved_notes_dir(settings.custom_notes_dir.as_deref());
     let trash_dir = get_trash_dir(settings.custom_notes_dir.as_deref());
+    let metadata_index = load_metadata_index(&notes_dir);
     let mut notes = Vec::new();
 
     if let Ok(entries) = fs::read_dir(&trash_dir) {
@@ -327,7 +372,7 @@ fn list_trashed_notes() -> Result<Vec<NoteMetadata>, String> {
             if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("md") {
                 let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
                 let id = filename.trim_end_matches(".md").to_string();
-                let is_pinned = filename.starts_with("pin_");
+                let is_pinned = is_note_pinned(&filename, &metadata_index);
 
                 if let Ok(content) = fs::read_to_string(&path) {
                     let title = extract_title_from_content(&content);
@@ -367,12 +412,13 @@ fn restore_note(filename: String) -> Result<NoteMetadata, String> {
 
     fs::rename(&src_path, &dest_path).map_err(|e| e.to_string())?;
 
+    let metadata_index = load_metadata_index(&notes_dir);
     let content = fs::read_to_string(&dest_path).map_err(|e| e.to_string())?;
     let title = extract_title_from_content(&content);
     let (updated_at, created_at) = get_file_timestamps(&dest_path);
     let character_count = content.chars().count();
     let id = filename.trim_end_matches(".md").to_string();
-    let is_pinned = filename.starts_with("pin_");
+    let is_pinned = is_note_pinned(&filename, &metadata_index);
 
     Ok(NoteMetadata {
         id,
@@ -389,10 +435,17 @@ fn restore_note(filename: String) -> Result<NoteMetadata, String> {
 #[tauri::command]
 fn permanently_delete_note(filename: String) -> Result<(), String> {
     let settings = get_settings();
+    let notes_dir = get_resolved_notes_dir(settings.custom_notes_dir.as_deref());
     let trash_dir = get_trash_dir(settings.custom_notes_dir.as_deref());
     let path = trash_dir.join(&filename);
     if path.exists() {
         fs::remove_file(path).map_err(|e| e.to_string())?;
+    }
+
+    // Clean up metadata entry if it was present
+    let mut metadata_index = load_metadata_index(&notes_dir);
+    if metadata_index.pinned.remove(&filename).is_some() {
+        let _ = save_metadata_index(&notes_dir, &metadata_index);
     }
     Ok(())
 }
@@ -400,15 +453,21 @@ fn permanently_delete_note(filename: String) -> Result<(), String> {
 #[tauri::command]
 fn empty_trash() -> Result<(), String> {
     let settings = get_settings();
+    let notes_dir = get_resolved_notes_dir(settings.custom_notes_dir.as_deref());
     let trash_dir = get_trash_dir(settings.custom_notes_dir.as_deref());
+    let mut metadata_index = load_metadata_index(&notes_dir);
+
     if let Ok(entries) = fs::read_dir(&trash_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_file() {
+                let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+                metadata_index.pinned.remove(&filename);
                 let _ = fs::remove_file(path);
             }
         }
     }
+    let _ = save_metadata_index(&notes_dir, &metadata_index);
     Ok(())
 }
 
@@ -698,6 +757,7 @@ pub fn run() {
             list_notes,
             read_note,
             save_note,
+            set_note_pinned,
             delete_note,
             list_trashed_notes,
             restore_note,
@@ -792,3 +852,64 @@ console.log("Hello from Kenote!");
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_metadata_index_serialization() {
+        let mut index = NotesMetadataIndex::default();
+        index.pinned.insert("note_123.md".to_string(), true);
+        index.pinned.insert("note_456.md".to_string(), false);
+
+        let json = serde_json::to_string(&index).expect("Should serialize");
+        let deserialized: NotesMetadataIndex =
+            serde_json::from_str(&json).expect("Should deserialize");
+
+        assert_eq!(deserialized.pinned.get("note_123.md"), Some(&true));
+        assert_eq!(deserialized.pinned.get("note_456.md"), Some(&false));
+    }
+
+    #[test]
+    fn test_is_note_pinned_logic() {
+        let mut index = NotesMetadataIndex::default();
+        index.pinned.insert("note_explicit_pinned.md".to_string(), true);
+        index.pinned.insert("note_explicit_unpinned.md".to_string(), false);
+
+        // Explicit index entries take precedence
+        assert!(is_note_pinned("note_explicit_pinned.md", &index));
+        assert!(!is_note_pinned("note_explicit_unpinned.md", &index));
+
+        // Legacy filename fallback for notes without explicit index entry
+        assert!(is_note_pinned("pin_note_legacy.md", &index));
+        assert!(!is_note_pinned("note_normal.md", &index));
+    }
+
+    #[test]
+    fn test_save_and_load_metadata_index() {
+        let temp_dir = std::env::temp_dir().join(format!("kenote_test_{}", chrono::Local::now().timestamp_nanos_opt().unwrap_or(0)));
+        let _ = fs::create_dir_all(&temp_dir);
+
+        let mut index = NotesMetadataIndex::default();
+        index.pinned.insert("note_alpha.md".to_string(), true);
+
+        assert!(save_metadata_index(&temp_dir, &index).is_ok());
+
+        let loaded = load_metadata_index(&temp_dir);
+        assert_eq!(loaded.pinned.get("note_alpha.md"), Some(&true));
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_extract_title_from_content() {
+        assert_eq!(extract_title_from_content("# My Title\nBody text"), "My Title");
+        assert_eq!(extract_title_from_content("### Nested Heading\nMore"), "Nested Heading");
+        assert_eq!(extract_title_from_content("Plain text first line"), "Plain text first line");
+        assert_eq!(extract_title_from_content("\n\n  \n# Spaced Title"), "Spaced Title");
+        assert_eq!(extract_title_from_content(""), "Untitled");
+        assert_eq!(extract_title_from_content("   \n\n  "), "Untitled");
+    }
+}
+
