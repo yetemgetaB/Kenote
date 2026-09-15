@@ -159,6 +159,7 @@ export interface EditorHandle {
   getMarkdown: () => string;
   setMarkdown: (md: string) => void;
   focus: () => void;
+  flushCursor: () => void;
   getEditor: () => ReturnType<typeof useEditor>;
 }
 
@@ -188,6 +189,19 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
     const cursorSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const isSwitchingNoteRef = useRef<boolean>(false);
     const prevNoteIdRef = useRef<string | null | undefined>(noteId);
+
+    const saveCursorImmediately = (currentNoteId: string | null | undefined, ed: any) => {
+      if (!currentNoteId || !ed || ed.isDestroyed || isSwitchingNoteRef.current) return;
+      try {
+        const { from, to } = ed.state.selection;
+        if (typeof from === "number" && typeof to === "number" && from >= 1) {
+          const key = "kenote_cursor_positions";
+          const current = JSON.parse(localStorage.getItem(key) || "{}");
+          current[currentNoteId] = { from, to };
+          localStorage.setItem(key, JSON.stringify(current));
+        }
+      } catch {}
+    };
 
     const restoreCursor = (currentNoteId: string, ed: any) => {
       if (!ed || ed.isDestroyed) return;
@@ -275,14 +289,8 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
         }
         cursorSaveTimeoutRef.current = setTimeout(() => {
           if (isSwitchingNoteRef.current) return;
-          try {
-            const { from, to } = ed.state.selection;
-            const key = "kenote_cursor_positions";
-            const current = JSON.parse(localStorage.getItem(key) || "{}");
-            current[noteId] = { from, to };
-            localStorage.setItem(key, JSON.stringify(current));
-          } catch {}
-        }, 150);
+          saveCursorImmediately(noteId, ed);
+        }, 100);
       },
       onUpdate: ({ editor: ed }) => {
         if (!ed || ed.isDestroyed) return;
@@ -306,20 +314,29 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
         if (cursorSaveTimeoutRef.current) {
           clearTimeout(cursorSaveTimeoutRef.current);
         }
+        if (prevNoteIdRef.current && editor && !editor.isDestroyed) {
+          saveCursorImmediately(prevNoteIdRef.current, editor);
+        }
       };
-    }, []);
+    }, [editor]);
 
     useEffect(() => {
       if (editor && onEditorReady) {
         onEditorReady(editor);
+        if (noteId) {
+          restoreCursor(noteId, editor);
+        }
       }
-    }, [editor, onEditorReady]);
+    }, [editor, onEditorReady, noteId]);
 
     // Set content and restore cursor safely during note switching
     useEffect(() => {
       if (!editor || !noteId) return;
 
       if (prevNoteIdRef.current !== noteId) {
+        if (prevNoteIdRef.current) {
+          saveCursorImmediately(prevNoteIdRef.current, editor);
+        }
         prevNoteIdRef.current = noteId;
         isSwitchingNoteRef.current = true;
         editor.commands.setContent(preserveBlankLines(initialContent || ""), false);
@@ -351,6 +368,11 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
       },
       focus: () => {
         editor?.commands.focus();
+      },
+      flushCursor: () => {
+        if (noteId && editor && !editor.isDestroyed) {
+          saveCursorImmediately(noteId, editor);
+        }
       },
       getEditor: () => editor,
     }));

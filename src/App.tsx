@@ -245,17 +245,22 @@ export function App() {
       return;
     }
 
+    editorRef.current?.flushCursor();
     await flushPendingSave();
 
     try {
       const newNote = await api.saveNote("", "", false);
       setNotes((prev) => [newNote, ...prev]);
+      activeNoteRef.current = newNote;
       setActiveNote(newNote);
       setActiveTitle("Untitled");
       setCharacterCount(0);
       setSaveStatus("saved");
       hasUnsavedChangesRef.current = false;
       pendingSaveRef.current = null;
+
+      // Update MRU
+      setRecentNoteIds((prevIds) => [newNote.id, ...prevIds.filter((id) => id !== newNote.id)]);
 
       // Track last active note in settings
       const updated = { ...settings, last_active_note_id: newNote.id };
@@ -270,31 +275,19 @@ export function App() {
   }, [flushPendingSave, settings, showToast]);
 
   // Select Note
-  const handleSelectNote = useCallback(async (note: NoteMetadata) => {
+  const handleSelectNote = useCallback((note: NoteMetadata) => {
     if (activeNoteRef.current?.id === note.id) return;
 
-    // Flush any pending save on the current note before switching
-    await flushPendingSave();
+    // Flush cursor on previous note
+    editorRef.current?.flushCursor();
 
-    // Clean up previous note if it was an abandoned empty note
     const prev = activeNoteRef.current;
-    if (isAbandonedEmptyNote(prev) && prev?.filename !== note.filename) {
-      try {
-        await api.deleteNote(prev!.filename);
-        setNotes((prevNotes) => prevNotes.filter((n) => n.filename !== prev!.filename));
-      } catch (err) {
-        console.warn("Could not prune abandoned empty note:", err);
-      }
-    }
 
+    // Update active note ref and MRU IMMEDIATELY to prevent race conditions on rapid switching
+    activeNoteRef.current = note;
     setActiveNote(note);
     setActiveTitle(note.title);
     setCharacterCount(note.character_count);
-    setSaveStatus("saved");
-    hasUnsavedChangesRef.current = false;
-    pendingSaveRef.current = null;
-
-    // Update MRU list
     setRecentNoteIds((prevIds) => [note.id, ...prevIds.filter((id) => id !== note.id)]);
 
     // Track last active note in settings
@@ -302,8 +295,41 @@ export function App() {
     setSettings(updated);
     api.saveSettings(updated);
 
+    // Flush any pending save on the previous note in background
+    if (hasUnsavedChangesRef.current && prev) {
+      const markdown = editorRef.current?.getMarkdown() ?? prev.content ?? "";
+      api.saveNote(prev.filename, markdown, prev.is_pinned).then((saved) => {
+        setNotes((prevNotes) => {
+          const index = prevNotes.findIndex((n) => n.id === saved.id);
+          let updatedNotes = [...prevNotes];
+          if (index !== -1) updatedNotes[index] = saved;
+          else updatedNotes.unshift(saved);
+          return updatedNotes.sort(
+            (a, b) =>
+              (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0) ||
+              b.updated_at - a.updated_at
+          );
+        });
+      }).catch((err) => {
+        console.error("Failed to save previous note on switch:", err);
+      });
+      hasUnsavedChangesRef.current = false;
+      pendingSaveRef.current = null;
+      setSaveStatus("saved");
+    }
+
+    // Clean up previous note if it was an abandoned empty note
+    if (isAbandonedEmptyNote(prev) && prev?.filename !== note.filename) {
+      api.deleteNote(prev!.filename).then(() => {
+        setNotes((prevNotes) => prevNotes.filter((n) => n.filename !== prev!.filename));
+        setRecentNoteIds((prevIds) => prevIds.filter((id) => id !== prev!.id));
+      }).catch((err) => {
+        console.warn("Could not prune abandoned empty note:", err);
+      });
+    }
+
     setTimeout(() => editorRef.current?.focus(), 50);
-  }, [flushPendingSave, settings]);
+  }, [settings]);
 
   // Toggle Pin Note (persisted in metadata index, no destructive filename mutations)
   const handleTogglePinNote = useCallback(async (note: NoteMetadata, e: React.MouseEvent) => {
@@ -375,9 +401,11 @@ export function App() {
             targetNote = loadedNotes[0];
           }
 
+          activeNoteRef.current = targetNote;
           setActiveNote(targetNote);
           setActiveTitle(targetNote.title);
           setCharacterCount(targetNote.character_count);
+          setRecentNoteIds([targetNote.id]);
         } else {
           await handleNewNote();
         }
@@ -449,9 +477,10 @@ export function App() {
     };
   }, [handleNewNote, handleSelectNote, saveStatus, showToast]);
 
-  // Beforeunload handler to flush saves and persist window state
+  // Beforeunload handler to flush saves, cursor, and persist window state
   useEffect(() => {
     const handleBeforeUnload = () => {
+      editorRef.current?.flushCursor();
       const current = activeNoteRef.current;
       if (hasUnsavedChangesRef.current && current) {
         const markdown = editorRef.current?.getMarkdown() ?? current.content ?? "";
@@ -477,6 +506,13 @@ export function App() {
       const remaining = notes.filter((n) => n.filename !== note.filename);
       setNotes(remaining);
       setRecentNoteIds((prev) => prev.filter((id) => id !== note.id));
+
+      try {
+        const key = "kenote_cursor_positions";
+        const currentMap = JSON.parse(localStorage.getItem(key) || "{}");
+        delete currentMap[note.id];
+        localStorage.setItem(key, JSON.stringify(currentMap));
+      } catch {}
 
       if (activeNote?.filename === note.filename) {
         if (remaining.length > 0) {
@@ -600,7 +636,8 @@ export function App() {
         quickSwitcherNotesRef.current = ordered;
 
         if (switcherMode === "instant") {
-          const currentIndex = ordered.findIndex((n) => n.id === activeNote?.id);
+          const currentId = activeNoteRef.current?.id;
+          const currentIndex = ordered.findIndex((n) => n.id === currentId);
           const isReverse = e.shiftKey || e.key === "PageUp";
           let nextIdx = 0;
           if (isReverse) {
