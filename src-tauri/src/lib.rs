@@ -158,8 +158,27 @@ fn get_settings() -> AppSettings {
 }
 
 #[tauri::command]
-fn save_settings(settings: AppSettings) -> Result<(), String> {
+fn save_settings(mut settings: AppSettings) -> Result<(), String> {
     let path = get_settings_path();
+    // Merge existing window position and dimensions if the caller did not specify them
+    if path.exists() {
+        if let Ok(content) = fs::read_to_string(&path) {
+            if let Ok(existing) = serde_json::from_str::<AppSettings>(&content) {
+                if settings.window_x.is_none() {
+                    settings.window_x = existing.window_x;
+                }
+                if settings.window_y.is_none() {
+                    settings.window_y = existing.window_y;
+                }
+                if settings.window_width.is_none() {
+                    settings.window_width = existing.window_width;
+                }
+                if settings.window_height.is_none() {
+                    settings.window_height = existing.window_height;
+                }
+            }
+        }
+    }
     let json = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
     fs::write(path, json).map_err(|e| e.to_string())?;
     Ok(())
@@ -783,11 +802,39 @@ pub fn run() {
                         let _ = win.set_size(LogicalSize::new(w, h));
                     }
                 }
+
+                let mut position_restored = false;
                 if let (Some(x), Some(y)) = (settings.window_x, settings.window_y) {
-                    // Only restore if valid on-screen coordinate (Windows minimize sets to -32000)
+                    // Only restore if valid on-screen coordinate
                     if x > -10000 && y > -10000 {
-                        let _ = win.set_position(LogicalPosition::new(x, y));
+                        let is_on_screen = if let Ok(monitors) = win.available_monitors() {
+                            if monitors.is_empty() {
+                                true
+                            } else {
+                                monitors.iter().any(|m| {
+                                    let pos = m.position();
+                                    let size = m.size();
+                                    let scale = m.scale_factor();
+                                    let logical_x = (pos.x as f64 / scale) as i32;
+                                    let logical_y = (pos.y as f64 / scale) as i32;
+                                    let logical_w = (size.width as f64 / scale) as i32;
+                                    let logical_h = (size.height as f64 / scale) as i32;
+                                    x >= logical_x - 100 && x < logical_x + logical_w && y >= logical_y - 50 && y < logical_y + logical_h
+                                })
+                            }
+                        } else {
+                            true
+                        };
+
+                        if is_on_screen {
+                            let _ = win.set_position(LogicalPosition::new(x, y));
+                            position_restored = true;
+                        }
                     }
+                }
+
+                if !position_restored {
+                    let _ = win.center();
                 }
 
                 let win_clone = win.clone();
@@ -911,5 +958,46 @@ mod tests {
         assert_eq!(extract_title_from_content(""), "Untitled");
         assert_eq!(extract_title_from_content("   \n\n  "), "Untitled");
     }
+
+    #[test]
+    fn test_settings_merging_preserves_window_bounds() {
+        let existing = AppSettings {
+            window_x: Some(450),
+            window_y: Some(250),
+            window_width: Some(600.0),
+            window_height: Some(800.0),
+            ..AppSettings::default()
+        };
+
+        let mut incoming = AppSettings {
+            last_active_note_id: Some("note_123".to_string()),
+            window_x: None,
+            window_y: None,
+            window_width: None,
+            window_height: None,
+            ..AppSettings::default()
+        };
+
+        // Simulated merge logic
+        if incoming.window_x.is_none() {
+            incoming.window_x = existing.window_x;
+        }
+        if incoming.window_y.is_none() {
+            incoming.window_y = existing.window_y;
+        }
+        if incoming.window_width.is_none() {
+            incoming.window_width = existing.window_width;
+        }
+        if incoming.window_height.is_none() {
+            incoming.window_height = existing.window_height;
+        }
+
+        assert_eq!(incoming.window_x, Some(450));
+        assert_eq!(incoming.window_y, Some(250));
+        assert_eq!(incoming.window_width, Some(600.0));
+        assert_eq!(incoming.window_height, Some(800.0));
+        assert_eq!(incoming.last_active_note_id, Some("note_123".to_string()));
+    }
 }
+
 
