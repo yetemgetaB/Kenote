@@ -19,6 +19,7 @@ import {
   FolderIcon,
   SettingsIcon,
   TrashIcon,
+  SaveIcon,
 } from "./components/Icons";
 
 export function App() {
@@ -65,10 +66,269 @@ export function App() {
   }>({ visible: false, message: "", undoNote: null });
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  const showToast = useCallback((message: string, undoNote: NoteMetadata | null = null) => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+    setToast({ visible: true, message, undoNote });
+    toastTimeoutRef.current = setTimeout(() => {
+      setToast({ visible: false, message: "", undoNote: null });
+    }, 5000);
+  }, []);
+
+  // Save status & pending edits tracking
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
+  const pendingSaveRef = useRef<{ filename: string; markdown: string; isPinned: boolean } | null>(null);
+  const hasUnsavedChangesRef = useRef<boolean>(false);
+  const activeNoteRef = useRef<NoteMetadata | null>(null);
+  const notesRef = useRef<NoteMetadata[]>(notes);
+
+  useEffect(() => {
+    activeNoteRef.current = activeNote;
+  }, [activeNote]);
+
+  useEffect(() => {
+    notesRef.current = notes;
+  }, [notes]);
+
   // Editor refs
   const editorRef = useRef<EditorHandle>(null);
   const [tiptapInstance, setTiptapInstance] = useState<any>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Helper to detect abandoned blank notes (untitled, zero chars, no content, unpinned)
+  const isAbandonedEmptyNote = (note: NoteMetadata | null | undefined): boolean => {
+    if (!note) return false;
+    return (
+      note.character_count === 0 &&
+      (!note.content || note.content.trim() === "") &&
+      (!note.title || note.title === "Untitled" || note.title.trim() === "") &&
+      !note.is_pinned
+    );
+  };
+
+  // Immediate flush of pending debounced save
+  const flushPendingSave = useCallback(async (): Promise<NoteMetadata | null> => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    if (pendingSaveRef.current) {
+      const { filename, markdown, isPinned } = pendingSaveRef.current;
+      try {
+        const saved = await api.saveNote(filename, markdown, isPinned);
+        pendingSaveRef.current = null;
+        hasUnsavedChangesRef.current = false;
+        setSaveStatus("saved");
+        setActiveNote((prev) => (prev && prev.filename === saved.filename ? { ...prev, ...saved } : prev));
+        setNotes((prevNotes) => {
+          const index = prevNotes.findIndex((n) => n.id === saved.id);
+          let updated = [...prevNotes];
+          if (index !== -1) updated[index] = saved;
+          else updated.unshift(saved);
+          return updated.sort(
+            (a, b) =>
+              (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0) ||
+              b.updated_at - a.updated_at
+          );
+        });
+        return saved;
+      } catch (err) {
+        console.error("Failed to flush save:", err);
+        setSaveStatus("error");
+        showToast("Save failed: " + (typeof err === "string" ? err : "Could not write to disk"));
+      }
+    }
+    return null;
+  }, [showToast]);
+
+  // Retry save when in error state
+  const retrySave = useCallback(async () => {
+    const current = activeNoteRef.current;
+    if (!current) return;
+    const markdown = editorRef.current?.getMarkdown() ?? current.content ?? "";
+    setSaveStatus("saving");
+    try {
+      const saved = await api.saveNote(current.filename, markdown, current.is_pinned);
+      pendingSaveRef.current = null;
+      hasUnsavedChangesRef.current = false;
+      setActiveNote((prev) => (prev ? { ...prev, ...saved } : saved));
+      setNotes((prevNotes) => {
+        const index = prevNotes.findIndex((n) => n.id === saved.id);
+        let updated = [...prevNotes];
+        if (index !== -1) updated[index] = saved;
+        else updated.unshift(saved);
+        return updated.sort(
+          (a, b) =>
+            (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0) ||
+            b.updated_at - a.updated_at
+        );
+      });
+      setSaveStatus("saved");
+      showToast("Note saved successfully.");
+    } catch (err) {
+      console.error("Retry save failed:", err);
+      setSaveStatus("error");
+      showToast("Retry failed: " + (typeof err === "string" ? err : "Could not write to disk"));
+    }
+  }, [showToast]);
+
+  // Save current note changes with debounce
+  const handleEditorChange = useCallback(
+    (markdown: string, charCount: number, firstLineTitle: string) => {
+      setActiveTitle(firstLineTitle);
+      setCharacterCount(charCount);
+      hasUnsavedChangesRef.current = true;
+      setSaveStatus("saving");
+
+      const current = activeNoteRef.current;
+      if (current) {
+        pendingSaveRef.current = {
+          filename: current.filename,
+          markdown,
+          isPinned: current.is_pinned,
+        };
+      }
+
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+
+      saveTimeoutRef.current = setTimeout(async () => {
+        const target = activeNoteRef.current;
+        if (!target) return;
+
+        try {
+          const saved = await api.saveNote(
+            target.filename,
+            markdown,
+            target.is_pinned
+          );
+
+          pendingSaveRef.current = null;
+          hasUnsavedChangesRef.current = false;
+          setSaveStatus("saved");
+
+          setActiveNote((prev) => (prev && prev.filename === saved.filename ? { ...prev, ...saved } : prev));
+
+          setNotes((prevNotes) => {
+            const index = prevNotes.findIndex((n) => n.id === saved.id);
+            let updated = [...prevNotes];
+            if (index !== -1) {
+              updated[index] = saved;
+            } else {
+              updated.unshift(saved);
+            }
+            return updated.sort(
+              (a, b) =>
+                (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0) ||
+                b.updated_at - a.updated_at
+            );
+          });
+        } catch (e) {
+          console.error("Failed to save note:", e);
+          setSaveStatus("error");
+          showToast("Failed to save note. Check disk write permissions.");
+        }
+      }, settings.auto_save_interval || 400);
+    },
+    [settings.auto_save_interval, showToast]
+  );
+
+  // New Note
+  const handleNewNote = useCallback(async () => {
+    // If currently on an untyped blank note, simply keep focus instead of accumulating empty notes
+    if (isAbandonedEmptyNote(activeNoteRef.current)) {
+      editorRef.current?.focus();
+      return;
+    }
+
+    await flushPendingSave();
+
+    try {
+      const newNote = await api.saveNote("", "", false);
+      setNotes((prev) => [newNote, ...prev]);
+      setActiveNote(newNote);
+      setActiveTitle("Untitled");
+      setCharacterCount(0);
+      setSaveStatus("saved");
+      hasUnsavedChangesRef.current = false;
+      pendingSaveRef.current = null;
+
+      // Track last active note in settings
+      const updated = { ...settings, last_active_note_id: newNote.id };
+      setSettings(updated);
+      api.saveSettings(updated);
+
+      setTimeout(() => editorRef.current?.focus(), 50);
+    } catch (e) {
+      console.error("Failed to create new note:", e);
+      showToast("Failed to create new note");
+    }
+  }, [flushPendingSave, settings, showToast]);
+
+  // Select Note
+  const handleSelectNote = useCallback(async (note: NoteMetadata) => {
+    if (activeNoteRef.current?.id === note.id) return;
+
+    // Flush any pending save on the current note before switching
+    await flushPendingSave();
+
+    // Clean up previous note if it was an abandoned empty note
+    const prev = activeNoteRef.current;
+    if (isAbandonedEmptyNote(prev) && prev?.filename !== note.filename) {
+      try {
+        await api.deleteNote(prev!.filename);
+        setNotes((prevNotes) => prevNotes.filter((n) => n.filename !== prev!.filename));
+      } catch (err) {
+        console.warn("Could not prune abandoned empty note:", err);
+      }
+    }
+
+    setActiveNote(note);
+    setActiveTitle(note.title);
+    setCharacterCount(note.character_count);
+    setSaveStatus("saved");
+    hasUnsavedChangesRef.current = false;
+    pendingSaveRef.current = null;
+
+    // Update MRU list
+    setRecentNoteIds((prevIds) => [note.id, ...prevIds.filter((id) => id !== note.id)]);
+
+    // Track last active note in settings
+    const updated = { ...settings, last_active_note_id: note.id };
+    setSettings(updated);
+    api.saveSettings(updated);
+
+    setTimeout(() => editorRef.current?.focus(), 50);
+  }, [flushPendingSave, settings]);
+
+  // Toggle Pin Note (persisted in metadata index, no destructive filename mutations)
+  const handleTogglePinNote = useCallback(async (note: NoteMetadata, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newPinned = !note.is_pinned;
+    try {
+      await api.setNotePinned(note.filename, newPinned);
+
+      setNotes((prevNotes) => {
+        const updated = prevNotes.map((n) =>
+          n.filename === note.filename ? { ...n, is_pinned: newPinned } : n
+        );
+        return updated.sort(
+          (a, b) =>
+            (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0) ||
+            b.updated_at - a.updated_at
+        );
+      });
+
+      if (activeNoteRef.current?.filename === note.filename) {
+        setActiveNote((prev) => (prev ? { ...prev, is_pinned: newPinned } : null));
+      }
+    } catch (err) {
+      console.error("Failed to toggle note pin:", err);
+      showToast(typeof err === "string" ? err : "Failed to toggle pin");
+    }
+  }, [showToast]);
 
   // Load initial data
   useEffect(() => {
@@ -97,7 +357,6 @@ export function App() {
           let targetNote: NoteMetadata | undefined;
 
           if (startupMode === "new") {
-            // User requested to open a brand new note on launch
             await handleNewNote();
             return;
           } else if (startupMode === "specific" && loadedSettings.startup_specific_note_id) {
@@ -110,7 +369,6 @@ export function App() {
             );
           }
 
-          // Fallback to first available note if specific/last wasn't found
           if (!targetNote) {
             targetNote = loadedNotes[0];
           }
@@ -119,123 +377,99 @@ export function App() {
           setActiveTitle(targetNote.title);
           setCharacterCount(targetNote.character_count);
         } else {
-          // Create initial empty note
-          handleNewNote();
+          await handleNewNote();
         }
       } catch (err) {
         console.error("Initialization error:", err);
       }
     }
     init();
-  }, []);
+  }, [handleNewNote]);
 
-  // Save current note changes with debounce
-  const handleEditorChange = useCallback(
-    (markdown: string, charCount: number, firstLineTitle: string) => {
-      setActiveTitle(firstLineTitle);
-      setCharacterCount(charCount);
+  // External file synchronization (on focus and periodic)
+  useEffect(() => {
+    const syncExternalChanges = async () => {
+      try {
+        const diskNotes = await api.listNotes();
+        const currentActive = activeNoteRef.current;
 
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-
-      saveTimeoutRef.current = setTimeout(async () => {
-        if (!activeNote) return;
-
-        try {
-          const saved = await api.saveNote(
-            activeNote.filename,
-            markdown,
-            activeNote.is_pinned
-          );
-
-          setActiveNote((prev) => (prev ? { ...prev, ...saved } : saved));
-
-          // Update notes list in memory
-          setNotes((prevNotes) => {
-            const index = prevNotes.findIndex((n) => n.id === saved.id);
-            let updated = [...prevNotes];
-            if (index !== -1) {
-              updated[index] = saved;
+        if (currentActive) {
+          const found = diskNotes.find((n) => n.filename === currentActive.filename);
+          if (!found) {
+            if (!hasUnsavedChangesRef.current) {
+              showToast("Active note was deleted externally.");
+              setNotes(diskNotes);
+              if (diskNotes.length > 0) {
+                handleSelectNote(diskNotes[0]);
+              } else {
+                handleNewNote();
+              }
+              return;
             } else {
-              updated.unshift(saved);
+              showToast("Active note was removed on disk, but your local edits are kept.");
             }
-            return updated.sort(
-              (a, b) =>
-                (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0) ||
-                b.updated_at - a.updated_at
-            );
-          });
-        } catch (e) {
-          console.error("Failed to save note:", e);
+          } else if (found.updated_at > currentActive.updated_at + 1500) {
+            // File was modified externally
+            if (!hasUnsavedChangesRef.current && saveStatus !== "saving") {
+              const fullNote = await api.readNote(currentActive.filename);
+              setActiveNote(fullNote);
+              setActiveTitle(fullNote.title);
+              setCharacterCount(fullNote.character_count);
+              editorRef.current?.setMarkdown(fullNote.content);
+              showToast("Reloaded note from external changes.");
+            } else {
+              showToast("External changes detected on disk. Press Ctrl+S to save your version.");
+            }
+          }
         }
-      }, settings.auto_save_interval || 400);
-    },
-    [activeNote, settings.auto_save_interval]
-  );
 
-  // New Note
-  const handleNewNote = async () => {
-    try {
-      const newNote = await api.saveNote("", "", false);
-      setNotes((prev) => [newNote, ...prev]);
-      setActiveNote(newNote);
-      setActiveTitle("Untitled");
-      setCharacterCount(0);
-
-      // Track last active note in settings
-      const updated = { ...settings, last_active_note_id: newNote.id };
-      setSettings(updated);
-      api.saveSettings(updated);
-
-      setTimeout(() => editorRef.current?.focus(), 50);
-    } catch (e) {
-      console.error("Failed to create new note:", e);
-    }
-  };
-
-  // Select Note
-  const handleSelectNote = (note: NoteMetadata) => {
-    setActiveNote(note);
-    setActiveTitle(note.title);
-    setCharacterCount(note.character_count);
-
-    // Update MRU list
-    setRecentNoteIds((prev) => [note.id, ...prev.filter((id) => id !== note.id)]);
-
-    // Track last active note in settings
-    const updated = { ...settings, last_active_note_id: note.id };
-    setSettings(updated);
-    api.saveSettings(updated);
-
-    setTimeout(() => editorRef.current?.focus(), 50);
-  };
-
-  // Toggle Pin Note
-  const handleTogglePinNote = async (note: NoteMetadata, e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      const updated = await api.saveNote(
-        note.filename,
-        note.content,
-        !note.is_pinned
-      );
-
-      const refreshed = await api.listNotes();
-      setNotes(refreshed);
-
-      if (activeNote?.id === note.id) {
-        setActiveNote(updated);
+        setNotes((prevNotes) => {
+          if (prevNotes.length !== diskNotes.length) return diskNotes;
+          const map = new Map(prevNotes.map((n) => [n.filename, n.updated_at]));
+          const hasDiff = diskNotes.some((n) => map.get(n.filename) !== n.updated_at);
+          return hasDiff ? diskNotes : prevNotes;
+        });
+      } catch (err) {
+        console.error("External sync error:", err);
       }
-    } catch (err) {
-      console.error("Failed to toggle note pin:", err);
-    }
-  };
+    };
+
+    const handleFocus = () => {
+      syncExternalChanges();
+    };
+
+    window.addEventListener("focus", handleFocus);
+    const interval = setInterval(syncExternalChanges, 10000);
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      clearInterval(interval);
+    };
+  }, [handleNewNote, handleSelectNote, saveStatus, showToast]);
+
+  // Beforeunload handler to flush saves and persist window state
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (pendingSaveRef.current) {
+        const { filename, markdown, isPinned } = pendingSaveRef.current;
+        api.saveNote(filename, markdown, isPinned).catch(() => {});
+      }
+      api.saveWindowState().catch(() => {});
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, []);
 
   // Delete Note (move to trash)
   const handleDeleteNote = async (note: NoteMetadata, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     try {
+      if (pendingSaveRef.current?.filename === note.filename) {
+        pendingSaveRef.current = null;
+      }
       await api.deleteNote(note.filename);
       const remaining = notes.filter((n) => n.filename !== note.filename);
       setNotes(remaining);
@@ -431,6 +665,9 @@ export function App() {
         setIsCommandPaletteOpen((prev) => !prev);
         setIsNoteSwitcherOpen(false);
         setIsSettingsOpen(false);
+      } else if (isCmdOrCtrl && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        flushPendingSave();
       } else if (isCmdOrCtrl && e.key.toLowerCase() === "p") {
         e.preventDefault();
         handleToggleAlwaysOnTop();
@@ -479,6 +716,13 @@ export function App() {
       shortcut: ["Ctrl", "N"],
       icon: <PlusIcon size={16} />,
       perform: () => handleNewNote(),
+    },
+    {
+      id: "save_note",
+      title: "Save Note Now",
+      shortcut: ["Ctrl", "S"],
+      icon: <SaveIcon size={16} />,
+      perform: () => flushPendingSave(),
     },
     {
       id: "browse_notes",
@@ -587,6 +831,8 @@ export function App() {
           <BottomToolbar
             editor={tiptapInstance}
             characterCount={characterCount}
+            saveStatus={saveStatus}
+            onRetrySave={retrySave}
           />
         </>
       )}

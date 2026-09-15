@@ -107,114 +107,125 @@ export const api = {
   },
 
   async saveNote(filename: string, content: string, is_pinned: boolean): Promise<NoteMetadata> {
-    try {
+    if (isTauri()) {
       return await invokeTauri<NoteMetadata>("save_note", { filename, content, isPinned: is_pinned });
-    } catch {
-      const list = await this.listNotes();
-      const extractTitle = (text: string) => {
-        for (const line of text.split("\n")) {
-          const t = line.trim();
-          if (t) return t.replace(/^#+\s*/, "").trim();
-        }
-        return "Untitled";
-      };
-
-      const now = Math.floor(Date.now() / 1000);
-      const title = extractTitle(content);
-      const character_count = content.length;
-
-      let targetNote = list.find((n) => n.filename === filename);
-      if (targetNote) {
-        targetNote.content = content;
-        targetNote.title = title;
-        targetNote.updated_at = now;
-        targetNote.character_count = character_count;
-        targetNote.is_pinned = is_pinned;
-      } else {
-        const id = `note_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-        const newFilename = `${id}.md`;
-        targetNote = {
-          id,
-          filename: newFilename,
-          title,
-          content,
-          updated_at: now,
-          created_at: now,
-          character_count,
-          is_pinned,
-        };
-        list.unshift(targetNote);
+    }
+    const list = await this.listNotes();
+    const extractTitle = (text: string) => {
+      for (const line of text.split("\n")) {
+        const t = line.trim();
+        if (t) return t.replace(/^#+\s*/, "").trim();
       }
+      return "Untitled";
+    };
 
+    const now = Math.floor(Date.now() / 1000);
+    const title = extractTitle(content);
+    const character_count = content.length;
+
+    let targetNote = list.find((n) => n.filename === filename);
+    if (targetNote) {
+      targetNote.content = content;
+      targetNote.title = title;
+      targetNote.updated_at = now;
+      targetNote.character_count = character_count;
+      targetNote.is_pinned = is_pinned;
+    } else {
+      const id = `note_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const newFilename = `${id}.md`;
+      targetNote = {
+        id,
+        filename: newFilename,
+        title,
+        content,
+        updated_at: now,
+        created_at: now,
+        character_count,
+        is_pinned,
+      };
+      list.unshift(targetNote);
+    }
+
+    list.sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0) || b.updated_at - a.updated_at);
+    localStorage.setItem(STORAGE_KEY_NOTES, JSON.stringify(list));
+    return targetNote;
+  },
+
+  async setNotePinned(filename: string, is_pinned: boolean): Promise<void> {
+    if (isTauri()) {
+      await invokeTauri("set_note_pinned", { filename, isPinned: is_pinned });
+      return;
+    }
+    const list = await this.listNotes();
+    const targetNote = list.find((n) => n.filename === filename);
+    if (targetNote) {
+      targetNote.is_pinned = is_pinned;
       list.sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0) || b.updated_at - a.updated_at);
       localStorage.setItem(STORAGE_KEY_NOTES, JSON.stringify(list));
-      return targetNote;
     }
   },
 
   async deleteNote(filename: string): Promise<void> {
-    try {
+    if (isTauri()) {
       await invokeTauri("delete_note", { filename });
-    } catch {
-      let list = await this.listNotes();
-      const trashed = list.find((n) => n.filename === filename);
-      list = list.filter((n) => n.filename !== filename);
-      localStorage.setItem(STORAGE_KEY_NOTES, JSON.stringify(list));
+      return;
+    }
+    let list = await this.listNotes();
+    const trashed = list.find((n) => n.filename === filename);
+    list = list.filter((n) => n.filename !== filename);
+    localStorage.setItem(STORAGE_KEY_NOTES, JSON.stringify(list));
 
-      if (trashed) {
-        const trashKey = "kenote_trash_mock";
-        const trashList = JSON.parse(localStorage.getItem(trashKey) || "[]");
-        trashList.unshift(trashed);
-        localStorage.setItem(trashKey, JSON.stringify(trashList));
-      }
+    if (trashed) {
+      const trashKey = "kenote_trash_mock";
+      const trashList = JSON.parse(localStorage.getItem(trashKey) || "[]");
+      trashList.unshift(trashed);
+      localStorage.setItem(trashKey, JSON.stringify(trashList));
     }
   },
 
   async listTrashedNotes(): Promise<NoteMetadata[]> {
-    try {
+    if (isTauri()) {
       return await invokeTauri<NoteMetadata[]>("list_trashed_notes");
-    } catch {
-      const trashKey = "kenote_trash_mock";
-      return JSON.parse(localStorage.getItem(trashKey) || "[]");
     }
+    const trashKey = "kenote_trash_mock";
+    return JSON.parse(localStorage.getItem(trashKey) || "[]");
   },
 
   async restoreNote(filename: string): Promise<NoteMetadata> {
-    try {
+    if (isTauri()) {
       return await invokeTauri<NoteMetadata>("restore_note", { filename });
-    } catch {
-      const trashKey = "kenote_trash_mock";
-      let trashList: NoteMetadata[] = JSON.parse(localStorage.getItem(trashKey) || "[]");
-      const note = trashList.find((n) => n.filename === filename);
-      if (!note) throw new Error("Trashed note not found");
-
-      trashList = trashList.filter((n) => n.filename !== filename);
-      localStorage.setItem(trashKey, JSON.stringify(trashList));
-
-      let list = await this.listNotes();
-      list.unshift(note);
-      localStorage.setItem(STORAGE_KEY_NOTES, JSON.stringify(list));
-      return note;
     }
+    const trashKey = "kenote_trash_mock";
+    let trashList: NoteMetadata[] = JSON.parse(localStorage.getItem(trashKey) || "[]");
+    const note = trashList.find((n) => n.filename === filename);
+    if (!note) throw new Error("Trashed note not found");
+
+    trashList = trashList.filter((n) => n.filename !== filename);
+    localStorage.setItem(trashKey, JSON.stringify(trashList));
+
+    let list = await this.listNotes();
+    list.unshift(note);
+    localStorage.setItem(STORAGE_KEY_NOTES, JSON.stringify(list));
+    return note;
   },
 
   async permanentlyDeleteNote(filename: string): Promise<void> {
-    try {
+    if (isTauri()) {
       await invokeTauri("permanently_delete_note", { filename });
-    } catch {
-      const trashKey = "kenote_trash_mock";
-      let trashList: NoteMetadata[] = JSON.parse(localStorage.getItem(trashKey) || "[]");
-      trashList = trashList.filter((n) => n.filename !== filename);
-      localStorage.setItem(trashKey, JSON.stringify(trashList));
+      return;
     }
+    const trashKey = "kenote_trash_mock";
+    let trashList: NoteMetadata[] = JSON.parse(localStorage.getItem(trashKey) || "[]");
+    trashList = trashList.filter((n) => n.filename !== filename);
+    localStorage.setItem(trashKey, JSON.stringify(trashList));
   },
 
   async emptyTrash(): Promise<void> {
-    try {
+    if (isTauri()) {
       await invokeTauri("empty_trash");
-    } catch {
-      localStorage.setItem("kenote_trash_mock", "[]");
+      return;
     }
+    localStorage.setItem("kenote_trash_mock", "[]");
   },
 
   async setAlwaysOnTop(alwaysOnTop: boolean): Promise<void> {

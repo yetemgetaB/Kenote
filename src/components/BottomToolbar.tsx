@@ -11,11 +11,15 @@ import {
 interface BottomToolbarProps {
   editor: TiptapEditor | null;
   characterCount: number;
+  saveStatus?: "saved" | "saving" | "error";
+  onRetrySave?: () => void;
 }
 
 export const BottomToolbar: React.FC<BottomToolbarProps> = ({
   editor,
   characterCount,
+  saveStatus = "saved",
+  onRetrySave,
 }) => {
   const [showHeadingMenu, setShowHeadingMenu] = useState(false);
   const [showTextMenu, setShowTextMenu] = useState(false);
@@ -295,9 +299,27 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
         </div>
       </div>
 
-      {/* Character Count Stats Right */}
-      <div className="text-[11px] text-gray-500 select-none">
-        {characterCount} {characterCount === 1 ? "character" : "characters"}
+      {/* Stats & Save Indicator Right */}
+      <div className="flex items-center space-x-3 text-[11px] text-gray-500 select-none">
+        {saveStatus === "saving" && (
+          <span className="text-gray-400 flex items-center space-x-1 animate-pulse">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 inline-block"></span>
+            <span>Saving...</span>
+          </span>
+        )}
+        {saveStatus === "error" && (
+          <button
+            onClick={onRetrySave}
+            title="Save failed. Click to retry."
+            className="text-red-400 hover:text-red-300 font-semibold flex items-center space-x-1 cursor-pointer focus:outline-none"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block"></span>
+            <span>Save error (retry)</span>
+          </button>
+        )}
+        <span>
+          {characterCount} {characterCount === 1 ? "character" : "characters"}
+        </span>
       </div>
     </footer>
   );
