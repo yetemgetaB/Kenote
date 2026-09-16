@@ -600,9 +600,40 @@ export function App() {
   };
 
   // Update Settings
-  const handleUpdateSettings = (newSettings: AppSettings) => {
+  const handleUpdateSettings = async (newSettings: AppSettings) => {
+    const prevCustomDir = settings.custom_notes_dir;
     setSettings(newSettings);
     applyAccentColor(newSettings.accent_color);
+
+    // If custom_notes_dir changed, refresh notes directory and load notes from new directory
+    if (newSettings.custom_notes_dir !== prevCustomDir) {
+      try {
+        const newDir = await api.getNotesDirectory();
+        setNotesDir(newDir);
+        const reloadedNotes = await api.listNotes();
+        setNotes(reloadedNotes);
+
+        if (reloadedNotes.length > 0) {
+          const stillExists = activeNote && reloadedNotes.some((n) => n.id === activeNote.id);
+          if (!stillExists) {
+            const first = reloadedNotes[0];
+            activeNoteRef.current = first;
+            setActiveNote(first);
+            setActiveTitle(first.title);
+            setCharacterCount(first.character_count);
+            setRecentNoteIds([first.id]);
+          }
+        } else {
+          activeNoteRef.current = null;
+          setActiveNote(null);
+          setActiveTitle("Untitled");
+          setCharacterCount(0);
+          setRecentNoteIds([]);
+        }
+      } catch (err) {
+        console.error("Failed to reload notes after directory switch:", err);
+      }
+    }
   };
 
   // Prepare ordered notes for Quick Switcher (MRU or Default list order)

@@ -55,4 +55,58 @@ describe("S4 Settings & External Integration Tests", () => {
       assert.equal(cargoVersion, APP_VERSION);
     });
   });
+
+  describe("Custom Notes Directory Handling", () => {
+    it("reports custom notes directory when set in settings, and default when cleared", async () => {
+      const storage = new Map();
+      globalThis.localStorage = {
+        getItem: (k) => storage.get(k) || null,
+        setItem: (k, v) => storage.set(k, String(v)),
+        removeItem: (k) => storage.delete(k),
+        clear: () => storage.clear(),
+      };
+
+      const { api } = await import("../src/utils/tauriBridge.ts");
+
+      // Default directory
+      const defaultDir = await api.getNotesDirectory();
+      assert.match(defaultDir, /AppData|Local Browser Storage/);
+
+      // Set custom directory
+      const customPath = "D:\\MySpecialNotes";
+      await api.saveSettings({
+        accent_color: "#0399F7",
+        custom_notes_dir: customPath,
+        font_size: "15px",
+        font_family: "system-ui",
+        line_height: "1.6",
+        auto_save_interval: 500,
+        always_on_top: false,
+      });
+
+      const updatedDir = await api.getNotesDirectory();
+      assert.equal(updatedDir, customPath);
+
+      // Switching directory preserves existing notes
+      const notesBefore = await api.listNotes();
+      assert.ok(notesBefore.length > 0);
+
+      // Reset custom directory
+      await api.saveSettings({
+        accent_color: "#0399F7",
+        custom_notes_dir: null,
+        font_size: "15px",
+        font_family: "system-ui",
+        line_height: "1.6",
+        auto_save_interval: 500,
+        always_on_top: false,
+      });
+
+      const resetDir = await api.getNotesDirectory();
+      assert.equal(resetDir, defaultDir);
+
+      const notesAfter = await api.listNotes();
+      assert.equal(notesAfter.length, notesBefore.length);
+    });
+  });
 });

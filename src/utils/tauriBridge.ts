@@ -96,8 +96,33 @@ export const api = {
     try {
       return await invokeTauri<string>("get_notes_directory");
     } catch {
+      const settings = await this.getSettings();
+      if (settings.custom_notes_dir && settings.custom_notes_dir.trim().length > 0) {
+        return settings.custom_notes_dir.trim();
+      }
       return "Local Browser Storage (AppData/Kenote/notes in desktop app)";
     }
+  },
+
+  async selectDirectory(defaultPath?: string): Promise<string | null> {
+    if (isTauri()) {
+      try {
+        const { open } = await import("@tauri-apps/plugin-dialog");
+        const selected = await open({
+          directory: true,
+          multiple: false,
+          defaultPath: defaultPath || undefined,
+        });
+        if (selected && typeof selected === "string") {
+          return selected;
+        }
+        return null;
+      } catch (e) {
+        console.error("Failed to open directory selection dialog:", e);
+        return null;
+      }
+    }
+    return null;
   },
 
   async listNotes(): Promise<NoteMetadata[]> {

@@ -87,9 +87,12 @@ fn get_settings_path() -> PathBuf {
 
 fn get_resolved_notes_dir(custom_dir: Option<&str>) -> PathBuf {
     if let Some(dir) = custom_dir {
-        let path = PathBuf::from(dir);
-        if path.exists() {
-            return path;
+        let trimmed = dir.trim();
+        if !trimmed.is_empty() {
+            let path = PathBuf::from(trimmed);
+            if fs::create_dir_all(&path).is_ok() && path.is_dir() {
+                return path;
+            }
         }
     }
     let notes_dir = get_app_data_dir().join("notes");
@@ -512,6 +515,7 @@ fn close_window(window: WebviewWindow) -> Result<(), String> {
 fn reveal_in_explorer(filename: Option<String>) -> Result<(), String> {
     let settings = get_settings();
     let notes_dir = get_resolved_notes_dir(settings.custom_notes_dir.as_deref());
+    let _ = fs::create_dir_all(&notes_dir);
     let target = if let Some(name) = filename {
         notes_dir.join(name)
     } else {
@@ -997,6 +1001,24 @@ mod tests {
         assert_eq!(incoming.window_width, Some(600.0));
         assert_eq!(incoming.window_height, Some(800.0));
         assert_eq!(incoming.last_active_note_id, Some("note_123".to_string()));
+    }
+
+    #[test]
+    fn test_get_resolved_notes_dir_resolution_and_fallback() {
+        let default_dir = get_resolved_notes_dir(None);
+        assert!(default_dir.ends_with("notes"));
+
+        // Fallback on whitespace or empty strings
+        assert_eq!(get_resolved_notes_dir(Some("")), default_dir);
+        assert_eq!(get_resolved_notes_dir(Some("   ")), default_dir);
+
+        // Valid custom directory resolution
+        let temp_custom = std::env::temp_dir().join(format!("kenote_test_custom_dir_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let resolved = get_resolved_notes_dir(Some(temp_custom.to_str().unwrap()));
+        assert_eq!(resolved, temp_custom);
+        assert!(temp_custom.is_dir());
+
+        let _ = fs::remove_dir_all(&temp_custom);
     }
 }
 
