@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { AppSettings, COLOR_PRESETS, NoteMetadata } from "../types/note";
 import { api } from "../utils/tauriBridge";
+import { APP_VERSION } from "../utils/version";
 import appIconUrl from "../assets/app-icon.png";
 import {
   Palette,
@@ -135,7 +136,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [isDownloadingUpdate, setIsDownloadingUpdate] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<"idle" | "up_to_date" | "available" | "error">("idle");
   const [latestRelease, setLatestRelease] = useState<ReleaseInfo | null>(null);
-  const currentVersion = "0.4.0";
+  const currentVersion = APP_VERSION;
 
   // Load trashed notes when navigating to trash tab or initially
   useEffect(() => {

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { AppSettings, COLOR_PRESETS, NoteMetadata } from "../types/note";
 import { CloseIcon, FolderIcon, CheckIcon } from "./Icons";
 import { api } from "../utils/tauriBridge";
+import { APP_VERSION } from "../utils/version";
 import appIconUrl from "../assets/app-icon.png";
 
 interface SettingsModalProps {
@@ -58,7 +59,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isDownloadingUpdate, setIsDownloadingUpdate] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<"idle" | "up_to_date" | "available" | "error">("idle");
   const [latestRelease, setLatestRelease] = useState<ReleaseInfo | null>(null);
-  const currentVersion = "0.3.4";
+  const currentVersion = APP_VERSION;
 
   if (!isOpen) return null;
 

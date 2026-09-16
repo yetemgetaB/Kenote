@@ -1,4 +1,5 @@
 import posthog from "posthog-js";
+import { APP_VERSION } from "./version";
 
 const POSTHOG_KEY = "phc_zErvHesRFUeAuvkbBRY5seV7H3JyQTdQ2NPqKESL4Lsx";
 const POSTHOG_HOST = "https://eu.i.posthog.com";
@@ -25,7 +26,7 @@ export function initAnalytics() {
   }
 }
 
-export function trackAppLaunch(version: string = "0.2.0") {
+export function trackAppLaunch(version: string = APP_VERSION) {
   try {
     initAnalytics();
     posthog.capture("app_launched", {
@@ -41,7 +42,7 @@ export function trackAppLaunch(version: string = "0.2.0") {
   }
 }
 
-export function trackOnboardingComplete(source: string, version: string = "0.2.0") {
+export function trackOnboardingComplete(source: string, version: string = APP_VERSION) {
   try {
     initAnalytics();
     posthog.capture("onboarding_completed", {

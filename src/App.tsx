@@ -11,6 +11,7 @@ import { NoteMetadata, AppSettings } from "./types/note";
 import { api } from "./utils/tauriBridge";
 import { applyAccentColor } from "./utils/theme";
 import { trackAppLaunch } from "./utils/analytics";
+import { APP_VERSION } from "./utils/version";
 import {
   PlusIcon,
   NoteSwitcherIcon,
@@ -371,7 +372,7 @@ export function App() {
           setIsWelcomeOpen(true);
         }
 
-        trackAppLaunch("0.2.0");
+        trackAppLaunch(APP_VERSION);
 
         const dir = await api.getNotesDirectory();
         setNotesDir(dir);
