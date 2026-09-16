@@ -8,7 +8,7 @@ import { CommandPalette, ActionItem } from "./components/CommandPalette";
 import { SettingsView } from "./components/SettingsView";
 import { WelcomeModal } from "./components/WelcomeModal";
 import { NoteMetadata, AppSettings } from "./types/note";
-import { api } from "./utils/tauriBridge";
+import { api, isValidExternalUrl } from "./utils/tauriBridge";
 import { applyAccentColor } from "./utils/theme";
 import { trackAppLaunch } from "./utils/analytics";
 import { APP_VERSION } from "./utils/version";
@@ -91,6 +91,28 @@ export function App() {
   useEffect(() => {
     notesRef.current = notes;
   }, [notes]);
+
+  // Intercept all external link clicks to reliably open in user's default browser
+  useEffect(() => {
+    const handleGlobalClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      const anchor = target?.closest("a");
+      if (anchor) {
+        const href = anchor.getAttribute("href") || "";
+        if (href.startsWith("#")) return;
+        if (isValidExternalUrl(href)) {
+          event.preventDefault();
+          event.stopPropagation();
+          api.openExternal(href);
+        }
+      }
+    };
+
+    document.addEventListener("click", handleGlobalClick, true);
+    return () => {
+      document.removeEventListener("click", handleGlobalClick, true);
+    };
+  }, []);
 
   // Editor refs
   const editorRef = useRef<EditorHandle>(null);

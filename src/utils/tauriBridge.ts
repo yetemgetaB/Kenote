@@ -1,9 +1,23 @@
-import { AppSettings, NoteMetadata } from "../types/note";
+import type { AppSettings, NoteMetadata } from "../types/note.ts";
 
 // Detect if running inside Tauri
 export const isTauri = () => {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 };
+
+// Strict URL protocol validation to prevent injection or malicious local execution
+export function isValidExternalUrl(rawUrl: string): boolean {
+  if (!rawUrl || typeof rawUrl !== "string") return false;
+  const trimmed = rawUrl.trim();
+  try {
+    const parsed = new URL(trimmed);
+    return ["http:", "https:", "mailto:", "tel:"].includes(parsed.protocol.toLowerCase());
+  } catch {
+    if (/^mailto:[^\s@]+@[^\s@]+\.[^\s@]+$/i.test(trimmed)) return true;
+    if (/^tel:\+?[0-9\s\-()]+$/i.test(trimmed)) return true;
+    return false;
+  }
+}
 
 // Lazy load tauri invoke
 async function invokeTauri<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
@@ -308,12 +322,32 @@ export const api = {
     }
   },
 
+  async openExternal(url: string): Promise<boolean> {
+    if (!isValidExternalUrl(url)) {
+      console.warn("Blocked attempt to open invalid or unsafe external URL:", url);
+      return false;
+    }
+    try {
+      if (isTauri()) {
+        const { openUrl } = await import("@tauri-apps/plugin-opener");
+        await openUrl(url);
+        return true;
+      } else {
+        window.open(url, "_blank", "noopener,noreferrer");
+        return true;
+      }
+    } catch (e) {
+      console.error("Failed to open external URL:", e);
+      return false;
+    }
+  },
+
   async downloadAndRunInstaller(downloadUrl: string): Promise<void> {
     try {
       await invokeTauri("download_and_run_installer", { downloadUrl });
     } catch (e) {
-      console.log("Download and run installer", e);
-      window.open(downloadUrl, "_blank");
+      console.warn("Desktop installer download failed, opening browser fallback:", e);
+      await this.openExternal(downloadUrl);
     }
   },
 };

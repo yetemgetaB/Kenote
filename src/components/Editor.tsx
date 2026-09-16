@@ -12,6 +12,7 @@ import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import { Markdown } from "tiptap-markdown";
 import { common, createLowlight } from "lowlight";
 import { CodeBlockComponent } from "./CodeBlockComponent";
+import { api, isValidExternalUrl } from "../utils/tauriBridge";
 
 const lowlight = createLowlight(common);
 
@@ -254,6 +255,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
           openOnClick: false,
           HTMLAttributes: {
             class: "text-[var(--accent-color,#0399F7)] underline cursor-pointer hover:opacity-80",
+            rel: "noopener noreferrer",
           },
         }),
         Placeholder.configure({
@@ -272,6 +274,19 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
           class:
             "focus:outline-none min-h-[calc(100vh-100px)] px-6 py-5 prose prose-invert max-w-none text-[#D8E1E8]",
           style: `font-size: ${fontSize}; line-height: ${lineHeight}; font-family: ${fontFamily};`,
+        },
+        handleClick: (_view, _pos, event) => {
+          const target = event.target as HTMLElement;
+          const anchor = target?.closest("a");
+          if (anchor) {
+            const href = anchor.getAttribute("href") || "";
+            if (isValidExternalUrl(href)) {
+              event.preventDefault();
+              api.openExternal(href);
+              return true;
+            }
+          }
+          return false;
         },
         handleKeyDown: (_view, event) => {
           // Prevent Windows Insert key from toggling terminal overwrite mode

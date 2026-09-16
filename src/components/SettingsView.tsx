@@ -301,12 +301,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   const handleOpenLink = async (url: string) => {
-    try {
-      const { openUrl } = await import("@tauri-apps/plugin-opener");
-      await openUrl(url);
-    } catch {
-      window.open(url, "_blank");
-    }
+    await api.openExternal(url);
   };
 
   const filteredTrash = trashedNotes.filter(
