@@ -135,6 +135,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [isDownloadingUpdate, setIsDownloadingUpdate] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<"idle" | "up_to_date" | "available" | "error">("idle");
+  const [updateErrorMessage, setUpdateErrorMessage] = useState<string | null>(null);
+  const [trashActionError, setTrashActionError] = useState<string | null>(null);
   const [latestRelease, setLatestRelease] = useState<ReleaseInfo | null>(null);
   const currentVersion = APP_VERSION;
 
@@ -147,8 +149,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     try {
       const trashed = await api.listTrashedNotes();
       setTrashedNotes(trashed);
+      setTrashActionError(null);
     } catch (e) {
       console.error("Failed to load trashed notes:", e);
+      setTrashActionError("Failed to load trashed notes.");
     }
   };
 
@@ -235,6 +239,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const handleRestoreTrashedNote = async (note: NoteMetadata) => {
     try {
+      setTrashActionError(null);
       const restored = await api.restoreNote(note.filename);
       setTrashedNotes((prev) => prev.filter((n) => n.filename !== note.filename));
       if (onRestoreNote) {
@@ -242,30 +247,36 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       }
     } catch (err) {
       console.error("Failed to restore note:", err);
+      setTrashActionError(`Failed to restore note "${note.title}".`);
     }
   };
 
   const handlePermanentDelete = async (note: NoteMetadata) => {
     try {
+      setTrashActionError(null);
       await api.permanentlyDeleteNote(note.filename);
       setTrashedNotes((prev) => prev.filter((n) => n.filename !== note.filename));
     } catch (err) {
       console.error("Failed to permanently delete note:", err);
+      setTrashActionError(`Failed to permanently delete note "${note.title}".`);
     }
   };
 
   const handleEmptyTrash = async () => {
     try {
+      setTrashActionError(null);
       await api.emptyTrash();
       setTrashedNotes([]);
     } catch (err) {
       console.error("Failed to empty trash:", err);
+      setTrashActionError("Failed to empty trash.");
     }
   };
 
   const handleCheckUpdate = async () => {
     setCheckingUpdate(true);
     setUpdateStatus("idle");
+    setUpdateErrorMessage(null);
     try {
       const response = await fetch(
         "https://api.github.com/repos/yetemgetaB/Kenote/releases/latest"
@@ -275,7 +286,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           setUpdateStatus("up_to_date");
           return;
         }
-        throw new Error("Failed to check release");
+        if (response.status === 403) {
+          throw new Error("GitHub API rate limit exceeded. Please try again later.");
+        }
+        throw new Error(`Release check failed with HTTP ${response.status}`);
       }
       const data = await response.json();
       const tagName = data.tag_name || "";
@@ -298,27 +312,40 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           name: data.name || `Version ${latestVer}`,
           body: data.body || "New features and performance improvements.",
           url: data.html_url || "https://github.com/yetemgetaB/Kenote/releases",
-          installerUrl: setupAsset?.browser_download_url || data.html_url,
+          installerUrl: setupAsset?.browser_download_url,
           publishedAt: data.published_at ? new Date(data.published_at).toLocaleDateString() : "",
         });
         setUpdateStatus("available");
       } else {
         setUpdateStatus("up_to_date");
       }
-    } catch {
-      setUpdateStatus("up_to_date");
+    } catch (err: any) {
+      console.warn("Failed to check for updates:", err);
+      setUpdateStatus("error");
+      setUpdateErrorMessage(
+        err?.message || "Could not check for updates. Please check your network connection."
+      );
     } finally {
       setCheckingUpdate(false);
     }
   };
 
   const handleDownloadAndInstall = async (installerUrl?: string) => {
-    if (!installerUrl) return;
+    if (!installerUrl) {
+      if (latestRelease?.url) {
+        await api.openExternal(latestRelease.url);
+      }
+      return;
+    }
     setIsDownloadingUpdate(true);
+    setUpdateErrorMessage(null);
     try {
       await api.downloadAndRunInstaller(installerUrl);
-    } catch (e) {
+    } catch (e: any) {
       console.error("Update error:", e);
+      setUpdateStatus("error");
+      setUpdateErrorMessage(e?.message || "Failed to download and launch update installer.");
+    } finally {
       setIsDownloadingUpdate(false);
     }
   };
@@ -916,6 +943,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 )}
               </div>
 
+              {trashActionError && (
+                <div className="p-2.5 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-400">
+                  {trashActionError}
+                </div>
+              )}
+
               {/* Search Bar for Trash */}
               <input
                 type="text"
@@ -1018,6 +1051,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                           ? `New release ${latestRelease?.version} is ready!`
                           : updateStatus === "up_to_date"
                           ? "Kenote is up to date."
+                          : updateStatus === "error"
+                          ? "Update check could not complete."
                           : "Stay on the latest version."}
                       </p>
                     </div>
@@ -1071,23 +1106,48 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         );
                       })()}
                     </div>
+                    {latestRelease.installerUrl ? (
+                      <button
+                        onClick={() => handleDownloadAndInstall(latestRelease.installerUrl)}
+                        disabled={isDownloadingUpdate}
+                        className="w-full py-2 bg-[var(--accent-color,#0399F7)] hover:bg-[var(--accent-hover,#0284c7)] disabled:opacity-75 text-white text-xs font-bold rounded-xl shadow-md transition-all focus:outline-none flex items-center justify-center space-x-2"
+                      >
+                        {isDownloadingUpdate ? (
+                          <>
+                            <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <span>Downloading & Installing in Background...</span>
+                          </>
+                        ) : (
+                          <span>Download & Install Now</span>
+                        )}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => api.openExternal(latestRelease.url)}
+                        className="w-full py-2 bg-[#252E3C] hover:bg-[#313C4E] text-white text-xs font-bold rounded-xl border border-[#374355] shadow-sm transition-all focus:outline-none flex items-center justify-center space-x-2"
+                      >
+                        <ExternalLink size={13} />
+                        <span>View Release on GitHub</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Update Error Banner */}
+                {updateStatus === "error" && (
+                  <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl space-y-1.5 mt-2">
+                    <div className="text-xs font-semibold text-red-400">
+                      Update Check Failed
+                    </div>
+                    <p className="text-[11px] text-gray-300">
+                      {updateErrorMessage || "Could not check for updates. Please try again later."}
+                    </p>
                     <button
-                      onClick={() =>
-                        handleDownloadAndInstall(
-                          latestRelease.installerUrl || latestRelease.url
-                        )
-                      }
-                      disabled={isDownloadingUpdate}
-                      className="w-full py-2 bg-[var(--accent-color,#0399F7)] hover:bg-[var(--accent-hover,#0284c7)] disabled:opacity-75 text-white text-xs font-bold rounded-xl shadow-md transition-all focus:outline-none flex items-center justify-center space-x-2"
+                      onClick={() => api.openExternal("https://github.com/yetemgetaB/Kenote/releases")}
+                      className="text-[11px] text-[var(--accent-color,#0399F7)] hover:underline flex items-center space-x-1 pt-0.5"
                     >
-                      {isDownloadingUpdate ? (
-                        <>
-                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          <span>Downloading & Installing in Background...</span>
-                        </>
-                      ) : (
-                        <span>Download & Install Now</span>
-                      )}
+                      <span>View releases on GitHub</span>
+                      <ExternalLink size={10} />
                     </button>
                   </div>
                 )}

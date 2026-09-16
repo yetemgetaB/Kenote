@@ -85,9 +85,9 @@ export const api = {
   },
 
   async saveSettings(settings: AppSettings): Promise<void> {
-    try {
+    if (isTauri()) {
       await invokeTauri("save_settings", { settings });
-    } catch {
+    } else {
       localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(settings));
     }
   },
@@ -295,7 +295,8 @@ export const api = {
     try {
       await invokeTauri("reveal_in_explorer", { filename });
     } catch (e) {
-      console.log("Reveal in explorer", e);
+      console.error("Failed to reveal in explorer:", e);
+      throw e;
     }
   },
 
@@ -373,6 +374,7 @@ export const api = {
     } catch (e) {
       console.warn("Desktop installer download failed, opening browser fallback:", e);
       await this.openExternal(downloadUrl);
+      throw e;
     }
   },
 };

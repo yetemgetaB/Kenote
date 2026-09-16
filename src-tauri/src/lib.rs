@@ -698,6 +698,7 @@ async fn download_and_run_installer(
 ) -> Result<(), String> {
     let temp_dir = std::env::temp_dir();
     let installer_path = temp_dir.join("Kenote-Update-Setup.exe");
+    let _ = fs::remove_file(&installer_path);
 
     let url = download_url.clone();
     let path = installer_path.clone();
@@ -736,16 +737,11 @@ async fn download_and_run_installer(
 
     #[cfg(target_os = "windows")]
     {
-        use std::os::windows::process::CommandExt;
         use std::process::Command;
 
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-
-        // Run NSIS setup silently (/S) so it updates files and restarts without terminal prompts
-        let _ = Command::new(&installer_path)
-            .arg("/S")
-            .creation_flags(CREATE_NO_WINDOW)
-            .spawn();
+        Command::new(&installer_path)
+            .spawn()
+            .map_err(|e| format!("Failed to run installer: {}", e))?;
 
         let _ = window.close();
     }
@@ -753,14 +749,20 @@ async fn download_and_run_installer(
     #[cfg(target_os = "macos")]
     {
         use std::process::Command;
-        let _ = Command::new("open").arg(&installer_path).spawn();
+        Command::new("open")
+            .arg(&installer_path)
+            .spawn()
+            .map_err(|e| format!("Failed to open installer: {}", e))?;
         let _ = window.close();
     }
 
     #[cfg(target_os = "linux")]
     {
         use std::process::Command;
-        let _ = Command::new("xdg-open").arg(&installer_path).spawn();
+        Command::new("xdg-open")
+            .arg(&installer_path)
+            .spawn()
+            .map_err(|e| format!("Failed to open installer: {}", e))?;
         let _ = window.close();
     }
 

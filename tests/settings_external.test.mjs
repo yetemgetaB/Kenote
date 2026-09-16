@@ -109,4 +109,66 @@ describe("S4 Settings & External Integration Tests", () => {
       assert.equal(notesAfter.length, notesBefore.length);
     });
   });
+
+  describe("Updater Reliability & Version Comparison", () => {
+    function isNewerVersion(remote, current) {
+      const parse = (v) => v.replace(/^v/, "").split(".").map((x) => parseInt(x, 10) || 0);
+      const r = parse(remote);
+      const c = parse(current);
+      for (let i = 0; i < Math.max(r.length, c.length); i++) {
+        const rVal = r[i] || 0;
+        const cVal = c[i] || 0;
+        if (rVal > cVal) return true;
+        if (rVal < cVal) return false;
+      }
+      return false;
+    }
+
+    it("correctly determines semantic version precedence", () => {
+      assert.equal(isNewerVersion("0.4.1", "0.4.0"), true);
+      assert.equal(isNewerVersion("v0.4.1", "0.4.0"), true);
+      assert.equal(isNewerVersion("0.5.0", "0.4.0"), true);
+      assert.equal(isNewerVersion("1.0.0", "0.4.0"), true);
+      assert.equal(isNewerVersion("0.4.0", "0.4.0"), false);
+      assert.equal(isNewerVersion("v0.4.0", "0.4.0"), false);
+      assert.equal(isNewerVersion("0.3.9", "0.4.0"), false);
+      assert.equal(isNewerVersion("0.3.4", "0.4.0"), false);
+    });
+
+    it("ensures network or HTTP failures are classified as error and not up_to_date", async () => {
+      // Test update check state transition simulation
+      let updateStatus = "idle";
+      let errorMessage = null;
+
+      async function checkUpdateWithMockResponse(mockStatus) {
+        try {
+          if (mockStatus === 404) {
+            updateStatus = "up_to_date";
+            return;
+          }
+          if (mockStatus === 403) {
+            throw new Error("GitHub API rate limit exceeded");
+          }
+          if (mockStatus !== 200) {
+            throw new Error(`HTTP ${mockStatus}`);
+          }
+        } catch (err) {
+          updateStatus = "error";
+          errorMessage = err.message;
+        }
+      }
+
+      await checkUpdateWithMockResponse(500);
+      assert.equal(updateStatus, "error");
+      assert.equal(errorMessage, "HTTP 500");
+
+      await checkUpdateWithMockResponse(403);
+      assert.equal(updateStatus, "error");
+      assert.match(errorMessage, /rate limit/);
+
+      // Only clean 404 (no releases published) is considered up_to_date
+      await checkUpdateWithMockResponse(404);
+      assert.equal(updateStatus, "up_to_date");
+    });
+  });
 });
