@@ -8,6 +8,7 @@ import {
   CloseIcon,
   SettingsIcon,
 } from "./Icons";
+import { ArrowLeft } from "lucide-react";
 
 interface TitlebarProps {
   title: string;
@@ -47,10 +48,18 @@ export const Titlebar: React.FC<TitlebarProps> = ({
           <button
             onClick={onCloseSettings}
             title="Back to Editor (Esc)"
-            className="flex items-center space-x-1.5 px-2 py-1 rounded-md text-gray-300 hover:text-white hover:bg-[#2A313D] transition-colors focus:outline-none text-xs font-semibold"
+            className="group flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-gray-200 bg-[#222834]/80 hover:bg-[#2B3444] active:bg-[#1C222D] border border-[#333E50]/80 hover:border-[#4B5A72] shadow-sm hover:shadow transition-all duration-150 focus:outline-none focus:ring-1 focus:ring-[var(--accent-color,#0399F7)]"
           >
-            <span>←</span>
-            <span>Editor</span>
+            <ArrowLeft
+              size={13}
+              className="text-[var(--accent-color,#0399F7)] group-hover:-translate-x-0.5 transition-transform duration-150 ease-out shrink-0"
+            />
+            <span className="font-semibold text-gray-100 group-hover:text-white transition-colors">
+              Back
+            </span>
+            <kbd className="inline-flex items-center justify-center font-mono text-[10px] text-gray-400 bg-[#141820]/90 px-1.5 py-0.5 rounded border border-[#2D3646] leading-none ml-0.5 group-hover:text-gray-300 group-hover:border-[#3E4A5E] transition-colors">
+              Esc
+            </kbd>
           </button>
         ) : (
           <>
