@@ -9,6 +9,15 @@ import {
   UpdateInfo,
   UpdateStatus,
 } from "../utils/updater";
+import {
+  setTelemetryEnabled,
+  trackUpdateCheck,
+  trackUpdateAvailable,
+  trackUpdateDownloadStarted,
+  trackUpdateSucceeded,
+  trackUpdateFailed,
+  trackFeatureUsed,
+} from "../utils/analytics";
 import appIconUrl from "../assets/app-icon.png";
 import {
   Palette,
@@ -123,7 +132,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [updateErrorMessage, setUpdateErrorMessage] = useState<string | null>(null);
   const [trashActionError, setTrashActionError] = useState<string | null>(null);
+  const [telemetryEnabled, setTelemetryEnabledState] = useState(settings.telemetry_enabled ?? true);
   const currentVersion = APP_VERSION;
+
+  // Sync telemetry state if settings prop changes externally
+  useEffect(() => {
+    setTelemetryEnabledState(settings.telemetry_enabled ?? true);
+  }, [settings.telemetry_enabled]);
 
   // Load trashed notes when navigating to trash tab or initially
   useEffect(() => {
@@ -139,6 +154,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       console.error("Failed to load trashed notes:", e);
       setTrashActionError("Failed to load trashed notes.");
     }
+  };
+
+  const handleToggleTelemetry = (enabled: boolean) => {
+    setTelemetryEnabledState(enabled);
+    setTelemetryEnabled(enabled);
+    const updated: AppSettings = {
+      ...settings,
+      telemetry_enabled: enabled,
+    };
+    onUpdateSettings(updated);
+    api.saveSettings(updated);
   };
 
   const handleSaveStartupBehavior = (
@@ -161,6 +187,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     order: "mru" | "pinned_updated",
     shortcut: "ctrl_tab" | "alt_tab" | "ctrl_pagedown"
   ) => {
+    trackFeatureUsed("quick_switcher");
     setQuickSwitcherMode(mode);
     setQuickSwitcherOrder(order);
     setQuickSwitcherShortcut(shortcut);
@@ -175,6 +202,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   const handleSaveColor = (color: string) => {
+    trackFeatureUsed("change_accent_color");
     setAccentColor(color);
     const updated = { ...settings, accent_color: color };
     onUpdateSettings(updated);
@@ -186,6 +214,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     newLineHeight: string,
     newFamily: string
   ) => {
+    trackFeatureUsed("change_typography");
     setFontSize(newSize);
     setLineHeight(newLineHeight);
     setFontFamily(newFamily);
@@ -203,6 +232,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     try {
       const selected = await api.selectDirectory(notesDir);
       if (selected && selected.trim().length > 0 && selected.trim() !== notesDir) {
+        trackFeatureUsed("change_notes_directory");
         const updated: AppSettings = { ...settings, custom_notes_dir: selected.trim() };
         onUpdateSettings(updated);
         await api.saveSettings(updated);
@@ -214,6 +244,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const handleResetFolder = async () => {
     try {
+      trackFeatureUsed("reset_notes_directory");
       const updated: AppSettings = { ...settings, custom_notes_dir: null };
       onUpdateSettings(updated);
       await api.saveSettings(updated);
@@ -226,6 +257,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     try {
       setTrashActionError(null);
       const restored = await api.restoreNote(note.filename);
+      trackFeatureUsed("restore_trashed_note");
       setTrashedNotes((prev) => prev.filter((n) => n.filename !== note.filename));
       if (onRestoreNote) {
         onRestoreNote(restored);
@@ -240,6 +272,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     try {
       setTrashActionError(null);
       await api.permanentlyDeleteNote(note.filename);
+      trackFeatureUsed("permanently_delete_note");
       setTrashedNotes((prev) => prev.filter((n) => n.filename !== note.filename));
     } catch (err) {
       console.error("Failed to permanently delete note:", err);
@@ -251,6 +284,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     try {
       setTrashActionError(null);
       await api.emptyTrash();
+      trackFeatureUsed("empty_trash");
       setTrashedNotes([]);
     } catch (err) {
       console.error("Failed to empty trash:", err);
@@ -259,6 +293,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   const handleCheckUpdate = async () => {
+    trackUpdateCheck("manual");
     setUpdateStatus("checking");
     setUpdateErrorMessage(null);
     try {
@@ -266,19 +301,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       if (res.error) {
         setUpdateStatus("error");
         setUpdateErrorMessage(res.error);
+        trackUpdateFailed("check_failed", "manual");
       } else if (res.available && res.update) {
         setUpdateInfo(res.update);
         setUpdateStatus("available");
+        trackUpdateAvailable(res.update.version, "manual");
       } else {
         setUpdateStatus("up_to_date");
       }
     } catch (err: any) {
       setUpdateStatus("error");
       setUpdateErrorMessage(err?.message || "Could not check for updates.");
+      trackUpdateFailed("check_failed", "manual");
     }
   };
 
   const handleInstallUpdate = async () => {
+    trackUpdateDownloadStarted(updateInfo?.version || "", "manual");
     setUpdateStatus("downloading");
     setDownloadProgress(0);
     setUpdateErrorMessage(null);
@@ -292,10 +331,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         }
       );
       setUpdateStatus("ready_to_restart");
+      trackUpdateSucceeded(updateInfo?.version || "");
     } catch (err: any) {
       console.error("Update failed:", err);
       setUpdateStatus("error");
       setUpdateErrorMessage(err?.message || "Failed to download and install update.");
+      const category = updateStatus === "installing" ? "install_failed" : "download_failed";
+      trackUpdateFailed(category, "manual");
     }
   };
 
@@ -643,6 +685,35 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       Ctrl + ,
                     </kbd>
                   </div>
+                </div>
+              </div>
+
+              {/* Anonymous Usage Statistics Card */}
+              <div className="p-4 bg-[#1B212B] border border-[#2B3442] rounded-xl space-y-3 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="pr-4">
+                    <h3 className="text-xs font-semibold text-white uppercase tracking-wider">
+                      Anonymous Usage Statistics
+                    </h3>
+                    <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">
+                      Help improve Kenote by sending anonymous usage statistics such as app launches, feature usage, and update results. Your notes, note contents, filenames, and personal information are never sent.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={telemetryEnabled}
+                    onClick={() => handleToggleTelemetry(!telemetryEnabled)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      telemetryEnabled ? "bg-[var(--accent-color,#0399F7)]" : "bg-[#2A3342]"
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        telemetryEnabled ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
                 </div>
               </div>
             </div>

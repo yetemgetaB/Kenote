@@ -1,6 +1,11 @@
 import React, { useState } from "react";
 import appIconUrl from "../assets/app-icon.png";
 import { UpdateInfo, installUpdate, relaunchApp } from "../utils/updater";
+import {
+  trackUpdateDownloadStarted,
+  trackUpdateSucceeded,
+  trackUpdateFailed,
+} from "../utils/analytics";
 import { Sparkles, RefreshCw, CheckCircle2, AlertTriangle } from "lucide-react";
 
 interface UpdateModalProps {
@@ -19,6 +24,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ isOpen, onClose, updat
   if (!isOpen || !update) return null;
 
   const handleUpdateNow = async () => {
+    trackUpdateDownloadStarted(update.version, "automatic");
     setStatus("downloading");
     setErrorMessage(null);
     try {
@@ -35,10 +41,13 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ isOpen, onClose, updat
         }
       );
       setStatus("ready");
+      trackUpdateSucceeded(update.version);
     } catch (err: any) {
       console.error("In-app update failed:", err);
       setStatus("error");
       setErrorMessage(err?.message || "Failed to download and install update.");
+      const category = status === "installing" ? "install_failed" : "download_failed";
+      trackUpdateFailed(category, "automatic");
     }
   };
 

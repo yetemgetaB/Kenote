@@ -29,6 +29,7 @@ export interface AppSettings {
   window_y?: number;
   has_completed_onboarding?: boolean;
   discovery_source?: string | null;
+  telemetry_enabled?: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -42,6 +43,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   quick_switcher_mode: "overlay",
   quick_switcher_order: "mru",
   quick_switcher_shortcut: "ctrl_tab",
+  telemetry_enabled: true,
 };
 
 export interface ColorPreset {

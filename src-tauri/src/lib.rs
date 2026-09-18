@@ -43,6 +43,12 @@ pub struct AppSettings {
     pub window_y: Option<i32>,
     pub has_completed_onboarding: bool,
     pub discovery_source: Option<String>,
+    #[serde(default = "default_telemetry_enabled")]
+    pub telemetry_enabled: Option<bool>,
+}
+
+fn default_telemetry_enabled() -> Option<bool> {
+    Some(true)
 }
 
 impl Default for AppSettings {
@@ -67,6 +73,7 @@ impl Default for AppSettings {
             window_y: None,
             has_completed_onboarding: false,
             discovery_source: None,
+            telemetry_enabled: Some(true),
         }
     }
 }

@@ -3,7 +3,6 @@ import appIconUrl from "../assets/app-icon.png";
 import { AppSettings } from "../types/note";
 import { api } from "../utils/tauriBridge";
 import { trackOnboardingComplete } from "../utils/analytics";
-import { APP_VERSION } from "../utils/version";
 import { CheckIcon } from "./Icons";
 
 interface WelcomeModalProps {
@@ -33,7 +32,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({
   if (!isOpen) return null;
 
   const handleGetStarted = () => {
-    trackOnboardingComplete(selectedSource, APP_VERSION);
+    trackOnboardingComplete(selectedSource);
     const updated: AppSettings = {
       ...settings,
       has_completed_onboarding: true,

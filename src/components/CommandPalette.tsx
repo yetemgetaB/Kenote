@@ -1,6 +1,21 @@
 import React, { useState, useEffect, useRef } from "react";
 import { NoteMetadata } from "../types/note";
 import { PinIcon, NoteSwitcherIcon } from "./Icons";
+import { trackCommandUsed, CommandActionId } from "../utils/analytics";
+
+const COMMAND_MAP: Record<string, CommandActionId> = {
+  new_note: "new_note",
+  browse_notes: "note_switcher",
+  note_switcher: "note_switcher",
+  toggle_pin: "toggle_pin",
+  copy_markdown: "copy_markdown",
+  open_folder: "reveal_in_explorer",
+  reveal_in_explorer: "reveal_in_explorer",
+  settings: "settings",
+  check_for_updates: "check_for_updates",
+  delete_active_note: "delete_note",
+  delete_note: "delete_note",
+};
 
 export interface ActionItem {
   id: string;
@@ -59,6 +74,15 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     setSelectedIndex(0);
   }, [search]);
 
+  const executeAction = (action: ActionItem) => {
+    const commandId = COMMAND_MAP[action.id];
+    if (commandId) {
+      trackCommandUsed(commandId);
+    }
+    action.perform();
+    onClose();
+  };
+
   // Handle keyboard navigation
   useEffect(() => {
     if (!isOpen) return;
@@ -87,8 +111,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
           const actionIndex = selectedIndex - filteredNotes.length;
           const action = filteredActions[actionIndex];
           if (action) {
-            action.perform();
-            onClose();
+            executeAction(action);
           }
         }
       }
@@ -195,8 +218,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                       <div
                         key={action.id}
                         onClick={() => {
-                          action.perform();
-                          onClose();
+                          executeAction(action);
                         }}
                         onMouseEnter={() => setSelectedIndex(overallIndex)}
                         className={`px-3 py-2.5 rounded-xl cursor-pointer flex items-center justify-between group transition-all ${

@@ -12,8 +12,15 @@ import { UpdateModal } from "./components/UpdateModal";
 import { NoteMetadata, AppSettings, DEFAULT_SETTINGS } from "./types/note";
 import { api, isValidExternalUrl } from "./utils/tauriBridge";
 import { applyAccentColor } from "./utils/theme";
-import { trackAppLaunch } from "./utils/analytics";
-import { APP_VERSION } from "./utils/version";
+import {
+  setTelemetryEnabled,
+  trackAppLaunch,
+  trackNoteCreated,
+  trackNoteDeleted,
+  trackNoteRestored,
+  trackUpdateCheck,
+  trackUpdateAvailable,
+} from "./utils/analytics";
 import { checkForUpdate, UpdateInfo } from "./utils/updater";
 import {
   PlusIcon,
@@ -270,6 +277,7 @@ export function App() {
 
     try {
       const newNote = await api.saveNote("", "", false);
+      trackNoteCreated();
       setNotes((prev) => [newNote, ...prev]);
       activeNoteRef.current = newNote;
       setActiveNote(newNote);
@@ -387,11 +395,15 @@ export function App() {
         setIsAlwaysOnTop(loadedSettings.always_on_top);
         applyAccentColor(loadedSettings.accent_color);
 
+        const telemetryEnabled = loadedSettings.telemetry_enabled ?? true;
+        setTelemetryEnabled(telemetryEnabled);
+        if (telemetryEnabled) {
+          trackAppLaunch();
+        }
+
         if (!loadedSettings.has_completed_onboarding) {
           setIsWelcomeOpen(true);
         }
-
-        trackAppLaunch(APP_VERSION);
 
         const dir = await api.getNotesDirectory();
         setNotesDir(dir);
@@ -440,8 +452,10 @@ export function App() {
   useEffect(() => {
     const timer = setTimeout(async () => {
       try {
+        trackUpdateCheck("automatic");
         const res = await checkForUpdate();
         if (res.available && res.update) {
+          trackUpdateAvailable(res.update.version, "automatic");
           setAvailableUpdate(res.update);
           setIsUpdateModalOpen(true);
         }
@@ -541,6 +555,7 @@ export function App() {
         pendingSaveRef.current = null;
       }
       await api.deleteNote(note.filename);
+      trackNoteDeleted();
       const remaining = notes.filter((n) => n.filename !== note.filename);
       setNotes(remaining);
       setRecentNoteIds((prev) => prev.filter((id) => id !== note.id));
@@ -579,6 +594,7 @@ export function App() {
 
   // Restore Note from Trash
   const handleRestoreNote = (restoredNote: NoteMetadata) => {
+    trackNoteRestored();
     setNotes((prev) => {
       const exists = prev.some((n) => n.id === restoredNote.id);
       if (exists) return prev;
