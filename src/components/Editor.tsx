@@ -16,6 +16,9 @@ import { api, isValidExternalUrl } from "../utils/tauriBridge";
 
 const lowlight = createLowlight(common);
 
+import { createSafeSelection } from "../utils/selection";
+export { createSafeSelection };
+
 // Smart Bold helper: toggles bold on the word around the cursor or on existing selection
 export function toggleSmartBold(editor: any): boolean {
   if (!editor || editor.isDestroyed) return false;
@@ -87,7 +90,10 @@ export function toggleSmartBold(editor: any): boolean {
   // Preserve cursor position
   const currentPos = $from.pos;
   const clampedPos = Math.min(Math.max(from, currentPos), to);
-  tr.setSelection(state.selection.constructor.near(tr.doc.resolve(clampedPos)));
+  const safeSel = createSafeSelection(tr.doc, clampedPos, clampedPos);
+  if (safeSel) {
+    tr.setSelection(safeSel);
+  }
 
   dispatch(tr);
   return true;
@@ -196,10 +202,13 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
       try {
         const { from, to } = ed.state.selection;
         if (typeof from === "number" && typeof to === "number" && from >= 1) {
-          const key = "kenote_cursor_positions";
-          const current = JSON.parse(localStorage.getItem(key) || "{}");
-          current[currentNoteId] = { from, to };
-          localStorage.setItem(key, JSON.stringify(current));
+          const $from = ed.state.doc.resolve(from);
+          if ($from.parent.inlineContent) {
+            const key = "kenote_cursor_positions";
+            const current = JSON.parse(localStorage.getItem(key) || "{}");
+            current[currentNoteId] = { from, to };
+            localStorage.setItem(key, JSON.stringify(current));
+          }
         }
       } catch {}
     };
@@ -210,21 +219,17 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
         const key = "kenote_cursor_positions";
         const savedMap = JSON.parse(localStorage.getItem(key) || "{}");
         const savedPos = savedMap[currentNoteId];
-        const docSize = ed.state.doc.content.size;
 
         if (savedPos && typeof savedPos.from === "number") {
-          const from = Math.min(Math.max(1, savedPos.from), docSize);
-          const to = Math.min(Math.max(from, savedPos.to ?? from), docSize);
-          try {
-            ed.commands.setTextSelection({ from, to });
-          } catch {
-            const resolvedPos = ed.state.doc.resolve(from);
-            const sel = ed.state.selection.constructor.near(resolvedPos);
-            ed.view.dispatch(ed.state.tr.setSelection(sel));
+          const safeSel = createSafeSelection(ed.state.doc, savedPos.from, savedPos.to);
+          if (safeSel) {
+            ed.view.dispatch(ed.state.tr.setSelection(safeSel));
+            ed.commands.scrollIntoView();
           }
-          ed.commands.scrollIntoView();
         }
-      } catch {}
+      } catch (err) {
+        console.warn("Could not restore cursor position:", err);
+      }
     };
 
     const editor = useEditor({
@@ -335,32 +340,40 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
       };
     }, [editor]);
 
+    const onEditorReadyRef = useRef(onEditorReady);
     useEffect(() => {
-      if (editor && onEditorReady) {
-        onEditorReady(editor);
+      onEditorReadyRef.current = onEditorReady;
+    }, [onEditorReady]);
+
+    const hasRestoredInitialCursorRef = useRef(false);
+
+    useEffect(() => {
+      if (editor && !hasRestoredInitialCursorRef.current) {
+        hasRestoredInitialCursorRef.current = true;
+        onEditorReadyRef.current?.(editor);
         if (noteId) {
           restoreCursor(noteId, editor);
         }
       }
-    }, [editor, onEditorReady, noteId]);
+    }, [editor, noteId]);
 
     // Set content and restore cursor safely during note switching
     useEffect(() => {
       if (!editor || !noteId) return;
 
       if (prevNoteIdRef.current !== noteId) {
+        if (cursorSaveTimeoutRef.current) {
+          clearTimeout(cursorSaveTimeoutRef.current);
+          cursorSaveTimeoutRef.current = null;
+        }
         if (prevNoteIdRef.current) {
           saveCursorImmediately(prevNoteIdRef.current, editor);
         }
         prevNoteIdRef.current = noteId;
         isSwitchingNoteRef.current = true;
         editor.commands.setContent(preserveBlankLines(initialContent || ""), false);
-        requestAnimationFrame(() => {
-          restoreCursor(noteId, editor);
-          setTimeout(() => {
-            isSwitchingNoteRef.current = false;
-          }, 100);
-        });
+        restoreCursor(noteId, editor);
+        isSwitchingNoteRef.current = false;
       }
     }, [noteId, initialContent, editor]);
 
@@ -371,14 +384,16 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
       },
       setMarkdown: (md: string) => {
         if (editor && !editor.isDestroyed) {
+          if (cursorSaveTimeoutRef.current) {
+            clearTimeout(cursorSaveTimeoutRef.current);
+            cursorSaveTimeoutRef.current = null;
+          }
           isSwitchingNoteRef.current = true;
           editor.commands.setContent(preserveBlankLines(md), false);
           if (noteId) {
             restoreCursor(noteId, editor);
           }
-          setTimeout(() => {
-            isSwitchingNoteRef.current = false;
-          }, 100);
+          isSwitchingNoteRef.current = false;
         }
       },
       focus: () => {

@@ -27,6 +27,7 @@ const CodeBlockLowlight = (await import("@tiptap/extension-code-block-lowlight")
 const { common, createLowlight } = await import("lowlight");
 const { Markdown } = await import("tiptap-markdown");
 const { Editor } = await import("@tiptap/core");
+const { createSafeSelection } = await import("../src/utils/selection.ts");
 
 const lowlight = createLowlight(common);
 
@@ -220,6 +221,135 @@ describe("Editor Markdown Roundtrip Tests", () => {
 
     const md2 = ed.storage.markdown.getMarkdown().trim();
     assert.strictEqual(md2, "hello world");
+    ed.destroy();
+  });
+});
+
+describe("Editor Cursor & Selection Regression Tests", () => {
+  test("places cursor accurately inside normal paragraphs without deviation", () => {
+    const ed = createTestEditor("Line 1\n\nLine 2\n\nLine 3");
+    const doc = ed.state.doc;
+    let line3Pos = null;
+    doc.descendants((node, pos) => {
+      if (node.isText && node.text.includes("Line 3")) {
+        line3Pos = pos + 2; // inside "Line 3"
+      }
+    });
+    assert.ok(line3Pos !== null, "Line 3 position must exist");
+    const safeSel = createSafeSelection(doc, line3Pos, line3Pos);
+    assert.ok(safeSel);
+    ed.view.dispatch(ed.state.tr.setSelection(safeSel));
+    assert.strictEqual(ed.state.selection.from, line3Pos);
+    assert.strictEqual(ed.state.selection.$from.parent.inlineContent, true);
+    ed.destroy();
+  });
+
+  test("places cursor accurately inside task items without warning or non-inline endpoints", () => {
+    const ed = createTestEditor("- [ ] Task 1\n- [ ] Task 2\n- [ ] Task 3");
+    const doc = ed.state.doc;
+    let task3Pos = null;
+    doc.descendants((node, pos) => {
+      if (node.isText && node.text.includes("Task 3")) {
+        task3Pos = pos + 3;
+      }
+    });
+    assert.ok(task3Pos !== null, "Task 3 position must exist");
+    const safeSel = createSafeSelection(doc, task3Pos, task3Pos);
+    assert.ok(safeSel);
+    ed.view.dispatch(ed.state.tr.setSelection(safeSel));
+    assert.strictEqual(ed.state.selection.from, task3Pos);
+    assert.strictEqual(ed.state.selection.$from.parent.type.name, "paragraph");
+    assert.strictEqual(ed.state.selection.$from.parent.inlineContent, true);
+    ed.destroy();
+  });
+
+  test("switching between notes containing task lists safely restores valid cursor positions", () => {
+    const ed = createTestEditor("- [ ] Note 1 Item 1\n- [ ] Note 1 Item 2");
+    // Save cursor position in Note 1
+    const note1Pos = ed.state.doc.content.size - 2;
+    const safeNote1Sel = createSafeSelection(ed.state.doc, note1Pos);
+    ed.view.dispatch(ed.state.tr.setSelection(safeNote1Sel));
+    const savedNote1Cursor = ed.state.selection.from;
+
+    // Switch to Note 2 with different task items
+    ed.commands.setContent("- [ ] Note 2 Alpha\n- [ ] Note 2 Beta\n- [ ] Note 2 Gamma", false);
+    const note2Sel = createSafeSelection(ed.state.doc, 5);
+    ed.view.dispatch(ed.state.tr.setSelection(note2Sel));
+    assert.strictEqual(ed.state.selection.$from.parent.inlineContent, true);
+
+    // Switch back to Note 1 and restore saved cursor safely
+    ed.commands.setContent("- [ ] Note 1 Item 1\n- [ ] Note 1 Item 2", false);
+    const restoredNote1Sel = createSafeSelection(ed.state.doc, savedNote1Cursor);
+    ed.view.dispatch(ed.state.tr.setSelection(restoredNote1Sel));
+    assert.strictEqual(ed.state.selection.from, savedNote1Cursor);
+    assert.strictEqual(ed.state.selection.$from.parent.inlineContent, true);
+    ed.destroy();
+  });
+
+  test("safely clamps and resolves invalid or block-boundary cursor positions (taskItem/doc boundary)", () => {
+    const ed = createTestEditor("- [ ] Task 1\n- [ ] Task 2\n- [ ] Task 3");
+    const doc = ed.state.doc;
+    // Pos 10 is taskItem boundary (non-inline content). In previous code, setTextSelection(10) triggered console.warn
+    const safeSel10 = createSafeSelection(doc, 10);
+    assert.ok(safeSel10);
+    assert.strictEqual(safeSel10.$from.parent.inlineContent, true, "Endpoint must point into inline content");
+    assert.strictEqual(safeSel10.$from.parent.type.name, "paragraph");
+
+    // Test extreme out-of-bounds pos 9999
+    const safeSelOutOfBounds = createSafeSelection(doc, 9999);
+    assert.ok(safeSelOutOfBounds);
+    assert.strictEqual(safeSelOutOfBounds.$from.parent.inlineContent, true);
+    assert.strictEqual(safeSelOutOfBounds.from <= doc.content.size, true);
+
+    // Test pos 0 (before doc)
+    const safeSelZero = createSafeSelection(doc, 0);
+    assert.ok(safeSelZero);
+    assert.strictEqual(safeSelZero.$from.parent.inlineContent, true);
+
+    ed.destroy();
+  });
+
+  test("synchronous note content switching guarantees user selection is not overwritten by stale RAF", () => {
+    const ed = createTestEditor("Line 1\n\nLine 2\n\nLine 3");
+    const cursorPositions = { "note-1": { from: 1, to: 1 }, "note-2": { from: 2, to: 2 } };
+
+    // Switch to Note 2 synchronously
+    ed.commands.setContent("Note 2 Line 1\n\nNote 2 Line 2\n\nNote 2 Line 3", false);
+    // Synchronous restore runs immediately
+    const safeSel = createSafeSelection(ed.state.doc, cursorPositions["note-2"].from);
+    ed.view.dispatch(ed.state.tr.setSelection(safeSel));
+
+    // User immediately clicks Line 3 (pos 25)
+    const userClickPos = ed.state.doc.content.size - 2;
+    const userClickSel = createSafeSelection(ed.state.doc, userClickPos);
+    ed.view.dispatch(ed.state.tr.setSelection(userClickSel));
+
+    // Verify user's selection remains on Line 3
+    assert.strictEqual(ed.state.selection.from, userClickPos);
+    assert.strictEqual(ed.state.selection.$from.parent.inlineContent, true);
+    ed.destroy();
+  });
+
+  test("allows normal typing and text insertion after clicking a line", () => {
+    const ed = createTestEditor("First line\n\nSecond line\n\nThird line");
+    // Simulate clicking the third line:
+    let thirdLineDocPos = null;
+    ed.state.doc.descendants((node, pos) => {
+      if (node.isText && node.text.includes("Third line")) {
+        thirdLineDocPos = pos + node.text.length; // end of third line
+      }
+    });
+    assert.ok(thirdLineDocPos !== null);
+
+    const clickSel = createSafeSelection(ed.state.doc, thirdLineDocPos);
+    ed.view.dispatch(ed.state.tr.setSelection(clickSel));
+
+    // Type " appended" at cursor
+    ed.commands.insertContent(" appended");
+
+    const updatedMd = ed.storage.markdown.getMarkdown();
+    assert.ok(updatedMd.includes("Third line appended"), `Expected "Third line appended" in: ${updatedMd}`);
+    assert.ok(updatedMd.startsWith("First line"));
     ed.destroy();
   });
 });

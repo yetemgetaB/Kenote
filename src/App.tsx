@@ -117,6 +117,9 @@ export function App() {
   // Editor refs
   const editorRef = useRef<EditorHandle>(null);
   const [tiptapInstance, setTiptapInstance] = useState<any>(null);
+  const handleEditorReady = useCallback((instance: any) => {
+    setTiptapInstance(instance);
+  }, []);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Helper to detect abandoned blank notes (untitled, zero chars, no content, unpinned)
@@ -917,7 +920,7 @@ export function App() {
               fontSize={settings.font_size}
               lineHeight={settings.line_height}
               fontFamily={settings.font_family}
-              onEditorReady={(editor) => setTiptapInstance(editor)}
+              onEditorReady={handleEditorReady}
             />
           </main>
 
