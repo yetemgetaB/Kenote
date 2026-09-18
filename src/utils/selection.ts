@@ -1,3 +1,4 @@
+import type { Node } from "@tiptap/pm/model";
 import { Selection, TextSelection } from "@tiptap/pm/state";
 
 /**
@@ -7,7 +8,7 @@ import { Selection, TextSelection } from "@tiptap/pm/state";
  * inline text position, preventing RangeErrors and corrupt DOM cursor states.
  */
 export function createSafeSelection(
-  doc: any,
+  doc: Node,
   rawFrom: number,
   rawTo?: number
 ): Selection | null {

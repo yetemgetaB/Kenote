@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { isValidExternalUrl } from "../src/utils/tauriBridge.ts";
-import { APP_VERSION } from "../src/utils/version.ts";
+import { APP_VERSION, isNewerVersion } from "../src/utils/version.ts";
+import { applyAccentColor } from "../src/utils/theme.ts";
 
 describe("S4 Settings & External Integration Tests", () => {
   describe("External URL Security Validation", () => {
@@ -135,19 +136,6 @@ describe("S4 Settings & External Integration Tests", () => {
   });
 
   describe("Updater Reliability & Version Comparison", () => {
-    function isNewerVersion(remote, current) {
-      const parse = (v) => v.replace(/^v/, "").split(".").map((x) => parseInt(x, 10) || 0);
-      const r = parse(remote);
-      const c = parse(current);
-      for (let i = 0; i < Math.max(r.length, c.length); i++) {
-        const rVal = r[i] || 0;
-        const cVal = c[i] || 0;
-        if (rVal > cVal) return true;
-        if (rVal < cVal) return false;
-      }
-      return false;
-    }
-
     it("correctly determines semantic version precedence", () => {
       assert.equal(isNewerVersion("0.4.1", "0.4.0"), true);
       assert.equal(isNewerVersion("v0.4.1", "0.4.0"), true);
@@ -193,6 +181,38 @@ describe("S4 Settings & External Integration Tests", () => {
       // Only clean 404 (no releases published) is considered up_to_date
       await checkUpdateWithMockResponse(404);
       assert.equal(updateStatus, "up_to_date");
+    });
+  });
+
+  describe("Theme Accent Color Application", () => {
+    it("converts 6-digit hex color to RGB and sets CSS custom properties", () => {
+      const styles = {};
+      const origDoc = globalThis.document;
+      globalThis.document = {
+        documentElement: {
+          style: {
+            setProperty: (prop, val) => {
+              styles[prop] = val;
+            },
+          },
+        },
+      };
+
+      try {
+        applyAccentColor("#10B981");
+        assert.equal(styles["--accent-color"], "#10B981");
+        assert.equal(styles["--accent-rgb"], "16, 185, 129");
+        assert.equal(styles["--accent-hover"], "rgba(16, 185, 129, 0.85)");
+        assert.equal(styles["--accent-muted"], "rgba(16, 185, 129, 0.15)");
+        assert.equal(styles["--accent-glow"], "rgba(16, 185, 129, 0.35)");
+
+        // Fallback for non-6-digit hex
+        applyAccentColor("invalid");
+        assert.equal(styles["--accent-color"], "invalid");
+        assert.equal(styles["--accent-rgb"], "3, 153, 247");
+      } finally {
+        globalThis.document = origDoc;
+      }
     });
   });
 });

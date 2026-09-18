@@ -31,6 +31,19 @@ export interface AppSettings {
   discovery_source?: string | null;
 }
 
+export const DEFAULT_SETTINGS: AppSettings = {
+  accent_color: "#0399F7",
+  custom_notes_dir: null,
+  font_size: "15px",
+  font_family: "system-ui",
+  line_height: "1.6",
+  auto_save_interval: 500,
+  always_on_top: false,
+  quick_switcher_mode: "overlay",
+  quick_switcher_order: "mru",
+  quick_switcher_shortcut: "ctrl_tab",
+};
+
 export interface ColorPreset {
   name: string;
   hex: string;

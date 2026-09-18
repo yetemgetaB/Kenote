@@ -1,5 +1,5 @@
 import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
-import { useEditor, EditorContent, ReactNodeViewRenderer } from "@tiptap/react";
+import { useEditor, EditorContent, ReactNodeViewRenderer, Editor as TiptapEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Paragraph from "@tiptap/extension-paragraph";
 import Bold from "@tiptap/extension-bold";
@@ -20,7 +20,7 @@ import { createSafeSelection } from "../utils/selection";
 export { createSafeSelection };
 
 // Smart Bold helper: toggles bold on the word around the cursor or on existing selection
-export function toggleSmartBold(editor: any): boolean {
+export function toggleSmartBold(editor: TiptapEditor | null): boolean {
   if (!editor || editor.isDestroyed) return false;
 
   const { state, dispatch } = editor.view;
@@ -177,7 +177,7 @@ interface EditorProps {
   fontSize?: string;
   lineHeight?: string;
   fontFamily?: string;
-  onEditorReady?: (editor: any) => void;
+  onEditorReady?: (editor: TiptapEditor) => void;
 }
 
 export const Editor = forwardRef<EditorHandle, EditorProps>(
@@ -197,7 +197,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
     const isSwitchingNoteRef = useRef<boolean>(false);
     const prevNoteIdRef = useRef<string | null | undefined>(noteId);
 
-    const saveCursorImmediately = (currentNoteId: string | null | undefined, ed: any) => {
+    const saveCursorImmediately = (currentNoteId: string | null | undefined, ed: TiptapEditor) => {
       if (!currentNoteId || !ed || ed.isDestroyed || isSwitchingNoteRef.current) return;
       try {
         const { from, to } = ed.state.selection;
@@ -213,7 +213,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
       } catch {}
     };
 
-    const restoreCursor = (currentNoteId: string, ed: any) => {
+    const restoreCursor = (currentNoteId: string, ed: TiptapEditor) => {
       if (!ed || ed.isDestroyed) return;
       try {
         const key = "kenote_cursor_positions";

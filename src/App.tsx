@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Titlebar } from "./components/Titlebar";
 import { Editor, EditorHandle } from "./components/Editor";
+import type { Editor as TiptapEditor } from "@tiptap/react";
 import { BottomToolbar } from "./components/BottomToolbar";
 import { NoteSwitcher } from "./components/NoteSwitcher";
 import { QuickSwitcherOverlay } from "./components/QuickSwitcherOverlay";
 import { CommandPalette, ActionItem } from "./components/CommandPalette";
 import { SettingsView } from "./components/SettingsView";
 import { WelcomeModal } from "./components/WelcomeModal";
-import { NoteMetadata, AppSettings } from "./types/note";
+import { NoteMetadata, AppSettings, DEFAULT_SETTINGS } from "./types/note";
 import { api, isValidExternalUrl } from "./utils/tauriBridge";
 import { applyAccentColor } from "./utils/theme";
 import { trackAppLaunch } from "./utils/analytics";
@@ -28,18 +29,7 @@ export function App() {
   const [activeNote, setActiveNote] = useState<NoteMetadata | null>(null);
   const [activeTitle, setActiveTitle] = useState("Untitled");
   const [characterCount, setCharacterCount] = useState(0);
-  const [settings, setSettings] = useState<AppSettings>({
-    accent_color: "#0399F7",
-    custom_notes_dir: null,
-    font_size: "15px",
-    font_family: "system-ui",
-    line_height: "1.6",
-    auto_save_interval: 500,
-    always_on_top: false,
-    quick_switcher_mode: "overlay",
-    quick_switcher_order: "mru",
-    quick_switcher_shortcut: "ctrl_tab",
-  });
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(false);
   const [notesDir, setNotesDir] = useState("");
 
@@ -116,8 +106,8 @@ export function App() {
 
   // Editor refs
   const editorRef = useRef<EditorHandle>(null);
-  const [tiptapInstance, setTiptapInstance] = useState<any>(null);
-  const handleEditorReady = useCallback((instance: any) => {
+  const [tiptapInstance, setTiptapInstance] = useState<TiptapEditor | null>(null);
+  const handleEditorReady = useCallback((instance: TiptapEditor) => {
     setTiptapInstance(instance);
   }, []);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -875,7 +865,7 @@ export function App() {
       icon: <TrashIcon size={16} className="text-red-400" />,
       perform: () => {
         if (activeNote) {
-          handleDeleteNote(activeNote, {} as any);
+          handleDeleteNote(activeNote);
         }
       },
     },

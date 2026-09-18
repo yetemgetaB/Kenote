@@ -1,4 +1,4 @@
-import type { AppSettings, NoteMetadata } from "../types/note.ts";
+import { type AppSettings, DEFAULT_SETTINGS, type NoteMetadata } from "../types/note.ts";
 
 // Detect if running inside Tauri
 export const isTauri = () => {
@@ -64,16 +64,6 @@ console.log("Hello from Kenote!");
   },
 ];
 
-const defaultSettings: AppSettings = {
-  accent_color: "#0399F7",
-  custom_notes_dir: null,
-  font_size: "15px",
-  font_family: "system-ui",
-  line_height: "1.6",
-  auto_save_interval: 500,
-  always_on_top: false,
-};
-
 let lastOpenedExternalUrl: string | null = null;
 let lastOpenedExternalTime = 0;
 
@@ -83,7 +73,7 @@ export const api = {
       return await invokeTauri<AppSettings>("get_settings");
     } catch {
       const stored = localStorage.getItem(STORAGE_KEY_SETTINGS);
-      return stored ? JSON.parse(stored) : defaultSettings;
+      return stored ? JSON.parse(stored) : DEFAULT_SETTINGS;
     }
   },
 

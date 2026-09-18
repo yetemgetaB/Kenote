@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { AppSettings, COLOR_PRESETS, NoteMetadata } from "../types/note";
 import { api } from "../utils/tauriBridge";
-import { APP_VERSION } from "../utils/version";
+import { APP_VERSION, isNewerVersion } from "../utils/version";
 import appIconUrl from "../assets/app-icon.png";
 import {
   Palette,
@@ -52,20 +52,6 @@ interface ReleaseInfo {
   url: string;
   installerUrl?: string;
   publishedAt: string;
-}
-
-// Compare semantic versions (returns true only if remote > current)
-function isNewerVersion(remote: string, current: string): boolean {
-  const parse = (v: string) => v.replace(/^v/, "").split(".").map((x) => parseInt(x, 10) || 0);
-  const r = parse(remote);
-  const c = parse(current);
-  for (let i = 0; i < Math.max(r.length, c.length); i++) {
-    const rVal = r[i] || 0;
-    const cVal = c[i] || 0;
-    if (rVal > cVal) return true;
-    if (rVal < cVal) return false;
-  }
-  return false;
 }
 
 // Clean and format GitHub release markdown body into structured lines
