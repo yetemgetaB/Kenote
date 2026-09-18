@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { AppSettings, COLOR_PRESETS, NoteMetadata } from "../types/note";
 import { api } from "../utils/tauriBridge";
-import { APP_VERSION, isNewerVersion } from "../utils/version";
+import { APP_VERSION } from "../utils/version";
+import {
+  checkForUpdate,
+  installUpdate,
+  relaunchApp,
+  UpdateInfo,
+  UpdateStatus,
+} from "../utils/updater";
 import appIconUrl from "../assets/app-icon.png";
 import {
   Palette,
@@ -26,6 +33,8 @@ import {
   Bookmark,
   Type,
   AlignLeft,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 
 interface SettingsViewProps {
@@ -44,15 +53,6 @@ type TabType =
   | "storage"
   | "trash"
   | "about";
-
-interface ReleaseInfo {
-  version: string;
-  name: string;
-  body: string;
-  url: string;
-  installerUrl?: string;
-  publishedAt: string;
-}
 
 // Clean and format GitHub release markdown body into structured lines
 function formatChangelog(raw: string): { title?: string; items: string[] } {
@@ -118,12 +118,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [trashSearch, setTrashSearch] = useState("");
 
   // Update check states
-  const [checkingUpdate, setCheckingUpdate] = useState(false);
-  const [isDownloadingUpdate, setIsDownloadingUpdate] = useState(false);
-  const [updateStatus, setUpdateStatus] = useState<"idle" | "up_to_date" | "available" | "error">("idle");
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState(0);
   const [updateErrorMessage, setUpdateErrorMessage] = useState<string | null>(null);
   const [trashActionError, setTrashActionError] = useState<string | null>(null);
-  const [latestRelease, setLatestRelease] = useState<ReleaseInfo | null>(null);
   const currentVersion = APP_VERSION;
 
   // Load trashed notes when navigating to trash tab or initially
@@ -260,79 +259,51 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   const handleCheckUpdate = async () => {
-    setCheckingUpdate(true);
-    setUpdateStatus("idle");
+    setUpdateStatus("checking");
     setUpdateErrorMessage(null);
     try {
-      const response = await fetch(
-        "https://api.github.com/repos/yetemgetaB/Kenote/releases/latest"
-      );
-      if (!response.ok) {
-        if (response.status === 404) {
-          setUpdateStatus("up_to_date");
-          return;
-        }
-        if (response.status === 403) {
-          throw new Error("GitHub API rate limit exceeded. Please try again later.");
-        }
-        throw new Error(`Release check failed with HTTP ${response.status}`);
-      }
-      const data = await response.json();
-      const tagName = data.tag_name || "";
-      const latestVer = tagName.replace(/^v/, "").trim();
-
-      if (latestVer && isNewerVersion(latestVer, currentVersion)) {
-        const setupAsset = Array.isArray(data.assets)
-          ? data.assets.find(
-              (a: any) =>
-                a.name?.endsWith("-setup.exe") ||
-                a.name?.endsWith(".exe") ||
-                a.name?.endsWith(".msi") ||
-                a.name?.endsWith(".dmg") ||
-                a.name?.endsWith(".AppImage")
-            )
-          : null;
-
-        setLatestRelease({
-          version: latestVer,
-          name: data.name || `Version ${latestVer}`,
-          body: data.body || "New features and performance improvements.",
-          url: data.html_url || "https://github.com/yetemgetaB/Kenote/releases",
-          installerUrl: setupAsset?.browser_download_url,
-          publishedAt: data.published_at ? new Date(data.published_at).toLocaleDateString() : "",
-        });
+      const res = await checkForUpdate();
+      if (res.error) {
+        setUpdateStatus("error");
+        setUpdateErrorMessage(res.error);
+      } else if (res.available && res.update) {
+        setUpdateInfo(res.update);
         setUpdateStatus("available");
       } else {
         setUpdateStatus("up_to_date");
       }
     } catch (err: any) {
-      console.warn("Failed to check for updates:", err);
       setUpdateStatus("error");
-      setUpdateErrorMessage(
-        err?.message || "Could not check for updates. Please check your network connection."
-      );
-    } finally {
-      setCheckingUpdate(false);
+      setUpdateErrorMessage(err?.message || "Could not check for updates.");
     }
   };
 
-  const handleDownloadAndInstall = async (installerUrl?: string) => {
-    if (!installerUrl) {
-      if (latestRelease?.url) {
-        await api.openExternal(latestRelease.url);
-      }
-      return;
-    }
-    setIsDownloadingUpdate(true);
+  const handleInstallUpdate = async () => {
+    setUpdateStatus("downloading");
+    setDownloadProgress(0);
     setUpdateErrorMessage(null);
     try {
-      await api.downloadAndRunInstaller(installerUrl);
-    } catch (e: any) {
-      console.error("Update error:", e);
+      await installUpdate(
+        (percent) => {
+          setDownloadProgress(percent);
+        },
+        () => {
+          setUpdateStatus("installing");
+        }
+      );
+      setUpdateStatus("ready_to_restart");
+    } catch (err: any) {
+      console.error("Update failed:", err);
       setUpdateStatus("error");
-      setUpdateErrorMessage(e?.message || "Failed to download and launch update installer.");
-    } finally {
-      setIsDownloadingUpdate(false);
+      setUpdateErrorMessage(err?.message || "Failed to download and install update.");
+    }
+  };
+
+  const handleRestart = async () => {
+    try {
+      await relaunchApp();
+    } catch (err: any) {
+      console.error("Failed to relaunch:", err);
     }
   };
 
@@ -1026,49 +997,83 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2.5">
                     <div className="p-2 rounded-xl bg-[#242C38] text-[var(--accent-color,#0399F7)]">
-                      <RefreshCw size={15} className={checkingUpdate ? "animate-spin" : ""} />
+                      <RefreshCw
+                        size={15}
+                        className={
+                          updateStatus === "checking" ||
+                          updateStatus === "downloading" ||
+                          updateStatus === "installing"
+                            ? "animate-spin"
+                            : ""
+                        }
+                      />
                     </div>
                     <div>
                       <h4 className="text-xs font-semibold text-white">App Updates</h4>
                       <p className="text-[11px] text-gray-400">
-                        {checkingUpdate
+                        {updateStatus === "checking"
                           ? "Checking for latest release..."
                           : updateStatus === "available"
-                          ? `New release ${latestRelease?.version} is ready!`
+                          ? `New release v${updateInfo?.version} is available!`
+                          : updateStatus === "downloading"
+                          ? `Downloading update (${downloadProgress}%)...`
+                          : updateStatus === "installing"
+                          ? "Verifying and installing update..."
+                          : updateStatus === "ready_to_restart"
+                          ? "Update installed. Ready to restart!"
                           : updateStatus === "up_to_date"
                           ? "Kenote is up to date."
                           : updateStatus === "error"
-                          ? "Update check could not complete."
+                          ? "Update check or install could not complete."
                           : "Stay on the latest version."}
                       </p>
                     </div>
                   </div>
 
-                  <button
-                    onClick={handleCheckUpdate}
-                    disabled={checkingUpdate}
-                    className="px-3 py-1.5 rounded-xl bg-[#252E3C] hover:bg-[#313C4E] text-white text-xs font-semibold transition-all focus:outline-none disabled:opacity-50 shrink-0 border border-[#374355]"
-                  >
-                    {checkingUpdate ? "Checking..." : "Check Now"}
-                  </button>
+                  {updateStatus === "ready_to_restart" ? (
+                    <button
+                      onClick={handleRestart}
+                      className="px-3 py-1.5 rounded-xl bg-[var(--accent-color,#0399F7)] hover:bg-[var(--accent-hover,#0284c7)] text-white text-xs font-semibold transition-all focus:outline-none shrink-0 shadow-md"
+                    >
+                      Restart Now
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleCheckUpdate}
+                      disabled={
+                        updateStatus === "checking" ||
+                        updateStatus === "downloading" ||
+                        updateStatus === "installing"
+                      }
+                      className="px-3 py-1.5 rounded-xl bg-[#252E3C] hover:bg-[#313C4E] text-white text-xs font-semibold transition-all focus:outline-none disabled:opacity-50 shrink-0 border border-[#374355]"
+                    >
+                      {updateStatus === "checking"
+                        ? "Checking..."
+                        : updateStatus === "downloading" || updateStatus === "installing"
+                        ? "Updating..."
+                        : "Check Now"}
+                    </button>
+                  )}
                 </div>
 
                 {/* Available Update Banner */}
-                {updateStatus === "available" && latestRelease && (
+                {updateStatus === "available" && updateInfo && (
                   <div className="p-3.5 bg-[var(--accent-muted,rgba(3,153,247,0.12))] border border-[var(--accent-color,#0399F7)]/40 rounded-xl space-y-2.5 mt-2">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-white text-xs flex items-center space-x-1">
                         <Sparkles size={13} className="text-[var(--accent-color,#0399F7)]" />
-                        <span>{latestRelease.name}</span>
+                        <span>Version {updateInfo.version}</span>
                       </span>
-                      <span className="text-[10px] text-gray-400">
-                        {latestRelease.publishedAt}
-                      </span>
+                      {updateInfo.date && (
+                        <span className="text-[10px] text-gray-400">
+                          {new Date(updateInfo.date).toLocaleDateString()}
+                        </span>
+                      )}
                     </div>
                     {/* Formatted Changelog Notes */}
                     <div className="bg-[#141922] border border-[#26303F] rounded-lg p-2.5 space-y-1.5 max-h-36 overflow-y-auto custom-scrollbar">
                       {(() => {
-                        const parsed = formatChangelog(latestRelease.body);
+                        const parsed = formatChangelog(updateInfo.body || "");
                         return (
                           <>
                             {parsed.title && (
@@ -1078,7 +1083,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                             )}
                             <ul className="space-y-1 text-[11px] text-gray-300">
                               {parsed.items.map((item, idx) => {
-                                // Highlight bold markdown keywords if present
                                 const cleanItem = item.replace(/\*\*(.*?)\*\*/g, "$1");
                                 return (
                                   <li key={idx} className="flex items-start space-x-1.5 leading-snug">
@@ -1092,41 +1096,87 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         );
                       })()}
                     </div>
-                    {latestRelease.installerUrl ? (
+                    <div className="flex items-center space-x-2 pt-1">
                       <button
-                        onClick={() => handleDownloadAndInstall(latestRelease.installerUrl)}
-                        disabled={isDownloadingUpdate}
-                        className="w-full py-2 bg-[var(--accent-color,#0399F7)] hover:bg-[var(--accent-hover,#0284c7)] disabled:opacity-75 text-white text-xs font-bold rounded-xl shadow-md transition-all focus:outline-none flex items-center justify-center space-x-2"
+                        onClick={handleInstallUpdate}
+                        className="flex-1 py-2 bg-[var(--accent-color,#0399F7)] hover:bg-[var(--accent-hover,#0284c7)] text-white text-xs font-bold rounded-xl shadow-md transition-all focus:outline-none flex items-center justify-center space-x-2"
                       >
-                        {isDownloadingUpdate ? (
-                          <>
-                            <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            <span>Downloading & Installing in Background...</span>
-                          </>
-                        ) : (
-                          <span>Download & Install Now</span>
-                        )}
+                        <span>Update Now</span>
                       </button>
-                    ) : (
                       <button
-                        onClick={() => api.openExternal(latestRelease.url)}
-                        className="w-full py-2 bg-[#252E3C] hover:bg-[#313C4E] text-white text-xs font-bold rounded-xl border border-[#374355] shadow-sm transition-all focus:outline-none flex items-center justify-center space-x-2"
+                        onClick={() => setUpdateStatus("idle")}
+                        className="px-4 py-2 bg-[#252E3C] hover:bg-[#313C4E] text-gray-300 hover:text-white text-xs font-semibold rounded-xl border border-[#374355] transition-all focus:outline-none"
                       >
-                        <ExternalLink size={13} />
-                        <span>View Release on GitHub</span>
+                        Later
                       </button>
-                    )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Downloading Progress Banner */}
+                {updateStatus === "downloading" && (
+                  <div className="p-3.5 bg-[#141922] border border-[#26303F] rounded-xl space-y-2.5 mt-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-medium text-white flex items-center space-x-1.5">
+                        <RefreshCw size={13} className="animate-spin text-[var(--accent-color,#0399F7)]" />
+                        <span>Downloading signed package...</span>
+                      </span>
+                      <span className="font-bold text-[var(--accent-color,#0399F7)]">
+                        {downloadProgress}%
+                      </span>
+                    </div>
+                    <div className="w-full h-2 bg-[#222B38] rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-[var(--accent-color,#0399F7)] transition-all duration-200 rounded-full"
+                        style={{ width: `${downloadProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Installing Banner */}
+                {updateStatus === "installing" && (
+                  <div className="p-3.5 bg-[#141922] border border-[#26303F] rounded-xl space-y-2 mt-2 flex items-center space-x-3">
+                    <div className="w-4 h-4 border-2 border-[var(--accent-color,#0399F7)] border-t-transparent rounded-full animate-spin shrink-0" />
+                    <div>
+                      <div className="text-xs font-semibold text-white">Installing Update</div>
+                      <p className="text-[11px] text-gray-400">
+                        Verifying signature and installing package...
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Ready to Restart Banner */}
+                {updateStatus === "ready_to_restart" && (
+                  <div className="p-3.5 bg-green-500/10 border border-green-500/30 rounded-xl space-y-2.5 mt-2">
+                    <div className="flex items-center space-x-2">
+                      <CheckCircle2 size={16} className="text-green-400 shrink-0" />
+                      <div className="text-xs font-semibold text-green-300">
+                        Update Ready to Apply
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-gray-300">
+                      The update has been installed successfully. Restart KeNote to complete.
+                    </p>
+                    <button
+                      onClick={handleRestart}
+                      className="w-full py-2 bg-green-600 hover:bg-green-500 text-white text-xs font-bold rounded-xl shadow-md transition-all focus:outline-none"
+                    >
+                      Restart KeNote Now
+                    </button>
                   </div>
                 )}
 
                 {/* Update Error Banner */}
                 {updateStatus === "error" && (
                   <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl space-y-1.5 mt-2">
-                    <div className="text-xs font-semibold text-red-400">
-                      Update Check Failed
+                    <div className="text-xs font-semibold text-red-400 flex items-center space-x-1.5">
+                      <AlertCircle size={13} />
+                      <span>Update Failed</span>
                     </div>
                     <p className="text-[11px] text-gray-300">
-                      {updateErrorMessage || "Could not check for updates. Please try again later."}
+                      {updateErrorMessage || "Could not check or install update. Please try again later."}
                     </p>
                     <button
                       onClick={() => api.openExternal("https://github.com/yetemgetaB/Kenote/releases")}

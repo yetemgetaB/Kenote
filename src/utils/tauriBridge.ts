@@ -327,14 +327,4 @@ export const api = {
       return false;
     }
   },
-
-  async downloadAndRunInstaller(downloadUrl: string): Promise<void> {
-    try {
-      await invokeTauri("download_and_run_installer", { downloadUrl });
-    } catch (e) {
-      console.warn("Desktop installer download failed, opening browser fallback:", e);
-      await this.openExternal(downloadUrl);
-      throw e;
-    }
-  },
 };

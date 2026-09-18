@@ -8,11 +8,13 @@ import { QuickSwitcherOverlay } from "./components/QuickSwitcherOverlay";
 import { CommandPalette, ActionItem } from "./components/CommandPalette";
 import { SettingsView } from "./components/SettingsView";
 import { WelcomeModal } from "./components/WelcomeModal";
+import { UpdateModal } from "./components/UpdateModal";
 import { NoteMetadata, AppSettings, DEFAULT_SETTINGS } from "./types/note";
 import { api, isValidExternalUrl } from "./utils/tauriBridge";
 import { applyAccentColor } from "./utils/theme";
 import { trackAppLaunch } from "./utils/analytics";
 import { APP_VERSION } from "./utils/version";
+import { checkForUpdate, UpdateInfo } from "./utils/updater";
 import {
   PlusIcon,
   NoteSwitcherIcon,
@@ -41,6 +43,8 @@ export function App() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [availableUpdate, setAvailableUpdate] = useState<UpdateInfo | null>(null);
 
   // Quick Switcher HUD state
   const [isQuickSwitcherOpen, setIsQuickSwitcherOpen] = useState(false);
@@ -431,6 +435,24 @@ export function App() {
     }
     init();
   }, [handleNewNote]);
+
+  // Silent background update check on app launch
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      try {
+        const res = await checkForUpdate();
+        if (res.available && res.update) {
+          setAvailableUpdate(res.update);
+          setIsUpdateModalOpen(true);
+        }
+      } catch (err) {
+        // Silently swallow background update check errors (offline, firewall, etc.)
+        console.warn("Silent update check failed:", err);
+      }
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   // External file synchronization (on focus and periodic)
   useEffect(() => {
@@ -993,6 +1015,13 @@ export function App() {
         onClose={() => setIsWelcomeOpen(false)}
         settings={settings}
         onUpdateSettings={handleUpdateSettings}
+      />
+
+      {/* Automatic Update Prompt */}
+      <UpdateModal
+        isOpen={isUpdateModalOpen}
+        update={availableUpdate}
+        onClose={() => setIsUpdateModalOpen(false)}
       />
 
     </div>

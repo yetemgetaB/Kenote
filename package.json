@@ -16,6 +16,8 @@
     "@tauri-apps/plugin-dialog": "^2.2.0",
     "@tauri-apps/plugin-fs": "^2.2.0",
     "@tauri-apps/plugin-opener": "^2.2.0",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-updater": "^2.11.0",
     "@tiptap/extension-bold": "^2.10.4",
     "@tiptap/extension-code-block-lowlight": "^2.10.4",
     "@tiptap/extension-link": "^2.10.4",

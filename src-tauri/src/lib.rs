@@ -588,90 +588,14 @@ fn save_window_state(window: WebviewWindow) -> Result<(), String> {
     Ok(())
 }
 
-#[tauri::command]
-async fn download_and_run_installer(
-    download_url: String,
-    window: WebviewWindow,
-) -> Result<(), String> {
-    let temp_dir = std::env::temp_dir();
-    let installer_path = temp_dir.join("Kenote-Update-Setup.exe");
-    let _ = fs::remove_file(&installer_path);
-
-    let url = download_url.clone();
-    let path = installer_path.clone();
-
-    // Run blocking download on a background OS thread
-    let (tx, rx) = std::sync::mpsc::channel();
-    std::thread::spawn(move || {
-        let res: Result<(), String> = (|| {
-            let client = reqwest::blocking::Client::builder()
-                .user_agent("Kenote-Updater")
-                .build()
-                .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
-
-            let mut response = client
-                .get(&url)
-                .send()
-                .map_err(|e| format!("Failed to download update file: {}", e))?;
-
-            if !response.status().is_success() {
-                return Err(format!("Download failed with status: {}", response.status()));
-            }
-
-            let mut dest = fs::File::create(&path)
-                .map_err(|e| format!("Failed to create temporary installer file: {}", e))?;
-
-            std::io::copy(&mut response, &mut dest)
-                .map_err(|e| format!("Failed to save installer data: {}", e))?;
-
-            Ok(())
-        })();
-        let _ = tx.send(res);
-    });
-
-    rx.recv()
-        .map_err(|_| "Download worker disconnected".to_string())??;
-
-    #[cfg(target_os = "windows")]
-    {
-        use std::process::Command;
-
-        Command::new(&installer_path)
-            .spawn()
-            .map_err(|e| format!("Failed to run installer: {}", e))?;
-
-        let _ = window.close();
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        use std::process::Command;
-        Command::new("open")
-            .arg(&installer_path)
-            .spawn()
-            .map_err(|e| format!("Failed to open installer: {}", e))?;
-        let _ = window.close();
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        use std::process::Command;
-        Command::new("xdg-open")
-            .arg(&installer_path)
-            .spawn()
-            .map_err(|e| format!("Failed to open installer: {}", e))?;
-        let _ = window.close();
-    }
-
-    Ok(())
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             get_settings,
             save_settings,
@@ -689,8 +613,7 @@ pub fn run() {
             minimize_window,
             close_window,
             reveal_in_explorer,
-            save_window_state,
-            download_and_run_installer
+            save_window_state
         ])
         .setup(|app| {
             // Restore window size and position from settings

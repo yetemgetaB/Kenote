@@ -33,6 +33,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/64x64.png",
@@ -59,6 +60,12 @@
     }
   },
   "plugins": {
-    "opener": {}
+    "opener": {},
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE2M0JCOEJENjQ4QTdCMjUKUldRbGU0cGt2Ymc3RnVNVU5hcGpCQkFMQmdkTFpJMmFOOVlYY29VRGxXM0h4OE9wUE5LeFdOS2gK",
+      "endpoints": [
+        "https://github.com/yetemgetaB/Kenote/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

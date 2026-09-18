@@ -29,3 +29,5 @@ pnpm-debug.log*
 # Tauri & Data
 kenote_data
 extracted_icon.png
+*.key
+*.key.pub
