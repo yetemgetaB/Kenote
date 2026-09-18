@@ -1005,13 +1005,6 @@ export function App() {
         onUpdateSettings={handleUpdateSettings}
       />
 
-      {/* Custom Frameless Installer Wizard (temporarily disabled) */}
-      {/* {isInstallerOpen && (
-        <CustomInstaller
-          onClose={() => setIsInstallerOpen(false)}
-          onInstalled={() => setIsInstallerOpen(false)}
-        />
-      )} */}
     </div>
   );
 }

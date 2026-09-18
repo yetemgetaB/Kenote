@@ -571,109 +571,6 @@ fn reveal_in_explorer(filename: Option<String>) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn get_default_install_dir() -> String {
-    if let Some(mut local_app_data) = dirs::data_local_dir() {
-        local_app_data.push("Programs");
-        local_app_data.push("Kenote");
-        return local_app_data.to_string_lossy().to_string();
-    }
-    "C:\\Program Files\\Kenote".to_string()
-}
-
-#[tauri::command]
-fn is_installed() -> bool {
-    let default_dir = get_default_install_dir();
-    if let Ok(current_exe) = std::env::current_exe() {
-        if let Some(parent) = current_exe.parent() {
-            if parent == Path::new(&default_dir) {
-                return true;
-            }
-        }
-    }
-    false
-}
-
-#[tauri::command]
-fn perform_installation(
-    target_dir: String,
-    _create_desktop_shortcut: bool,
-    _create_start_menu_shortcut: bool,
-) -> Result<(), String> {
-    let target_path = PathBuf::from(&target_dir);
-    fs::create_dir_all(&target_path).map_err(|e| e.to_string())?;
-
-    let current_exe = std::env::current_exe().map_err(|e| e.to_string())?;
-    let dest_exe = target_path.join("kenote.exe");
-
-    // Copy executable if not already in target directory
-    if current_exe != dest_exe {
-        let _ = fs::copy(&current_exe, &dest_exe);
-    }
-
-    // Create Shortcuts on Windows
-    #[cfg(target_os = "windows")]
-    {
-        use std::process::Command;
-        let exe_str = dest_exe.to_string_lossy();
-
-        if _create_desktop_shortcut {
-            if let Some(desktop) = dirs::desktop_dir() {
-                let lnk_path = desktop.join("Kenote.lnk");
-                let ps_cmd = format!(
-                    "$s=(New-Object -COM WScript.Shell).CreateShortcut('{}');$s.TargetPath='{}';$s.WorkingDirectory='{}';$s.Save()",
-                    lnk_path.to_string_lossy(),
-                    exe_str,
-                    target_path.to_string_lossy()
-                );
-                let _ = Command::new("powershell")
-                    .args(["-NoProfile", "-NonInteractive", "-Command", &ps_cmd])
-                    .output();
-            }
-        }
-
-        if _create_start_menu_shortcut {
-            if let Some(roaming) = dirs::data_dir() {
-                let start_menu = roaming.join("Microsoft").join("Windows").join("Start Menu").join("Programs");
-                let _ = fs::create_dir_all(&start_menu);
-                let lnk_path = start_menu.join("Kenote.lnk");
-                let ps_cmd = format!(
-                    "$s=(New-Object -COM WScript.Shell).CreateShortcut('{}');$s.TargetPath='{}';$s.WorkingDirectory='{}';$s.Save()",
-                    lnk_path.to_string_lossy(),
-                    exe_str,
-                    target_path.to_string_lossy()
-                );
-                let _ = Command::new("powershell")
-                    .args(["-NoProfile", "-NonInteractive", "-Command", &ps_cmd])
-                    .output();
-            }
-        }
-    }
-
-    Ok(())
-}
-
-#[tauri::command]
-fn launch_installed_app(target_dir: String, window: WebviewWindow) -> Result<(), String> {
-    let target_path = PathBuf::from(&target_dir);
-
-    #[cfg(target_os = "windows")]
-    {
-        use std::process::Command;
-        let dest_exe = target_path.join("kenote.exe");
-        let _ = Command::new(&dest_exe).spawn();
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        use std::process::Command;
-        let _ = Command::new(&target_path).spawn();
-    }
-
-    let _ = window.close();
-    Ok(())
-}
-
-#[tauri::command]
 fn save_window_state(window: WebviewWindow) -> Result<(), String> {
     if let (Ok(pos), Ok(size)) = (window.outer_position(), window.inner_size()) {
         let scale = window.scale_factor().unwrap_or(1.0);
@@ -792,10 +689,6 @@ pub fn run() {
             minimize_window,
             close_window,
             reveal_in_explorer,
-            get_default_install_dir,
-            is_installed,
-            perform_installation,
-            launch_installed_app,
             save_window_state,
             download_and_run_installer
         ])
