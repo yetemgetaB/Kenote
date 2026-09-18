@@ -53,6 +53,7 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         with:
           tagName: v__VERSION__
           releaseName: "Kenote v__VERSION__"
@@ -61,14 +62,13 @@ jobs:
 
             ### ✨ What's New
             - **Window State Persistence**: Automatically restores window position (x, y) and dimensions across app restarts.
-            - **In-App Direct Auto-Updater**: One-click download and automated installer execution without leaving the app.
+            - **Signed In-App Auto-Updater**: Seamless in-app updates cryptographically signed and verified via Tauri v2.
             - **First-Run Welcome Screen**: Interactive discovery survey and quick feature highlights.
             - **Live WYSIWYG Markdown**: In-place headings, bold, italics, strikethrough, checklists, blockquotes, and code blocks.
             - **Always-On-Top Pinning**: Keep notes floating on top of all apps (`Ctrl + P` or top bar pin icon).
             - **Local-First .md Storage**: Instant auto-saving to local `.md` markdown files.
             - **Browse Notes Switcher**: Instant fuzzy search and quick note switching (`Ctrl + O`).
             - **Command Actions Palette**: Quick command menu (`Ctrl + K`).
-            - **Custom Frameless Installer Wizard**: Bespoke dark acrylic setup experience.
 
             ### 📦 Download & Install
             - **Windows**: Download the `.msi` or `-setup.exe` installer below.
