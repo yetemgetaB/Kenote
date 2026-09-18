@@ -36,6 +36,30 @@ describe("S4 Settings & External Integration Tests", () => {
       assert.equal(isValidExternalUrl(null), false);
       assert.equal(isValidExternalUrl(undefined), false);
     });
+
+    it("deduplicates rapid clicks to prevent opening external links twice", async () => {
+      const { api } = await import("../src/utils/tauriBridge.ts");
+      let windowOpenCalls = 0;
+      globalThis.window = {
+        open: () => {
+          windowOpenCalls++;
+          return {};
+        },
+      };
+
+      const url = "https://github.com/yetemgetaB/Kenote";
+      // First call opens the link
+      const first = await api.openExternal(url);
+      assert.equal(first, true);
+      assert.equal(windowOpenCalls, 1);
+
+      // Immediate duplicate call within 500ms cooldown is deduplicated
+      const second = await api.openExternal(url);
+      assert.equal(second, true);
+      assert.equal(windowOpenCalls, 1, "Should not invoke window.open twice for duplicate rapid click");
+
+      delete globalThis.window;
+    });
   });
 
   describe("Application Version Consistency", () => {

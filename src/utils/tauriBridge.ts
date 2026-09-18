@@ -74,6 +74,9 @@ const defaultSettings: AppSettings = {
   always_on_top: false,
 };
 
+let lastOpenedExternalUrl: string | null = null;
+let lastOpenedExternalTime = 0;
+
 export const api = {
   async getSettings(): Promise<AppSettings> {
     try {
@@ -353,15 +356,22 @@ export const api = {
       console.warn("Blocked attempt to open invalid or unsafe external URL:", url);
       return false;
     }
+    const now = Date.now();
+    if (lastOpenedExternalUrl === url && now - lastOpenedExternalTime < 500) {
+      return true;
+    }
+    lastOpenedExternalUrl = url;
+    lastOpenedExternalTime = now;
     try {
       if (isTauri()) {
         const { openUrl } = await import("@tauri-apps/plugin-opener");
         await openUrl(url);
         return true;
-      } else {
+      } else if (typeof window !== "undefined" && typeof window.open === "function") {
         window.open(url, "_blank", "noopener,noreferrer");
         return true;
       }
+      return true;
     } catch (e) {
       console.error("Failed to open external URL:", e);
       return false;
