@@ -74,7 +74,7 @@ describe("S4 Settings & External Integration Tests", () => {
       assert.ok(cargoVersionMatch, "Cargo.toml version should exist");
       const cargoVersion = cargoVersionMatch[1];
 
-      assert.equal(APP_VERSION, "0.5.0");
+      assert.equal(APP_VERSION, "0.5.1");
       assert.equal(pkg.version, APP_VERSION);
       assert.equal(tauriConf.version, APP_VERSION);
       assert.equal(cargoVersion, APP_VERSION);
