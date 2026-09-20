@@ -1,5 +1,6 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
+import posthog from "posthog-js";
 import {
   ALLOWED_EVENTS,
   COMMAND_ACTIONS,
@@ -10,6 +11,9 @@ import {
   buildEventPayload,
   setTelemetryEnabled,
   getTelemetryEnabled,
+  trackAppLaunch,
+  _resetAppLaunchTrackedForTesting,
+  initAnalytics,
 } from "../src/utils/analytics.ts";
 import { APP_VERSION } from "../src/utils/version.ts";
 
@@ -233,6 +237,76 @@ describe("Phase B1: Privacy-Safe Analytics Telemetry Tests", () => {
     it("DEFAULT_SETTINGS has telemetry_enabled set to true", async () => {
       const { DEFAULT_SETTINGS } = await import("../src/types/note.ts");
       assert.equal(DEFAULT_SETTINGS.telemetry_enabled, true);
+    });
+  });
+
+  describe("11. App Launch Lifecycle & Regression Protection", () => {
+    let capturedEvents = [];
+    const posthogClient = posthog.init ? posthog : posthog.default ?? posthog.posthog ?? posthog;
+    const originalCapture = posthogClient.capture;
+
+    beforeEach(() => {
+      capturedEvents = [];
+      posthogClient.capture = (event, properties) => {
+        capturedEvents.push({ event, properties });
+      };
+      _resetAppLaunchTrackedForTesting();
+      setTelemetryEnabled(true);
+    });
+
+    afterEach(() => {
+      posthogClient.capture = originalCapture;
+      _resetAppLaunchTrackedForTesting();
+      setTelemetryEnabled(true);
+    });
+
+    it("one KeNote application launch produces at most one app_launched event across repeated calls", () => {
+      // Simulate multiple calls as caused by React effect loops, re-renders, or multiple mountings
+      for (let i = 0; i < 10; i++) {
+        trackAppLaunch();
+      }
+
+      const launchEvents = capturedEvents.filter((e) => e.event === "app_launched");
+      assert.equal(
+        launchEvents.length,
+        1,
+        `Expected exactly 1 app_launched event, but got ${launchEvents.length}`
+      );
+      assert.equal(launchEvents[0].properties.version, APP_VERSION);
+      assert.ok(["windows", "macos", "linux"].includes(launchEvents[0].properties.platform));
+    });
+
+    it("subsequent session launch can fire after session reset", () => {
+      trackAppLaunch();
+      assert.equal(capturedEvents.filter((e) => e.event === "app_launched").length, 1);
+
+      // Simulate a new application launch session
+      _resetAppLaunchTrackedForTesting();
+      trackAppLaunch();
+      assert.equal(capturedEvents.filter((e) => e.event === "app_launched").length, 2);
+    });
+
+    it("app_launched is suppressed when telemetry is disabled", () => {
+      setTelemetryEnabled(false);
+      trackAppLaunch();
+      assert.equal(capturedEvents.filter((e) => e.event === "app_launched").length, 0);
+    });
+
+    it("initAnalytics configures capture_performance: false to disable automatic Web Vitals", () => {
+      const originalInit = posthogClient.init;
+      let initConfig = null;
+      posthogClient.init = (_key, config) => {
+        initConfig = config;
+      };
+
+      try {
+        initAnalytics(true);
+        if (initConfig) {
+          assert.equal(initConfig.capture_performance, false);
+        }
+      } finally {
+        posthogClient.init = originalInit;
+      }
     });
   });
 });

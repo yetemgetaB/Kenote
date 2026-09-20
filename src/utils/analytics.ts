@@ -93,13 +93,22 @@ export type AppErrorCategory = (typeof APP_ERROR_CATEGORIES)[number];
 
 let isTelemetryEnabled = true;
 let isInitialized = false;
+let hasTrackedAppLaunch = false;
+
+export function _resetAppLaunchTrackedForTesting() {
+  hasTrackedAppLaunch = false;
+}
+
+function getPostHogClient() {
+  return (posthog as any)?.init ? posthog : (posthog as any)?.default ?? (posthog as any)?.posthog ?? posthog;
+}
 
 export function setTelemetryEnabled(enabled: boolean) {
   isTelemetryEnabled = enabled;
   if (!enabled) {
     if (isInitialized) {
       try {
-        posthog.opt_out_capturing();
+        getPostHogClient().opt_out_capturing();
       } catch (e) {
         // Silently catch
       }
@@ -107,7 +116,7 @@ export function setTelemetryEnabled(enabled: boolean) {
   } else {
     if (isInitialized) {
       try {
-        posthog.opt_in_capturing();
+        getPostHogClient().opt_in_capturing();
       } catch (e) {
         // Silently catch
       }
@@ -134,12 +143,15 @@ export function initAnalytics(enabled: boolean = isTelemetryEnabled) {
   if (!enabled) return;
   if (isInitialized) return;
 
+  isInitialized = true;
+
   try {
-    posthog.init(POSTHOG_KEY, {
+    getPostHogClient().init(POSTHOG_KEY, {
       api_host: POSTHOG_HOST,
       autocapture: false,
       capture_pageview: false,
       capture_pageleave: false,
+      capture_performance: false,
       disable_session_recording: true,
       disable_surveys: true,
       disable_conversations: true,
@@ -157,17 +169,15 @@ export function initAnalytics(enabled: boolean = isTelemetryEnabled) {
         "$initial_referring_domain",
         "$raw_user_agent",
       ],
-      before_send: (event) => {
+      before_send: (event: any) => {
         if (!event) return null;
         if (!isTelemetryEnabled) return null;
         if (!ALLOWED_EVENTS.includes(event.event as AnalyticsEventName)) return null;
         return event;
       },
-      loaded: () => {
-        isInitialized = true;
-      },
     });
   } catch (e) {
+    isInitialized = false;
     console.debug("Analytics initialization skipped:", e);
   }
 }
@@ -178,7 +188,7 @@ function captureEvent(event: AnalyticsEventName, properties: BaseAnalyticsProper
   }
   try {
     initAnalytics();
-    posthog.capture(event, properties);
+    getPostHogClient().capture(event, properties);
   } catch (e) {
     console.debug("Analytics capture skipped:", e);
   }
@@ -186,6 +196,10 @@ function captureEvent(event: AnalyticsEventName, properties: BaseAnalyticsProper
 
 // 1. Core Lifecycle
 export function trackAppLaunch() {
+  if (hasTrackedAppLaunch) {
+    return;
+  }
+  hasTrackedAppLaunch = true;
   captureEvent("app_launched", buildEventPayload());
 }
 

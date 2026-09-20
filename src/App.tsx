@@ -291,16 +291,18 @@ export function App() {
       setRecentNoteIds((prevIds) => [newNote.id, ...prevIds.filter((id) => id !== newNote.id)]);
 
       // Track last active note in settings
-      const updated = { ...settings, last_active_note_id: newNote.id };
-      setSettings(updated);
-      api.saveSettings(updated);
+      setSettings((prev) => {
+        const updated = { ...prev, last_active_note_id: newNote.id };
+        api.saveSettings(updated);
+        return updated;
+      });
 
       setTimeout(() => editorRef.current?.focus(), 50);
     } catch (e) {
       console.error("Failed to create new note:", e);
       showToast("Failed to create new note");
     }
-  }, [flushPendingSave, settings, showToast]);
+  }, [flushPendingSave, showToast]);
 
   // Select Note
   const handleSelectNote = useCallback((note: NoteMetadata) => {
@@ -319,9 +321,11 @@ export function App() {
     setRecentNoteIds((prevIds) => [note.id, ...prevIds.filter((id) => id !== note.id)]);
 
     // Track last active note in settings
-    const updated = { ...settings, last_active_note_id: note.id };
-    setSettings(updated);
-    api.saveSettings(updated);
+    setSettings((prev) => {
+      const updated = { ...prev, last_active_note_id: note.id };
+      api.saveSettings(updated);
+      return updated;
+    });
 
     // Flush any pending save on the previous note in background
     if (hasUnsavedChangesRef.current && prev) {
@@ -386,8 +390,17 @@ export function App() {
     }
   }, [showToast]);
 
-  // Load initial data
+  const hasInitializedRef = useRef(false);
+  const handleNewNoteRef = useRef(handleNewNote);
   useEffect(() => {
+    handleNewNoteRef.current = handleNewNote;
+  }, [handleNewNote]);
+
+  // Load initial data (strictly once on startup)
+  useEffect(() => {
+    if (hasInitializedRef.current) return;
+    hasInitializedRef.current = true;
+
     async function init() {
       try {
         const loadedSettings = await api.getSettings();
@@ -417,7 +430,7 @@ export function App() {
           let targetNote: NoteMetadata | undefined;
 
           if (startupMode === "new") {
-            await handleNewNote();
+            await handleNewNoteRef.current();
             return;
           } else if (startupMode === "specific" && loadedSettings.startup_specific_note_id) {
             targetNote = loadedNotes.find(
@@ -439,14 +452,14 @@ export function App() {
           setCharacterCount(targetNote.character_count);
           setRecentNoteIds([targetNote.id]);
         } else {
-          await handleNewNote();
+          await handleNewNoteRef.current();
         }
       } catch (err) {
         console.error("Initialization error:", err);
       }
     }
     init();
-  }, [handleNewNote]);
+  }, []);
 
   // Silent background update check on app launch
   useEffect(() => {
