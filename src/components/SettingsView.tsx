@@ -6,9 +6,11 @@ import {
   checkForUpdate,
   installUpdate,
   relaunchApp,
+  setPendingUpdateTarget,
   UpdateInfo,
   UpdateStatus,
 } from "../utils/updater";
+import { ReleaseNotesView } from "./ReleaseNotesView";
 import {
   setTelemetryEnabled,
   trackUpdateCheck,
@@ -62,37 +64,6 @@ type TabType =
   | "storage"
   | "trash"
   | "about";
-
-// Clean and format GitHub release markdown body into structured lines
-function formatChangelog(raw: string): { title?: string; items: string[] } {
-  if (!raw) return { items: ["General stability and performance improvements."] };
-  const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
-  const items: string[] = [];
-  let title: string | undefined;
-
-  for (const line of lines) {
-    if (line.startsWith("#")) {
-      if (!title) {
-        title = line.replace(/^#+\s*/, "").replace(/[*_]/g, "").trim();
-      }
-      continue;
-    }
-    // Bullet items
-    if (line.startsWith("-") || line.startsWith("*")) {
-      const clean = line.replace(/^[-*]\s*/, "").trim();
-      if (clean) items.push(clean);
-    } else if (line.length > 0 && !title) {
-      title = line;
-    } else if (line.length > 0) {
-      items.push(line);
-    }
-  }
-
-  if (items.length === 0) {
-    items.push(raw.replace(/^#+\s*/gm, "").trim() || "Performance improvements and bug fixes.");
-  }
-  return { title, items };
-}
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
   settings,
@@ -300,7 +271,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       const res = await checkForUpdate();
       if (res.error) {
         setUpdateStatus("error");
-        setUpdateErrorMessage(res.error);
+        const cleanError = res.error.replace(/([a-zA-Z]:\\[^\s]+)|(\/[^\s]+)/g, "[path]");
+        setUpdateErrorMessage(cleanError || "Could not check for updates.");
         trackUpdateFailed("check_failed", "manual");
       } else if (res.available && res.update) {
         setUpdateInfo(res.update);
@@ -311,7 +283,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       }
     } catch (err: any) {
       setUpdateStatus("error");
-      setUpdateErrorMessage(err?.message || "Could not check for updates.");
+      const raw = err?.message || String(err);
+      const cleanError = raw.replace(/([a-zA-Z]:\\[^\s]+)|(\/[^\s]+)/g, "[path]");
+      setUpdateErrorMessage(cleanError || "Could not check for updates.");
       trackUpdateFailed("check_failed", "manual");
     }
   };
@@ -335,7 +309,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     } catch (err: any) {
       console.error("Update failed:", err);
       setUpdateStatus("error");
-      setUpdateErrorMessage(err?.message || "Failed to download and install update.");
+      const raw = err?.message || String(err);
+      const cleanError = raw.replace(/([a-zA-Z]:\\[^\s]+)|(\/[^\s]+)/g, "[path]");
+      setUpdateErrorMessage(cleanError || "Failed to download and install update.");
       const category = updateStatus === "installing" ? "install_failed" : "download_failed";
       trackUpdateFailed(category, "manual");
     }
@@ -343,6 +319,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const handleRestart = async () => {
     try {
+      if (updateInfo) {
+        setPendingUpdateTarget(updateInfo.version, APP_VERSION);
+      }
       await relaunchApp();
     } catch (err: any) {
       console.error("Failed to relaunch:", err);
@@ -1093,7 +1072,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                           : updateStatus === "ready_to_restart"
                           ? "Update installed. Ready to restart!"
                           : updateStatus === "up_to_date"
-                          ? "Kenote is up to date."
+                          ? `KeNote is up to date (v${APP_VERSION}).`
                           : updateStatus === "error"
                           ? "Update check or install could not complete."
                           : "Stay on the latest version."}
@@ -1141,32 +1120,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         </span>
                       )}
                     </div>
-                    {/* Formatted Changelog Notes */}
-                    <div className="bg-[#141922] border border-[#26303F] rounded-lg p-2.5 space-y-1.5 max-h-36 overflow-y-auto custom-scrollbar">
-                      {(() => {
-                        const parsed = formatChangelog(updateInfo.body || "");
-                        return (
-                          <>
-                            {parsed.title && (
-                              <div className="text-[11px] font-semibold text-white/90 pb-1 border-b border-[#252E3C]">
-                                {parsed.title}
-                              </div>
-                            )}
-                            <ul className="space-y-1 text-[11px] text-gray-300">
-                              {parsed.items.map((item, idx) => {
-                                const cleanItem = item.replace(/\*\*(.*?)\*\*/g, "$1");
-                                return (
-                                  <li key={idx} className="flex items-start space-x-1.5 leading-snug">
-                                    <span className="text-[var(--accent-color,#0399F7)] text-xs mt-0.5">•</span>
-                                    <span>{cleanItem}</span>
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          </>
-                        );
-                      })()}
-                    </div>
+                    {/* Formatted Release Notes */}
+                    {updateInfo.body && (
+                      <div className="bg-[#141922] border border-[#26303F] rounded-lg p-2.5 max-h-36 overflow-hidden flex flex-col space-y-1">
+                        <div className="text-[11px] font-semibold text-white/90 pb-1 border-b border-[#252E3C] shrink-0">
+                          Release Notes
+                        </div>
+                        <ReleaseNotesView content={updateInfo.body} maxHeightClass="max-h-28" />
+                      </div>
+                    )}
                     <div className="flex items-center space-x-2 pt-1">
                       <button
                         onClick={handleInstallUpdate}

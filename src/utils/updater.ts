@@ -1,6 +1,7 @@
-﻿import { check, Update } from "@tauri-apps/plugin-updater";
+import { check, Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
-import { isTauri } from "./tauriBridge";
+import { isTauri } from "./tauriBridge.ts";
+import { APP_VERSION, isVersionAtLeast } from "./version.ts";
 
 export type UpdateStatus =
   | "idle"
@@ -23,6 +24,114 @@ export type ProgressCallback = (percent: number, downloadedBytes: number, totalB
 
 let activeUpdate: Update | null = null;
 
+// ==========================================
+// 1. Session-Level Startup Check Guard
+// ==========================================
+let hasCheckedStartupUpdateThisSession = false;
+let isStartupUpdateDismissedThisSession = false;
+
+export function isStartupUpdateEligible(): boolean {
+  return !hasCheckedStartupUpdateThisSession && !isStartupUpdateDismissedThisSession;
+}
+
+export function markStartupUpdateCheckedThisSession(): void {
+  hasCheckedStartupUpdateThisSession = true;
+}
+
+export function dismissStartupUpdateThisSession(): void {
+  isStartupUpdateDismissedThisSession = true;
+}
+
+export function resetStartupUpdateSessionStateForTesting(): void {
+  hasCheckedStartupUpdateThisSession = false;
+  isStartupUpdateDismissedThisSession = false;
+}
+
+// ==========================================
+// 2. Pending Post-Update Target State
+// ==========================================
+export const STORAGE_KEY_PENDING_UPDATE = "kenote_pending_update_target";
+const PENDING_UPDATE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+export interface PendingUpdateTarget {
+  previousVersion: string;
+  targetVersion: string;
+  timestamp: number;
+}
+
+export function setPendingUpdateTarget(targetVersion: string, previousVersion?: string): void {
+  if (typeof window === "undefined" || !window.localStorage) return;
+  try {
+    const payload: PendingUpdateTarget = {
+      previousVersion: previousVersion || APP_VERSION,
+      targetVersion,
+      timestamp: Date.now(),
+    };
+    window.localStorage.setItem(STORAGE_KEY_PENDING_UPDATE, JSON.stringify(payload));
+  } catch (err) {
+    console.warn("Failed to persist pending update target:", err);
+  }
+}
+
+export function getPendingUpdateTarget(): PendingUpdateTarget | null {
+  if (typeof window === "undefined" || !window.localStorage) return null;
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY_PENDING_UPDATE);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      typeof parsed.targetVersion !== "string" ||
+      typeof parsed.previousVersion !== "string"
+    ) {
+      clearPendingUpdateTarget();
+      return null;
+    }
+    // Check expiry
+    if (typeof parsed.timestamp === "number" && Date.now() - parsed.timestamp > PENDING_UPDATE_EXPIRY_MS) {
+      clearPendingUpdateTarget();
+      return null;
+    }
+    return parsed as PendingUpdateTarget;
+  } catch {
+    clearPendingUpdateTarget();
+    return null;
+  }
+}
+
+export function clearPendingUpdateTarget(): void {
+  if (typeof window === "undefined" || !window.localStorage) return;
+  try {
+    window.localStorage.removeItem(STORAGE_KEY_PENDING_UPDATE);
+  } catch {
+    // Ignore storage clear errors
+  }
+}
+
+export function checkPendingUpdateSuccess(currentVersion: string): {
+  isSuccess: boolean;
+  targetVersion?: string;
+} {
+  const pending = getPendingUpdateTarget();
+  if (!pending) {
+    return { isSuccess: false };
+  }
+
+  if (isVersionAtLeast(currentVersion, pending.targetVersion)) {
+    // Successfully upgraded to target version or higher!
+    clearPendingUpdateTarget();
+    return { isSuccess: true, targetVersion: pending.targetVersion };
+  }
+
+  // If currentVersion is still less than target, do not show false success.
+  // We keep the pending state intact until an actual successful upgrade or expiry.
+  return { isSuccess: false };
+}
+
+// ==========================================
+// 3. Core Updater Operations
+// ==========================================
 export async function checkForUpdate(): Promise<{
   available: boolean;
   update?: UpdateInfo;

@@ -21,7 +21,14 @@ import {
   trackUpdateCheck,
   trackUpdateAvailable,
 } from "./utils/analytics";
-import { checkForUpdate, UpdateInfo } from "./utils/updater";
+import {
+  checkForUpdate,
+  UpdateInfo,
+  checkPendingUpdateSuccess,
+  isStartupUpdateEligible,
+  markStartupUpdateCheckedThisSession,
+} from "./utils/updater";
+import { APP_VERSION } from "./utils/version";
 import {
   PlusIcon,
   NoteSwitcherIcon,
@@ -461,13 +468,30 @@ export function App() {
     init();
   }, []);
 
+  // Post-update confirmation check on application startup
+  useEffect(() => {
+    try {
+      const updateResult = checkPendingUpdateSuccess(APP_VERSION);
+      if (updateResult.isSuccess) {
+        showToast(`KeNote was updated successfully. You're now running v${APP_VERSION}.`);
+      }
+    } catch (err) {
+      console.warn("Failed to check pending update status:", err);
+    }
+  }, [showToast]);
+
   // Silent background update check on app launch
   useEffect(() => {
+    if (!isStartupUpdateEligible()) {
+      return;
+    }
+    markStartupUpdateCheckedThisSession();
+
     const timer = setTimeout(async () => {
       try {
         trackUpdateCheck("automatic");
         const res = await checkForUpdate();
-        if (res.available && res.update) {
+        if (res.available && res.update && isStartupUpdateEligible()) {
           trackUpdateAvailable(res.update.version, "automatic");
           setAvailableUpdate(res.update);
           setIsUpdateModalOpen(true);

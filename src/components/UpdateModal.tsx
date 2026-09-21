@@ -1,11 +1,18 @@
 import React, { useState } from "react";
 import appIconUrl from "../assets/app-icon.png";
-import { UpdateInfo, installUpdate, relaunchApp } from "../utils/updater";
+import {
+  UpdateInfo,
+  installUpdate,
+  relaunchApp,
+  setPendingUpdateTarget,
+  dismissStartupUpdateThisSession,
+} from "../utils/updater";
 import {
   trackUpdateDownloadStarted,
   trackUpdateSucceeded,
   trackUpdateFailed,
 } from "../utils/analytics";
+import { ReleaseNotesView } from "./ReleaseNotesView";
 import { Sparkles, RefreshCw, CheckCircle2, AlertTriangle } from "lucide-react";
 
 interface UpdateModalProps {
@@ -22,6 +29,11 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ isOpen, onClose, updat
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!isOpen || !update) return null;
+
+  const handleLater = () => {
+    dismissStartupUpdateThisSession();
+    onClose();
+  };
 
   const handleUpdateNow = async () => {
     trackUpdateDownloadStarted(update.version, "automatic");
@@ -45,14 +57,23 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ isOpen, onClose, updat
     } catch (err: any) {
       console.error("In-app update failed:", err);
       setStatus("error");
-      setErrorMessage(err?.message || "Failed to download and install update.");
+      const raw = err?.message || String(err);
+      // Clean sensitive or local file paths from user-facing error message
+      const sanitized = raw.replace(/([a-zA-Z]:\\[^\s]+)|(\/[^\s]+)/g, "[path]");
+      setErrorMessage(sanitized || "Failed to download and install update.");
       const category = status === "installing" ? "install_failed" : "download_failed";
       trackUpdateFailed(category, "automatic");
     }
   };
 
   const handleRestart = async () => {
-    await relaunchApp();
+    try {
+      // Record pending target version before triggering relaunch
+      setPendingUpdateTarget(update.version, update.currentVersion);
+      await relaunchApp();
+    } catch (err) {
+      console.error("Failed to relaunch application:", err);
+    }
   };
 
   return (
@@ -94,11 +115,11 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ isOpen, onClose, updat
           {status === "available" && (
             <>
               {update.body && (
-                <div className="bg-[#12161D] border border-[#26303F] rounded-xl p-3 max-h-36 overflow-y-auto custom-scrollbar text-gray-300 leading-relaxed space-y-1">
-                  <div className="text-[11px] font-semibold text-white/90 pb-1 border-b border-[#252E3C]">
-                    Release Highlights
+                <div className="bg-[#12161D] border border-[#26303F] rounded-xl p-3 max-h-48 overflow-hidden flex flex-col text-gray-300 leading-relaxed space-y-1.5">
+                  <div className="text-[11px] font-semibold text-white/90 pb-1 border-b border-[#252E3C] shrink-0">
+                    Release Notes
                   </div>
-                  <p className="text-[11px] text-gray-300 whitespace-pre-wrap">{update.body}</p>
+                  <ReleaseNotesView content={update.body} maxHeightClass="max-h-40" />
                 </div>
               )}
               <p className="text-gray-400 text-center text-[11px]">
@@ -157,7 +178,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ isOpen, onClose, updat
           {status === "available" && (
             <>
               <button
-                onClick={onClose}
+                onClick={handleLater}
                 className="px-4 py-2 rounded-xl bg-[#252E3C] hover:bg-[#313C4E] text-gray-300 hover:text-white text-xs font-semibold transition-all focus:outline-none border border-[#354152]"
               >
                 Later
@@ -193,7 +214,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ isOpen, onClose, updat
           {status === "error" && (
             <>
               <button
-                onClick={onClose}
+                onClick={handleLater}
                 className="px-4 py-2 rounded-xl bg-[#252E3C] hover:bg-[#313C4E] text-gray-300 hover:text-white text-xs font-semibold transition-all focus:outline-none border border-[#354152]"
               >
                 Dismiss

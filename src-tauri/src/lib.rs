@@ -666,6 +666,14 @@ pub fn run() {
                     let _ = win.center();
                 }
 
+                // Restore persisted always-on-top state before making window visible
+                if settings.always_on_top {
+                    let _ = win.set_always_on_top(true);
+                }
+
+                // Display window smoothly now that position, size, and pin state are configured
+                let _ = win.show();
+
                 let win_clone = win.clone();
                 win.on_window_event(move |event| {
                     match event {
@@ -844,6 +852,20 @@ mod tests {
         assert!(temp_custom.is_dir());
 
         let _ = fs::remove_dir_all(&temp_custom);
+    }
+
+    #[test]
+    fn test_always_on_top_settings_serialization() {
+        let settings = AppSettings {
+            always_on_top: true,
+            ..AppSettings::default()
+        };
+        let json = serde_json::to_string(&settings).expect("Should serialize");
+        let deserialized: AppSettings = serde_json::from_str(&json).expect("Should deserialize");
+        assert!(deserialized.always_on_top);
+
+        let default_settings = AppSettings::default();
+        assert!(!default_settings.always_on_top);
     }
 }
 

@@ -61,14 +61,13 @@ jobs:
             ## Kenote v__VERSION__
 
             ### ✨ What's New
-            - **Window State Persistence**: Automatically restores window position (x, y) and dimensions across app restarts.
-            - **Signed In-App Auto-Updater**: Seamless in-app updates cryptographically signed and verified via Tauri v2.
-            - **First-Run Welcome Screen**: Interactive discovery survey and quick feature highlights.
-            - **Live WYSIWYG Markdown**: In-place headings, bold, italics, strikethrough, checklists, blockquotes, and code blocks.
-            - **Always-On-Top Pinning**: Keep notes floating on top of all apps (`Ctrl + P` or top bar pin icon).
-            - **Local-First .md Storage**: Instant auto-saving to local `.md` markdown files.
-            - **Browse Notes Switcher**: Instant fuzzy search and quick note switching (`Ctrl + O`).
-            - **Command Actions Palette**: Quick command menu (`Ctrl + K`).
+            - **Automatic Update Checking**: Silently checks for signed updates on startup.
+            - **Improved Updater Experience**: Clean Update Now and Later controls with real progress indicators.
+            - **Formatted Release Notes**: In-app rich markdown rendering for release changelogs.
+
+            ### 🚀 Improvements
+            - **Post-Update Confirmation**: Confirms successful updates after restart.
+            - **Reliable Session Handling**: Eliminates redundant update prompts within the same session.
 
             ### 📦 Download & Install
             - **Windows**: Download the `.msi` or `-setup.exe` installer below.
