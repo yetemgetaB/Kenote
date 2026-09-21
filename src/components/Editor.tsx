@@ -108,9 +108,9 @@ export function preserveBlankLines(md: string): string {
       if (index % 2 === 1) return part;
       return part.replace(/(\r?\n){3,}/g, (match) => {
         const count = match.split(/\r?\n/).length - 1;
-        const extra = count - 2;
-        const breaks = Array(extra).fill("<br>").join("\n\n");
-        return `\n\n${breaks}\n\n`;
+        const extraEmptyParagraphs = count - 2;
+        const emptyTags = Array(extraEmptyParagraphs).fill("<p></p>").join("\n");
+        return `\n\n${emptyTags}\n\n`;
       });
     })
     .join("");
@@ -123,7 +123,7 @@ export const CustomParagraph = Paragraph.extend({
       markdown: {
         serialize(state: any, node: any) {
           if (node.childCount === 0) {
-            state.write("<br>");
+            state.write("");
             state.closeBlock(node);
           } else {
             state.renderInline(node);
@@ -269,8 +269,8 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
         }),
         Markdown.configure({
           html: true,
-          transformPastedText: true,
-          transformCopiedText: true,
+          transformPastedText: false,
+          transformCopiedText: false,
         }),
       ],
       content: preserveBlankLines(initialContent || ""),

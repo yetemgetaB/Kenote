@@ -33,13 +33,29 @@ const lowlight = createLowlight(common);
 
 const Paragraph = (await import("@tiptap/extension-paragraph")).default;
 
+function preserveBlankLines(md) {
+  if (!md) return "";
+  const parts = md.split(/(```[\s\S]*?```|~~~[\s\S]*?~~~)/g);
+  return parts
+    .map((part, index) => {
+      if (index % 2 === 1) return part;
+      return part.replace(/(\r?\n){3,}/g, (match) => {
+        const count = match.split(/\r?\n/).length - 1;
+        const extraEmptyParagraphs = count - 2;
+        const emptyTags = Array(extraEmptyParagraphs).fill("<p></p>").join("\n");
+        return `\n\n${emptyTags}\n\n`;
+      });
+    })
+    .join("");
+}
+
 const CustomParagraph = Paragraph.extend({
   addStorage() {
     return {
       markdown: {
         serialize(state, node) {
           if (node.childCount === 0) {
-            state.write("<br>");
+            state.write("");
             state.closeBlock(node);
           } else {
             state.renderInline(node);
@@ -83,11 +99,11 @@ function createTestEditor(content = "") {
       Link.configure({ openOnClick: false }),
       Markdown.configure({
         html: true,
-        transformPastedText: true,
-        transformCopiedText: true,
+        transformPastedText: false,
+        transformCopiedText: false,
       }),
     ],
-    content,
+    content: preserveBlankLines(content),
   });
 }
 
@@ -160,7 +176,34 @@ describe("Editor Markdown Roundtrip Tests", () => {
     const ed = createTestEditor();
     ed.commands.setContent("<p>Line 1</p><p></p><p>Line 2</p>");
     const md = ed.storage.markdown.getMarkdown();
-    console.log("EMPTY P SERIALIZED TO MD:", JSON.stringify(md));
+    assert.strictEqual(md, "Line 1\n\n\nLine 2");
+    assert.strictEqual(md.includes("<br>"), false);
+    assert.strictEqual(md.includes("\\"), false);
+    ed.destroy();
+  });
+
+  test("preserves multiple consecutive newlines without backslashes or br tags", () => {
+    const testCases = [
+      "Line 1\n\nLine 2",
+      "Line 1\n\n\nLine 2",
+      "Line 1\n\n\n\nLine 2",
+      "Line 1\n\n\n\n\nLine 2",
+    ];
+    for (const input of testCases) {
+      const ed = createTestEditor(input);
+      const output = ed.storage.markdown.getMarkdown();
+      assert.strictEqual(output, input, `Expected ${JSON.stringify(input)} to equal ${JSON.stringify(output)}`);
+      assert.strictEqual(output.includes("<br>"), false);
+      assert.strictEqual(output.includes("\\"), false);
+      ed.destroy();
+    }
+  });
+
+  test("preserves legitimate markdown escapes without corrupting them", () => {
+    const input = "Escaped \\*asterisk\\* and \\[brackets\\] and \\_underscore\\_";
+    const ed = createTestEditor(input);
+    const output = ed.storage.markdown.getMarkdown().trim();
+    assert.strictEqual(output, input);
     ed.destroy();
   });
 
