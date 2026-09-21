@@ -1,4 +1,4 @@
-﻿import { describe, it, beforeEach } from "node:test";
+import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
 
@@ -37,7 +37,8 @@ describe("S3 Navigation & Window State Tests", () => {
           notesMap.delete(id);
         }
       }
-      for (const remaining of notesMap.values()) {
+      const unvisited = Array.from(notesMap.values()).sort((a, b) => b.updated_at - a.updated_at);
+      for (const remaining of unvisited) {
         mruNotes.push(remaining);
       }
       return mruNotes;
@@ -64,6 +65,20 @@ describe("S3 Navigation & Window State Tests", () => {
       assert.equal(ordered[1].id, "note_normal_1");
       assert.equal(ordered[2].id, "note_pinned_1");
       assert.equal(ordered[3].id, "note_pinned_2");
+    });
+
+    it("unvisited notes are ordered by recency, not by pinned state", () => {
+      const customNotes = [
+        { id: "note_pinned_old", is_pinned: true, updated_at: 100 },
+        { id: "note_unpinned_recent", is_pinned: false, updated_at: 500 },
+        { id: "note_active", is_pinned: false, updated_at: 200 },
+      ];
+      const recentNoteIds = ["note_active"];
+      const ordered = getOrderedNotes(customNotes, recentNoteIds);
+
+      assert.equal(ordered[0].id, "note_active");
+      assert.equal(ordered[1].id, "note_unpinned_recent"); // recency (500) beats pinned (100)
+      assert.equal(ordered[2].id, "note_pinned_old");
     });
 
     it("prevents duplicate entries in MRU and prunes deleted notes", () => {

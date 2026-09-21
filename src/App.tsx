@@ -50,7 +50,14 @@ export function App() {
   const [notesDir, setNotesDir] = useState("");
 
   // MRU Note history
-  const [recentNoteIds, setRecentNoteIds] = useState<string[]>([]);
+  const [, setRecentNoteIds] = useState<string[]>([]);
+  const recentNoteIdsRef = useRef<string[]>([]);
+
+  // Settings ref to prevent stale closures in event listeners
+  const settingsRef = useRef<AppSettings>(settings);
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
 
   // Modals state
   const [isNoteSwitcherOpen, setIsNoteSwitcherOpen] = useState(false);
@@ -285,21 +292,23 @@ export function App() {
     try {
       const newNote = await api.saveNote("", "", false);
       trackNoteCreated();
-      setNotes((prev) => [newNote, ...prev]);
+      notesRef.current = [newNote, ...notesRef.current];
       activeNoteRef.current = newNote;
+      recentNoteIdsRef.current = [newNote.id, ...recentNoteIdsRef.current.filter((id) => id !== newNote.id)];
+
+      setNotes(notesRef.current);
       setActiveNote(newNote);
       setActiveTitle("Untitled");
       setCharacterCount(0);
       setSaveStatus("saved");
       hasUnsavedChangesRef.current = false;
       pendingSaveRef.current = null;
-
-      // Update MRU
-      setRecentNoteIds((prevIds) => [newNote.id, ...prevIds.filter((id) => id !== newNote.id)]);
+      setRecentNoteIds(recentNoteIdsRef.current);
 
       // Track last active note in settings
       setSettings((prev) => {
         const updated = { ...prev, last_active_note_id: newNote.id };
+        settingsRef.current = updated;
         api.saveSettings(updated);
         return updated;
       });
@@ -322,14 +331,16 @@ export function App() {
 
     // Update active note ref and MRU IMMEDIATELY to prevent race conditions on rapid switching
     activeNoteRef.current = note;
+    recentNoteIdsRef.current = [note.id, ...recentNoteIdsRef.current.filter((id) => id !== note.id)];
     setActiveNote(note);
     setActiveTitle(note.title);
     setCharacterCount(note.character_count);
-    setRecentNoteIds((prevIds) => [note.id, ...prevIds.filter((id) => id !== note.id)]);
+    setRecentNoteIds(recentNoteIdsRef.current);
 
     // Track last active note in settings
-    setSettings((prev) => {
-      const updated = { ...prev, last_active_note_id: note.id };
+    setSettings((prevSettings) => {
+      const updated = { ...prevSettings, last_active_note_id: note.id };
+      settingsRef.current = updated;
       api.saveSettings(updated);
       return updated;
     });
@@ -338,17 +349,12 @@ export function App() {
     if (hasUnsavedChangesRef.current && prev) {
       const markdown = editorRef.current?.getMarkdown() ?? prev.content ?? "";
       api.saveNote(prev.filename, markdown, prev.is_pinned).then((saved) => {
-        setNotes((prevNotes) => {
-          const index = prevNotes.findIndex((n) => n.id === saved.id);
-          let updatedNotes = [...prevNotes];
-          if (index !== -1) updatedNotes[index] = saved;
-          else updatedNotes.unshift(saved);
-          return updatedNotes.sort(
-            (a, b) =>
-              (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0) ||
-              b.updated_at - a.updated_at
-          );
-        });
+        notesRef.current = notesRef.current.map((n) => (n.id === saved.id ? saved : n)).sort(
+          (a, b) =>
+            (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0) ||
+            b.updated_at - a.updated_at
+        );
+        setNotes(notesRef.current);
       }).catch((err) => {
         console.error("Failed to save previous note on switch:", err);
       });
@@ -360,36 +366,44 @@ export function App() {
     // Clean up previous note if it was an abandoned empty note
     if (isAbandonedEmptyNote(prev) && prev?.filename !== note.filename) {
       api.deleteNote(prev!.filename).then(() => {
-        setNotes((prevNotes) => prevNotes.filter((n) => n.filename !== prev!.filename));
-        setRecentNoteIds((prevIds) => prevIds.filter((id) => id !== prev!.id));
+        notesRef.current = notesRef.current.filter((n) => n.filename !== prev!.filename);
+        recentNoteIdsRef.current = recentNoteIdsRef.current.filter((id) => id !== prev!.id);
+        setNotes(notesRef.current);
+        setRecentNoteIds(recentNoteIdsRef.current);
       }).catch((err) => {
         console.warn("Could not prune abandoned empty note:", err);
       });
     }
 
     setTimeout(() => editorRef.current?.focus(), 50);
-  }, [settings]);
+  }, []);
 
   // Toggle Pin Note (persisted in metadata index, no destructive filename mutations)
   const handleTogglePinNote = useCallback(async (note: NoteMetadata, e: React.MouseEvent) => {
     e.stopPropagation();
     const newPinned = !note.is_pinned;
     try {
-      await api.setNotePinned(note.filename, newPinned);
+      // Synchronously update activeNoteRef, pendingSaveRef, and notesRef before async IPC to protect against autosave races
+      if (activeNoteRef.current?.filename === note.filename) {
+        activeNoteRef.current = { ...activeNoteRef.current, is_pinned: newPinned };
+        if (pendingSaveRef.current && pendingSaveRef.current.filename === note.filename) {
+          pendingSaveRef.current.isPinned = newPinned;
+        }
+      }
 
-      setNotes((prevNotes) => {
-        const updated = prevNotes.map((n) =>
-          n.filename === note.filename ? { ...n, is_pinned: newPinned } : n
-        );
-        return updated.sort(
+      notesRef.current = notesRef.current
+        .map((n) => (n.filename === note.filename ? { ...n, is_pinned: newPinned } : n))
+        .sort(
           (a, b) =>
             (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0) ||
             b.updated_at - a.updated_at
         );
-      });
 
+      await api.setNotePinned(note.filename, newPinned);
+
+      setNotes(notesRef.current);
       if (activeNoteRef.current?.filename === note.filename) {
-        setActiveNote((prev) => (prev ? { ...prev, is_pinned: newPinned } : null));
+        setActiveNote(activeNoteRef.current);
       }
     } catch (err) {
       console.error("Failed to toggle note pin:", err);
@@ -412,6 +426,7 @@ export function App() {
       try {
         const loadedSettings = await api.getSettings();
         setSettings(loadedSettings);
+        settingsRef.current = loadedSettings;
         setIsAlwaysOnTop(loadedSettings.always_on_top);
         applyAccentColor(loadedSettings.accent_color);
 
@@ -429,6 +444,7 @@ export function App() {
         setNotesDir(dir);
 
         const loadedNotes = await api.listNotes();
+        notesRef.current = loadedNotes;
         setNotes(loadedNotes);
 
         const startupMode = loadedSettings.startup_behavior || "last";
@@ -457,7 +473,17 @@ export function App() {
           setActiveNote(targetNote);
           setActiveTitle(targetNote.title);
           setCharacterCount(targetNote.character_count);
-          setRecentNoteIds([targetNote.id]);
+
+          // Seed MRU deterministically: active note first, followed by remaining notes sorted by recency (updated_at desc)
+          const sortedByRecency = loadedNotes
+            .slice()
+            .sort((a, b) => b.updated_at - a.updated_at);
+          const initialMru = [
+            targetNote.id,
+            ...sortedByRecency.filter((n) => n.id !== targetNote!.id).map((n) => n.id),
+          ];
+          recentNoteIdsRef.current = initialMru;
+          setRecentNoteIds(initialMru);
         } else {
           await handleNewNoteRef.current();
         }
@@ -517,7 +543,13 @@ export function App() {
           if (!found) {
             if (!hasUnsavedChangesRef.current) {
               showToast("Active note was deleted externally.");
+              notesRef.current = diskNotes;
               setNotes(diskNotes);
+              recentNoteIdsRef.current = recentNoteIdsRef.current.filter((id) =>
+                diskNotes.some((n) => n.id === id)
+              );
+              setRecentNoteIds(recentNoteIdsRef.current);
+
               if (diskNotes.length > 0) {
                 handleSelectNote(diskNotes[0]);
               } else {
@@ -527,25 +559,43 @@ export function App() {
             } else {
               showToast("Active note was removed on disk, but your local edits are kept.");
             }
-          } else if (found.updated_at > currentActive.updated_at + 1500) {
-            // File was modified externally
-            if (!hasUnsavedChangesRef.current && saveStatus !== "saving") {
-              const fullNote = await api.readNote(currentActive.filename);
-              setActiveNote(fullNote);
-              setActiveTitle(fullNote.title);
-              setCharacterCount(fullNote.character_count);
-              editorRef.current?.setMarkdown(fullNote.content);
-              showToast("Reloaded note from external changes.");
-            } else {
-              showToast("External changes detected on disk. Press Ctrl+S to save your version.");
+          } else {
+            // Keep pin status synchronized if changed on disk
+            if (found.is_pinned !== currentActive.is_pinned) {
+              activeNoteRef.current = { ...currentActive, is_pinned: found.is_pinned };
+              setActiveNote((prev) => (prev ? { ...prev, is_pinned: found.is_pinned } : prev));
+            }
+
+            if (found.updated_at > currentActive.updated_at + 1500) {
+              // File was modified externally
+              if (!hasUnsavedChangesRef.current && saveStatus !== "saving") {
+                const fullNote = await api.readNote(currentActive.filename);
+                activeNoteRef.current = fullNote;
+                setActiveNote(fullNote);
+                setActiveTitle(fullNote.title);
+                setCharacterCount(fullNote.character_count);
+                editorRef.current?.setMarkdown(fullNote.content);
+                showToast("Reloaded note from external changes.");
+              } else {
+                showToast("External changes detected on disk. Press Ctrl+S to save your version.");
+              }
             }
           }
         }
 
+        // Clean up any stale IDs from recentNoteIdsRef that no longer exist on disk
+        const diskIdSet = new Set(diskNotes.map((n) => n.id));
+        const prunedMru = recentNoteIdsRef.current.filter((id) => diskIdSet.has(id));
+        if (prunedMru.length !== recentNoteIdsRef.current.length) {
+          recentNoteIdsRef.current = prunedMru;
+          setRecentNoteIds(prunedMru);
+        }
+
+        notesRef.current = diskNotes;
         setNotes((prevNotes) => {
           if (prevNotes.length !== diskNotes.length) return diskNotes;
           const map = new Map(prevNotes.map((n) => [n.filename, n.updated_at]));
-          const hasDiff = diskNotes.some((n) => map.get(n.filename) !== n.updated_at);
+          const hasDiff = diskNotes.some((n) => map.get(n.filename) !== n.updated_at || map.has(n.filename) === false);
           return hasDiff ? diskNotes : prevNotes;
         });
       } catch (err) {
@@ -593,9 +643,11 @@ export function App() {
       }
       await api.deleteNote(note.filename);
       trackNoteDeleted();
-      const remaining = notes.filter((n) => n.filename !== note.filename);
+      const remaining = notesRef.current.filter((n) => n.filename !== note.filename);
+      notesRef.current = remaining;
+      recentNoteIdsRef.current = recentNoteIdsRef.current.filter((id) => id !== note.id);
       setNotes(remaining);
-      setRecentNoteIds((prev) => prev.filter((id) => id !== note.id));
+      setRecentNoteIds(recentNoteIdsRef.current);
 
       try {
         const key = "kenote_cursor_positions";
@@ -604,9 +656,11 @@ export function App() {
         localStorage.setItem(key, JSON.stringify(currentMap));
       } catch {}
 
-      if (activeNote?.filename === note.filename) {
+      if (activeNoteRef.current?.filename === note.filename) {
         if (remaining.length > 0) {
-          handleSelectNote(remaining[0]);
+          const nextMruId = recentNoteIdsRef.current[0];
+          const nextNote = remaining.find((n) => n.id === nextMruId) || remaining[0];
+          handleSelectNote(nextNote);
         } else {
           handleNewNote();
         }
@@ -632,16 +686,12 @@ export function App() {
   // Restore Note from Trash
   const handleRestoreNote = (restoredNote: NoteMetadata) => {
     trackNoteRestored();
-    setNotes((prev) => {
-      const exists = prev.some((n) => n.id === restoredNote.id);
-      if (exists) return prev;
-      const updated = [restoredNote, ...prev];
-      return updated.sort(
-        (a, b) =>
-          (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0) ||
-          b.updated_at - a.updated_at
-      );
-    });
+    notesRef.current = [restoredNote, ...notesRef.current.filter((n) => n.id !== restoredNote.id)].sort(
+      (a, b) =>
+        (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0) ||
+        b.updated_at - a.updated_at
+    );
+    setNotes(notesRef.current);
     handleSelectNote(restoredNote);
   };
 
@@ -663,13 +713,15 @@ export function App() {
     setIsAlwaysOnTop(newState);
     await api.setAlwaysOnTop(newState);
     const updated = { ...settings, always_on_top: newState };
+    settingsRef.current = updated;
     setSettings(updated);
     await api.saveSettings(updated);
   };
 
   // Update Settings
   const handleUpdateSettings = async (newSettings: AppSettings) => {
-    const prevCustomDir = settings.custom_notes_dir;
+    const prevCustomDir = settingsRef.current.custom_notes_dir;
+    settingsRef.current = newSettings;
     setSettings(newSettings);
     applyAccentColor(newSettings.accent_color);
 
@@ -679,23 +731,29 @@ export function App() {
         const newDir = await api.getNotesDirectory();
         setNotesDir(newDir);
         const reloadedNotes = await api.listNotes();
+        notesRef.current = reloadedNotes;
         setNotes(reloadedNotes);
 
         if (reloadedNotes.length > 0) {
-          const stillExists = activeNote && reloadedNotes.some((n) => n.id === activeNote.id);
+          const stillExists = activeNoteRef.current && reloadedNotes.some((n) => n.id === activeNoteRef.current?.id);
           if (!stillExists) {
             const first = reloadedNotes[0];
             activeNoteRef.current = first;
             setActiveNote(first);
             setActiveTitle(first.title);
             setCharacterCount(first.character_count);
-            setRecentNoteIds([first.id]);
+
+            const sorted = reloadedNotes.slice().sort((a, b) => b.updated_at - a.updated_at);
+            const mru = [first.id, ...sorted.filter((n) => n.id !== first.id).map((n) => n.id)];
+            recentNoteIdsRef.current = mru;
+            setRecentNoteIds(mru);
           }
         } else {
           activeNoteRef.current = null;
           setActiveNote(null);
           setActiveTitle("Untitled");
           setCharacterCount(0);
+          recentNoteIdsRef.current = [];
           setRecentNoteIds([]);
         }
       } catch (err) {
@@ -706,34 +764,36 @@ export function App() {
 
   // Prepare ordered notes for Quick Switcher (MRU or Default list order)
   const getOrderedNotes = useCallback(() => {
-    if (settings.quick_switcher_order === "pinned_updated") {
-      return notes;
+    const currentNotes = notesRef.current;
+    if (settingsRef.current.quick_switcher_order === "pinned_updated") {
+      return currentNotes;
     }
     // MRU Order
     const mruNotes: NoteMetadata[] = [];
-    const notesMap = new Map(notes.map((n) => [n.id, n]));
+    const notesMap = new Map(currentNotes.map((n) => [n.id, n]));
 
-    for (const id of recentNoteIds) {
+    for (const id of recentNoteIdsRef.current) {
       const note = notesMap.get(id);
       if (note) {
         mruNotes.push(note);
         notesMap.delete(id);
       }
     }
-    // Add any remaining notes not yet in MRU history
-    for (const remaining of notesMap.values()) {
+    // Add any remaining unvisited notes sorted by recency (updated_at descending), NOT pinned priority!
+    const unvisited = Array.from(notesMap.values()).sort((a, b) => b.updated_at - a.updated_at);
+    for (const remaining of unvisited) {
       mruNotes.push(remaining);
     }
     return mruNotes;
-  }, [notes, recentNoteIds, settings.quick_switcher_order]);
+  }, []);
 
   // Global Keyboard Shortcuts & Quick Switcher modifier release
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isCmdOrCtrl = e.ctrlKey || e.metaKey;
       const isAlt = e.altKey;
-      const shortcutConfig = settings.quick_switcher_shortcut || "ctrl_tab";
-      const switcherMode = settings.quick_switcher_mode || "overlay";
+      const shortcutConfig = settingsRef.current.quick_switcher_shortcut || "ctrl_tab";
+      const switcherMode = settingsRef.current.quick_switcher_mode || "overlay";
 
       // 1. Check if quick switcher shortcut key is pressed
       let isSwitcherShortcut = false;
@@ -751,7 +811,7 @@ export function App() {
         }
       }
 
-      if (isSwitcherShortcut && notes.length > 1) {
+      if (isSwitcherShortcut && notesRef.current.length > 1) {
         e.preventDefault();
 
         const ordered = getOrderedNotes();
@@ -844,7 +904,7 @@ export function App() {
     const handleKeyUp = (e: KeyboardEvent) => {
       if (!isQuickSwitcherOpenRef.current) return;
 
-      const shortcutConfig = settings.quick_switcher_shortcut || "ctrl_tab";
+      const shortcutConfig = settingsRef.current.quick_switcher_shortcut || "ctrl_tab";
       const isModifierReleased =
         (shortcutConfig === "ctrl_tab" && (e.key === "Control" || e.key === "Meta")) ||
         (shortcutConfig === "alt_tab" && e.key === "Alt") ||
@@ -868,7 +928,7 @@ export function App() {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, [isAlwaysOnTop, notes, activeNote, settings, getOrderedNotes]);
+  }, [handleNewNote, handleSelectNote, flushPendingSave, handleToggleAlwaysOnTop, getOrderedNotes, isSettingsOpen]);
 
   // Actions for Command Palette
   const actions: ActionItem[] = [

@@ -322,11 +322,7 @@ fn set_note_pinned(filename: String, is_pinned: bool) -> Result<(), String> {
     }
 
     let mut metadata_index = load_metadata_index(&notes_dir);
-    if is_pinned {
-        metadata_index.pinned.insert(filename, true);
-    } else {
-        metadata_index.pinned.remove(&filename);
-    }
+    metadata_index.pinned.insert(filename, is_pinned);
     save_metadata_index(&notes_dir, &metadata_index)?;
     Ok(())
 }
@@ -346,11 +342,7 @@ fn save_note(mut filename: String, content: String, is_pinned: bool) -> Result<N
 
     // Update metadata index for pin status without renaming the file
     let mut metadata_index = load_metadata_index(&notes_dir);
-    if is_pinned {
-        metadata_index.pinned.insert(filename.clone(), true);
-    } else {
-        metadata_index.pinned.remove(&filename);
-    }
+    metadata_index.pinned.insert(filename.clone(), is_pinned);
     let _ = save_metadata_index(&notes_dir, &metadata_index);
 
     let title = extract_title_from_content(&content);
@@ -760,12 +752,14 @@ mod tests {
         let mut index = NotesMetadataIndex::default();
         index.pinned.insert("note_explicit_pinned.md".to_string(), true);
         index.pinned.insert("note_explicit_unpinned.md".to_string(), false);
+        index.pinned.insert("pin_legacy_unpinned.md".to_string(), false);
 
-        // Explicit index entries take precedence
+        // Explicit index entries take precedence (even over legacy pin_ filename prefix)
         assert!(is_note_pinned("note_explicit_pinned.md", &index));
         assert!(!is_note_pinned("note_explicit_unpinned.md", &index));
+        assert!(!is_note_pinned("pin_legacy_unpinned.md", &index));
 
-        // Legacy filename fallback for notes without explicit index entry
+        // Legacy filename fallback only for notes without explicit index entry
         assert!(is_note_pinned("pin_note_legacy.md", &index));
         assert!(!is_note_pinned("note_normal.md", &index));
     }
