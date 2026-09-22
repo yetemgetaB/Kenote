@@ -202,16 +202,17 @@ fn get_notes_directory() -> String {
 }
 
 fn extract_title_from_content(content: &str) -> String {
-    for line in content.lines() {
-        let trimmed = line.trim();
-        if !trimmed.is_empty() {
-            let without_hash = trimmed.trim_start_matches('#').trim();
-            if !without_hash.is_empty() {
-                return without_hash.to_string();
-            }
+    let first_line = content.lines().next().unwrap_or("").trim();
+    if first_line.is_empty() {
+        "Untitled".to_string()
+    } else {
+        let without_hash = first_line.trim_start_matches('#').trim();
+        if without_hash.is_empty() {
+            "Untitled".to_string()
+        } else {
+            without_hash.to_string()
         }
     }
-    "Untitled".to_string()
 }
 
 fn get_file_timestamps(path: &Path) -> (u64, u64) {
@@ -785,7 +786,7 @@ mod tests {
         assert_eq!(extract_title_from_content("# My Title\nBody text"), "My Title");
         assert_eq!(extract_title_from_content("### Nested Heading\nMore"), "Nested Heading");
         assert_eq!(extract_title_from_content("Plain text first line"), "Plain text first line");
-        assert_eq!(extract_title_from_content("\n\n  \n# Spaced Title"), "Spaced Title");
+        assert_eq!(extract_title_from_content("\nThis is body content."), "Untitled");
         assert_eq!(extract_title_from_content(""), "Untitled");
         assert_eq!(extract_title_from_content("   \n\n  "), "Untitled");
     }

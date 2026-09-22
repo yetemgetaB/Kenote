@@ -276,8 +276,9 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
       onUpdate: ({ editor: ed }) => {
         if (!ed || ed.isDestroyed) return;
 
-        const text = ed.state.doc.textContent;
-        const { charCount, wordCount, firstLineTitle } = computeDocumentStats(text);
+        const fullText = ed.getText();
+        const charCount = ed.state.doc.textContent.length;
+        const { wordCount, firstLineTitle } = computeDocumentStats(fullText, charCount);
 
         onChange(charCount, wordCount, firstLineTitle);
       },
@@ -304,8 +305,9 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
     useEffect(() => {
       if (editor && !hasRestoredInitialCursorRef.current) {
         hasRestoredInitialCursorRef.current = true;
-        const text = editor.state.doc.textContent;
-        const { charCount, wordCount, firstLineTitle } = computeDocumentStats(text);
+        const fullText = editor.getText();
+        const charCount = editor.state.doc.textContent.length;
+        const { wordCount, firstLineTitle } = computeDocumentStats(fullText, charCount);
         onChange(charCount, wordCount, firstLineTitle);
         onEditorReadyRef.current?.(editor);
         if (noteId) {
@@ -329,8 +331,9 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
         prevNoteIdRef.current = noteId;
         isSwitchingNoteRef.current = true;
         editor.commands.setContent(preserveBlankLines(initialContent || ""), false);
-        const text = editor.state.doc.textContent;
-        const { charCount, wordCount, firstLineTitle } = computeDocumentStats(text);
+        const fullText = editor.getText();
+        const charCount = editor.state.doc.textContent.length;
+        const { wordCount, firstLineTitle } = computeDocumentStats(fullText, charCount);
         onChange(charCount, wordCount, firstLineTitle);
         restoreCursor(noteId, editor);
         isSwitchingNoteRef.current = false;
@@ -350,8 +353,9 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
           }
           isSwitchingNoteRef.current = true;
           editor.commands.setContent(preserveBlankLines(md), false);
-          const text = editor.state.doc.textContent;
-          const { charCount, wordCount, firstLineTitle } = computeDocumentStats(text);
+          const fullText = editor.getText();
+          const charCount = editor.state.doc.textContent.length;
+          const { wordCount, firstLineTitle } = computeDocumentStats(fullText, charCount);
           onChange(charCount, wordCount, firstLineTitle);
           if (noteId) {
             restoreCursor(noteId, editor);

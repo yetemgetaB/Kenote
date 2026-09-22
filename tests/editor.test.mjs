@@ -458,10 +458,9 @@ describe("Editor Cursor & Selection Regression Tests", () => {
   });
 });
 
-const { computeDocumentStats } = await import("../src/utils/documentStats.ts");
+const { computeDocumentStats, extractNoteTitle } = await import("../src/utils/documentStats.ts");
 
-describe("Document Statistics & Count Tests", () => {
-
+describe("Document Statistics & Title Semantics Tests", () => {
   test("calculates empty document stats correctly", () => {
     const emptyStats = computeDocumentStats("");
     assert.strictEqual(emptyStats.charCount, 0);
@@ -489,27 +488,63 @@ describe("Document Statistics & Count Tests", () => {
     assert.strictEqual(stats.firstLineTitle, "Hello   world!");
   });
 
-  test("extracts firstLineTitle cleanly ignoring leading/trailing blank lines", () => {
-    const text = "\n\nActual First Line\nSecond Line";
-    const stats = computeDocumentStats(text);
-    assert.strictEqual(stats.firstLineTitle, "Actual First Line");
-    assert.strictEqual(stats.wordCount, 5);
+  test("extracts only first physical line before newline as title", () => {
+    const noteContent = "Physics Assignment\nChapter 3: Linear Algebra\n\nWe need to study vectors...";
+    assert.strictEqual(extractNoteTitle(noteContent), "Physics Assignment");
+
+    const stats = computeDocumentStats(noteContent);
+    assert.strictEqual(stats.firstLineTitle, "Physics Assignment");
   });
 
-  test("matches editor doc.textContent during live typing and content updates", () => {
-    const ed = createTestEditor("The quick brown fox jumps over the lazy dog.");
-    const text = ed.state.doc.textContent;
-    const stats = computeDocumentStats(text);
-    assert.strictEqual(stats.charCount, 44);
-    assert.strictEqual(stats.wordCount, 9);
-    assert.strictEqual(stats.firstLineTitle, "The quick brown fox jumps over the lazy dog.");
+  test("empty first line produces empty title and Untitled fallback without treating body as title", () => {
+    const noteContent = "\nThis is body content.";
+    assert.strictEqual(extractNoteTitle(noteContent), "");
 
-    // Insert more words at the end of the document
+    const stats = computeDocumentStats(noteContent);
+    assert.strictEqual(stats.firstLineTitle, "Untitled");
+  });
+
+  test("single-line note without newline treats entire line as title", () => {
+    const noteContent = "Single line note";
+    assert.strictEqual(extractNoteTitle(noteContent), "Single line note");
+
+    const stats = computeDocumentStats(noteContent);
+    assert.strictEqual(stats.firstLineTitle, "Single line note");
+  });
+
+  test("markdown heading markers on first line are stripped from title view", () => {
+    assert.strictEqual(extractNoteTitle("# Physics Assignment\nBody"), "Physics Assignment");
+    assert.strictEqual(extractNoteTitle("### Chapter 3 Notes\nBody"), "Chapter 3 Notes");
+  });
+
+  test("windows paths and special characters in first line remain intact", () => {
+    const pathContent = "C:\\Users\\Test\\Documents\nNext line";
+    assert.strictEqual(extractNoteTitle(pathContent), "C:\\Users\\Test\\Documents");
+  });
+
+  test("editing body lines does not alter the first line title", () => {
+    const ed = createTestEditor("<p>Physics Assignment</p><p>Chapter 3: Linear Algebra</p>");
+    const text1 = ed.getText();
+    const stats1 = computeDocumentStats(text1);
+    assert.strictEqual(stats1.firstLineTitle, "Physics Assignment");
+
+    // Modify second paragraph (body)
     ed.commands.setTextSelection(ed.state.doc.content.size - 1);
-    ed.commands.insertContent(" And another line.");
-    const updatedText = ed.state.doc.textContent;
-    const updatedStats = computeDocumentStats(updatedText);
-    assert.strictEqual(updatedStats.wordCount, 12);
+    ed.commands.insertContent(" - Additional notes");
+    const text2 = ed.getText();
+    const stats2 = computeDocumentStats(text2);
+    assert.strictEqual(stats2.firstLineTitle, "Physics Assignment");
+    ed.destroy();
+  });
+
+  test("editing first line updates title immediately", () => {
+    const ed = createTestEditor("<p>Physics Assignment</p><p>Chapter 3: Linear Algebra</p>");
+    // Select first paragraph text and replace
+    ed.commands.setTextSelection({ from: 1, to: 19 });
+    ed.commands.insertContent("Physics Assignment - Final");
+    const text = ed.getText();
+    const stats = computeDocumentStats(text);
+    assert.strictEqual(stats.firstLineTitle, "Physics Assignment - Final");
     ed.destroy();
   });
 });
