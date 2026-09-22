@@ -349,12 +349,15 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
 
       {/* Stats & Save Indicator Right */}
       <div className="flex items-center space-x-3 text-[11px] text-gray-500 select-none">
-        {/* Dedicated Save Status Slot with reserved width & stable layout */}
-        <div className="w-24 h-5 flex items-center justify-end shrink-0">
+        {/* Dedicated Save Status Slot with responsive collapse & stable layout */}
+        <div className="save-status-slot">
           {saveStatus === "saving" && (
-            <div className="flex items-center space-x-1.5 text-gray-400 animate-pulse">
+            <div
+              title="Saving…"
+              className="flex items-center space-x-1.5 text-gray-400 animate-pulse"
+            >
               <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
-              <span>Saving…</span>
+              <span className="save-status-text">Saving…</span>
             </div>
           )}
           {saveStatus === "error" && (
@@ -365,17 +368,18 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               className="flex items-center space-x-1.5 text-red-400 hover:text-red-300 font-medium cursor-pointer focus:outline-none transition-colors"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
-              <span>Save failed</span>
+              <span className="save-status-text">Save failed</span>
             </button>
           )}
           {saveStatus === "saved" && (
             <div
+              title="Saved"
               className={`flex items-center space-x-1.5 text-gray-400 transition-opacity duration-300 ${
                 showSaved ? "opacity-100" : "opacity-0 pointer-events-none"
               }`}
             >
               <CheckIcon size={12} className="text-emerald-400 shrink-0" />
-              <span>Saved</span>
+              <span className="save-status-text">Saved</span>
             </div>
           )}
         </div>

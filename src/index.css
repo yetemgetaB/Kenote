@@ -359,3 +359,31 @@ body {
   font-style: italic;
 }
 
+/* Responsive Save Status Indicator */
+.save-status-slot {
+  display: none;
+}
+
+@media (min-width: 420px) {
+  .save-status-slot {
+    display: flex;
+    width: 1.25rem;
+    height: 1.25rem;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .save-status-text {
+    display: none;
+  }
+}
+
+@media (min-width: 480px) {
+  .save-status-slot {
+    width: 6rem;
+    justify-content: flex-end;
+  }
+  .save-status-text {
+    display: inline;
+  }
+}
