@@ -11,20 +11,28 @@ import { toggleSmartBold, toggleSmartItalic, toggleSmartUnderline } from "./Edit
 
 interface BottomToolbarProps {
   editor: TiptapEditor | null;
-  characterCount: number;
+  charCount?: number;
+  wordCount?: number;
+  characterCount?: number;
   saveStatus?: "saved" | "saving" | "error";
   onRetrySave?: () => void;
 }
 
 export const BottomToolbar: React.FC<BottomToolbarProps> = ({
   editor,
+  charCount,
+  wordCount,
   characterCount,
   saveStatus = "saved",
   onRetrySave,
 }) => {
+  const [statMode, setStatMode] = useState<"chars" | "words">("chars");
   const [showHeadingMenu, setShowHeadingMenu] = useState(false);
   const [showTextMenu, setShowTextMenu] = useState(false);
   const [showListMenu, setShowListMenu] = useState(false);
+
+  const safeCharCount = charCount ?? characterCount ?? 0;
+  const safeWordCount = wordCount ?? 0;
 
   const headingRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
@@ -302,25 +310,38 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
 
       {/* Stats & Save Indicator Right */}
       <div className="flex items-center space-x-3 text-[11px] text-gray-500 select-none">
-        {saveStatus === "saving" && (
-          <span className="text-gray-400 flex items-center space-x-1 animate-pulse">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 inline-block"></span>
-            <span>Saving...</span>
-          </span>
-        )}
-        {saveStatus === "error" && (
-          <button
-            onClick={onRetrySave}
-            title="Save failed. Click to retry."
-            className="text-red-400 hover:text-red-300 font-semibold flex items-center space-x-1 cursor-pointer focus:outline-none"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block"></span>
-            <span>Save error (retry)</span>
-          </button>
-        )}
-        <span>
-          {characterCount} {characterCount === 1 ? "character" : "characters"}
-        </span>
+        {/* Dedicated Save Status Slot with stable layout */}
+        <div className="flex items-center justify-end min-h-[16px]">
+          {saveStatus === "saving" && (
+            <span className="text-gray-400 flex items-center space-x-1 animate-pulse">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0"></span>
+              <span>Saving...</span>
+            </span>
+          )}
+          {saveStatus === "error" && (
+            <button
+              onClick={onRetrySave}
+              type="button"
+              title="Save failed. Click to retry."
+              className="text-red-400 hover:text-red-300 font-semibold flex items-center space-x-1 cursor-pointer focus:outline-none"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
+              <span>Save error (retry)</span>
+            </button>
+          )}
+        </div>
+
+        {/* Interactive Document Statistics Button */}
+        <button
+          type="button"
+          onClick={() => setStatMode((prev) => (prev === "chars" ? "words" : "chars"))}
+          title={statMode === "chars" ? "Show word count" : "Show character count"}
+          className="hover:text-white transition-colors cursor-pointer focus:outline-none tabular-nums text-right"
+        >
+          {statMode === "chars"
+            ? `${safeCharCount} ${safeCharCount === 1 ? "char" : "chars"}`
+            : `${safeWordCount} ${safeWordCount === 1 ? "word" : "words"}`}
+        </button>
       </div>
     </footer>
   );

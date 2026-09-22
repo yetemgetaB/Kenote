@@ -44,7 +44,8 @@ export function App() {
   const [notes, setNotes] = useState<NoteMetadata[]>([]);
   const [activeNote, setActiveNote] = useState<NoteMetadata | null>(null);
   const [activeTitle, setActiveTitle] = useState("Untitled");
-  const [characterCount, setCharacterCount] = useState(0);
+  const [charCount, setCharCount] = useState(0);
+  const [wordCount, setWordCount] = useState(0);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(false);
   const [notesDir, setNotesDir] = useState("");
@@ -217,9 +218,10 @@ export function App() {
 
   // Save current note changes with debounce
   const handleEditorChange = useCallback(
-    (charCount: number, firstLineTitle: string) => {
+    (newCharCount: number, newWordCount: number, firstLineTitle: string) => {
       setActiveTitle(firstLineTitle);
-      setCharacterCount(charCount);
+      setCharCount(newCharCount);
+      setWordCount(newWordCount);
       hasUnsavedChangesRef.current = true;
       setSaveStatus("saving");
 
@@ -299,7 +301,8 @@ export function App() {
       setNotes(notesRef.current);
       setActiveNote(newNote);
       setActiveTitle("Untitled");
-      setCharacterCount(0);
+      setCharCount(0);
+      setWordCount(0);
       setSaveStatus("saved");
       hasUnsavedChangesRef.current = false;
       pendingSaveRef.current = null;
@@ -334,7 +337,7 @@ export function App() {
     recentNoteIdsRef.current = [note.id, ...recentNoteIdsRef.current.filter((id) => id !== note.id)];
     setActiveNote(note);
     setActiveTitle(note.title);
-    setCharacterCount(note.character_count);
+    setCharCount(note.character_count);
     setRecentNoteIds(recentNoteIdsRef.current);
 
     // Track last active note in settings
@@ -472,7 +475,7 @@ export function App() {
           activeNoteRef.current = targetNote;
           setActiveNote(targetNote);
           setActiveTitle(targetNote.title);
-          setCharacterCount(targetNote.character_count);
+          setCharCount(targetNote.character_count);
 
           // Seed MRU deterministically: active note first, followed by remaining notes sorted by recency (updated_at desc)
           const sortedByRecency = loadedNotes
@@ -573,7 +576,7 @@ export function App() {
                 activeNoteRef.current = fullNote;
                 setActiveNote(fullNote);
                 setActiveTitle(fullNote.title);
-                setCharacterCount(fullNote.character_count);
+                setCharCount(fullNote.character_count);
                 editorRef.current?.setMarkdown(fullNote.content);
                 showToast("Reloaded note from external changes.");
               } else {
@@ -741,7 +744,7 @@ export function App() {
             activeNoteRef.current = first;
             setActiveNote(first);
             setActiveTitle(first.title);
-            setCharacterCount(first.character_count);
+            setCharCount(first.character_count);
 
             const sorted = reloadedNotes.slice().sort((a, b) => b.updated_at - a.updated_at);
             const mru = [first.id, ...sorted.filter((n) => n.id !== first.id).map((n) => n.id)];
@@ -752,7 +755,8 @@ export function App() {
           activeNoteRef.current = null;
           setActiveNote(null);
           setActiveTitle("Untitled");
-          setCharacterCount(0);
+          setCharCount(0);
+          setWordCount(0);
           recentNoteIdsRef.current = [];
           setRecentNoteIds([]);
         }
@@ -1052,7 +1056,8 @@ export function App() {
           {/* Bottom Formatting Toolbar */}
           <BottomToolbar
             editor={tiptapInstance}
-            characterCount={characterCount}
+            charCount={charCount}
+            wordCount={wordCount}
             saveStatus={saveStatus}
             onRetrySave={retrySave}
           />

@@ -126,10 +126,13 @@ export interface EditorHandle {
   getEditor: () => ReturnType<typeof useEditor>;
 }
 
+import { computeDocumentStats } from "../utils/documentStats";
+export { computeDocumentStats };
+
 interface EditorProps {
   noteId?: string | null;
   initialContent: string;
-  onChange: (charCount: number, firstLineTitle: string) => void;
+  onChange: (charCount: number, wordCount: number, firstLineTitle: string) => void;
   fontSize?: string;
   lineHeight?: string;
   fontFamily?: string;
@@ -273,17 +276,10 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
       onUpdate: ({ editor: ed }) => {
         if (!ed || ed.isDestroyed) return;
 
-        // Efficient live character count and first line title without full AST serialization
         const text = ed.state.doc.textContent;
-        const charCount = text.length;
+        const { charCount, wordCount, firstLineTitle } = computeDocumentStats(text);
 
-        let firstLineTitle = "Untitled";
-        const firstLineMatch = text.match(/^[^\r\n]+/);
-        if (firstLineMatch && firstLineMatch[0].trim().length > 0) {
-          firstLineTitle = firstLineMatch[0].trim();
-        }
-
-        onChange(charCount, firstLineTitle);
+        onChange(charCount, wordCount, firstLineTitle);
       },
     });
 
@@ -308,12 +304,15 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
     useEffect(() => {
       if (editor && !hasRestoredInitialCursorRef.current) {
         hasRestoredInitialCursorRef.current = true;
+        const text = editor.state.doc.textContent;
+        const { charCount, wordCount, firstLineTitle } = computeDocumentStats(text);
+        onChange(charCount, wordCount, firstLineTitle);
         onEditorReadyRef.current?.(editor);
         if (noteId) {
           restoreCursor(noteId, editor);
         }
       }
-    }, [editor, noteId]);
+    }, [editor, noteId, onChange]);
 
     // Set content and restore cursor safely during note switching
     useEffect(() => {
@@ -330,10 +329,13 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
         prevNoteIdRef.current = noteId;
         isSwitchingNoteRef.current = true;
         editor.commands.setContent(preserveBlankLines(initialContent || ""), false);
+        const text = editor.state.doc.textContent;
+        const { charCount, wordCount, firstLineTitle } = computeDocumentStats(text);
+        onChange(charCount, wordCount, firstLineTitle);
         restoreCursor(noteId, editor);
         isSwitchingNoteRef.current = false;
       }
-    }, [noteId, initialContent, editor]);
+    }, [noteId, initialContent, editor, onChange]);
 
     useImperativeHandle(ref, () => ({
       getMarkdown: () => {
@@ -348,6 +350,9 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
           }
           isSwitchingNoteRef.current = true;
           editor.commands.setContent(preserveBlankLines(md), false);
+          const text = editor.state.doc.textContent;
+          const { charCount, wordCount, firstLineTitle } = computeDocumentStats(text);
+          onChange(charCount, wordCount, firstLineTitle);
           if (noteId) {
             restoreCursor(noteId, editor);
           }

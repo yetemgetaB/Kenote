@@ -17,8 +17,13 @@ globalThis.Node = dom.window.Node;
 globalThis.Element = dom.window.Element;
 globalThis.HTMLElement = dom.window.HTMLElement;
 globalThis.DOMParser = dom.window.DOMParser;
-globalThis.requestAnimationFrame = (cb) => setTimeout(cb, 0);
-globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
+globalThis.requestAnimationFrame = (cb) => {
+  try {
+    cb(Date.now());
+  } catch {}
+  return 0;
+};
+globalThis.cancelAnimationFrame = () => {};
 
 const StarterKit = (await import("@tiptap/starter-kit")).default;
 const Underline = (await import("@tiptap/extension-underline")).default;
@@ -449,6 +454,62 @@ describe("Editor Cursor & Selection Regression Tests", () => {
     const updatedMd = ed.storage.markdown.getMarkdown();
     assert.ok(updatedMd.includes("Third line appended"), `Expected "Third line appended" in: ${updatedMd}`);
     assert.ok(updatedMd.startsWith("First line"));
+    ed.destroy();
+  });
+});
+
+const { computeDocumentStats } = await import("../src/utils/documentStats.ts");
+
+describe("Document Statistics & Count Tests", () => {
+
+  test("calculates empty document stats correctly", () => {
+    const emptyStats = computeDocumentStats("");
+    assert.strictEqual(emptyStats.charCount, 0);
+    assert.strictEqual(emptyStats.wordCount, 0);
+    assert.strictEqual(emptyStats.firstLineTitle, "Untitled");
+
+    const nullStats = computeDocumentStats(null);
+    assert.strictEqual(nullStats.charCount, 0);
+    assert.strictEqual(nullStats.wordCount, 0);
+    assert.strictEqual(nullStats.firstLineTitle, "Untitled");
+  });
+
+  test("calculates whitespace-only document stats correctly", () => {
+    const wsStats = computeDocumentStats("   \n\n\t  \r\n   ");
+    assert.strictEqual(wsStats.charCount, 13);
+    assert.strictEqual(wsStats.wordCount, 0);
+    assert.strictEqual(wsStats.firstLineTitle, "Untitled");
+  });
+
+  test("calculates words and characters accurately across multiple spaces and newlines", () => {
+    const text = "Hello   world!\n\nThis is\ta   test.\n";
+    const stats = computeDocumentStats(text);
+    assert.strictEqual(stats.charCount, text.length);
+    assert.strictEqual(stats.wordCount, 6);
+    assert.strictEqual(stats.firstLineTitle, "Hello   world!");
+  });
+
+  test("extracts firstLineTitle cleanly ignoring leading/trailing blank lines", () => {
+    const text = "\n\nActual First Line\nSecond Line";
+    const stats = computeDocumentStats(text);
+    assert.strictEqual(stats.firstLineTitle, "Actual First Line");
+    assert.strictEqual(stats.wordCount, 5);
+  });
+
+  test("matches editor doc.textContent during live typing and content updates", () => {
+    const ed = createTestEditor("The quick brown fox jumps over the lazy dog.");
+    const text = ed.state.doc.textContent;
+    const stats = computeDocumentStats(text);
+    assert.strictEqual(stats.charCount, 44);
+    assert.strictEqual(stats.wordCount, 9);
+    assert.strictEqual(stats.firstLineTitle, "The quick brown fox jumps over the lazy dog.");
+
+    // Insert more words at the end of the document
+    ed.commands.setTextSelection(ed.state.doc.content.size - 1);
+    ed.commands.insertContent(" And another line.");
+    const updatedText = ed.state.doc.textContent;
+    const updatedStats = computeDocumentStats(updatedText);
+    assert.strictEqual(updatedStats.wordCount, 12);
     ed.destroy();
   });
 });
