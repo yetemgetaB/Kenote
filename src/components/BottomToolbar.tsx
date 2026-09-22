@@ -6,6 +6,7 @@ import {
   QuoteIcon,
   LinkIcon,
   ListIcon,
+  CheckIcon,
 } from "./Icons";
 import { toggleSmartBold, toggleSmartItalic, toggleSmartUnderline } from "./Editor";
 
@@ -30,6 +31,44 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
   const [showHeadingMenu, setShowHeadingMenu] = useState(false);
   const [showTextMenu, setShowTextMenu] = useState(false);
   const [showListMenu, setShowListMenu] = useState(false);
+  const [showSaved, setShowSaved] = useState(false);
+
+  const prevSaveStatusRef = useRef(saveStatus);
+  const savedFadeTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Manage quiet saved confirmation fade
+  useEffect(() => {
+    if (saveStatus === "saving") {
+      if (savedFadeTimerRef.current) {
+        clearTimeout(savedFadeTimerRef.current);
+        savedFadeTimerRef.current = null;
+      }
+      setShowSaved(false);
+    } else if (saveStatus === "saved") {
+      if (prevSaveStatusRef.current === "saving") {
+        setShowSaved(true);
+        if (savedFadeTimerRef.current) clearTimeout(savedFadeTimerRef.current);
+        savedFadeTimerRef.current = setTimeout(() => {
+          setShowSaved(false);
+        }, 2000);
+      }
+    } else if (saveStatus === "error") {
+      if (savedFadeTimerRef.current) {
+        clearTimeout(savedFadeTimerRef.current);
+        savedFadeTimerRef.current = null;
+      }
+      setShowSaved(false);
+    }
+    prevSaveStatusRef.current = saveStatus;
+  }, [saveStatus]);
+
+  useEffect(() => {
+    return () => {
+      if (savedFadeTimerRef.current) {
+        clearTimeout(savedFadeTimerRef.current);
+      }
+    };
+  }, []);
 
   const safeCharCount = charCount ?? characterCount ?? 0;
   const safeWordCount = wordCount ?? 0;
@@ -310,24 +349,34 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
 
       {/* Stats & Save Indicator Right */}
       <div className="flex items-center space-x-3 text-[11px] text-gray-500 select-none">
-        {/* Dedicated Save Status Slot with stable layout */}
-        <div className="flex items-center justify-end min-h-[16px]">
+        {/* Dedicated Save Status Slot with reserved width & stable layout */}
+        <div className="w-24 h-5 flex items-center justify-end shrink-0">
           {saveStatus === "saving" && (
-            <span className="text-gray-400 flex items-center space-x-1 animate-pulse">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0"></span>
-              <span>Saving...</span>
-            </span>
+            <div className="flex items-center space-x-1.5 text-gray-400 animate-pulse">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+              <span>Saving…</span>
+            </div>
           )}
           {saveStatus === "error" && (
             <button
               onClick={onRetrySave}
               type="button"
               title="Save failed. Click to retry."
-              className="text-red-400 hover:text-red-300 font-semibold flex items-center space-x-1 cursor-pointer focus:outline-none"
+              className="flex items-center space-x-1.5 text-red-400 hover:text-red-300 font-medium cursor-pointer focus:outline-none transition-colors"
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
-              <span>Save error (retry)</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
+              <span>Save failed</span>
             </button>
+          )}
+          {saveStatus === "saved" && (
+            <div
+              className={`flex items-center space-x-1.5 text-gray-400 transition-opacity duration-300 ${
+                showSaved ? "opacity-100" : "opacity-0 pointer-events-none"
+              }`}
+            >
+              <CheckIcon size={12} className="text-emerald-400 shrink-0" />
+              <span>Saved</span>
+            </div>
           )}
         </div>
 
@@ -336,7 +385,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
           type="button"
           onClick={() => setStatMode((prev) => (prev === "chars" ? "words" : "chars"))}
           title={statMode === "chars" ? "Show word count" : "Show character count"}
-          className="hover:text-white transition-colors cursor-pointer focus:outline-none tabular-nums text-right"
+          className="hover:text-white transition-colors cursor-pointer focus:outline-none tabular-nums text-right shrink-0"
         >
           {statMode === "chars"
             ? `${safeCharCount} ${safeCharCount === 1 ? "char" : "chars"}`
