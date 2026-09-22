@@ -7,7 +7,7 @@ import {
   LinkIcon,
   ListIcon,
 } from "./Icons";
-import { toggleSmartBold } from "./Editor";
+import { toggleSmartBold, toggleSmartItalic, toggleSmartUnderline } from "./Editor";
 
 interface BottomToolbarProps {
   editor: TiptapEditor | null;
@@ -161,7 +161,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               </button>
               <button
                 onClick={() => {
-                  editor.chain().focus().toggleItalic().run();
+                  toggleSmartItalic(editor);
                   setShowTextMenu(false);
                 }}
                 className={`w-full px-3 py-1.5 text-left text-xs hover:bg-[#2A3240] hover:text-white flex items-center justify-between ${
@@ -185,7 +185,7 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
               </button>
               <button
                 onClick={() => {
-                  editor.chain().focus().toggleUnderline().run();
+                  toggleSmartUnderline(editor);
                   setShowTextMenu(false);
                 }}
                 className={`w-full px-3 py-1.5 text-left text-xs hover:bg-[#2A3240] hover:text-white flex items-center justify-between ${

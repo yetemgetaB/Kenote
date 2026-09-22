@@ -4,8 +4,8 @@ import { Selection, TextSelection } from "@tiptap/pm/state";
 /**
  * Safely creates a ProseMirror selection guaranteed to point into an inline textblock.
  * If the provided positions point to non-inline boundaries (such as taskItem, taskList,
- * or doc root), ProseMirror's Selection.near is used to resolve to the nearest valid
- * inline text position, preventing RangeErrors and corrupt DOM cursor states.
+ * or doc root), TextSelection.findFrom is used to resolve to the nearest valid
+ * inline text position, preventing RangeErrors, NodeSelection fallback, and corrupt DOM cursor states.
  */
 export function createSafeSelection(
   doc: Node,
@@ -27,11 +27,17 @@ export function createSafeSelection(
     return new TextSelection($from, $to);
   }
 
-  // Otherwise, use ProseMirror's Selection.near to resolve to the nearest valid inline selection
-  const safeFromSel = Selection.near($from, 1);
+  // Otherwise, resolve to the nearest valid inline text selection
+  const safeFromSel = TextSelection.findFrom($from, 1, true) || TextSelection.findFrom($from, -1, true);
+  if (!safeFromSel) {
+    return Selection.atStart(doc);
+  }
   if (clampedFrom === clampedTo) {
     return safeFromSel;
   }
-  const safeToSel = Selection.near($to, 1);
+  const safeToSel = TextSelection.findFrom($to, 1, true) || TextSelection.findFrom($to, -1, true);
+  if (!safeToSel) {
+    return safeFromSel;
+  }
   return new TextSelection(safeFromSel.$from, safeToSel.$to);
 }

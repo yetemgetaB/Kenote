@@ -3,6 +3,7 @@ import { useEditor, EditorContent, ReactNodeViewRenderer, Editor as TiptapEditor
 import StarterKit from "@tiptap/starter-kit";
 import Paragraph from "@tiptap/extension-paragraph";
 import Bold from "@tiptap/extension-bold";
+import Italic from "@tiptap/extension-italic";
 import Placeholder from "@tiptap/extension-placeholder";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
@@ -19,85 +20,20 @@ const lowlight = createLowlight(common);
 import { createSafeSelection } from "../utils/selection";
 export { createSafeSelection };
 
-// Smart Bold helper: toggles bold on the word around the cursor or on existing selection
-export function toggleSmartBold(editor: TiptapEditor | null): boolean {
-  if (!editor || editor.isDestroyed) return false;
-
-  const { state, dispatch } = editor.view;
-  const { selection, schema } = state;
-  const boldMark = schema.marks.bold;
-  if (!boldMark) return false;
-
-  // 1. If selection is not empty, toggle bold on the selection normally
-  if (!selection.empty) {
-    return editor.chain().focus().toggleBold().run();
-  }
-
-  // 2. Collapsed selection (cursor). Inspect word around cursor
-  const { $from } = selection;
-  const parent = $from.parent;
-  if (!parent.isTextblock) {
-    return editor.chain().focus().toggleBold().run();
-  }
-
-  const text = parent.textContent;
-  const offset = $from.parentOffset;
-
-  const isWordChar = (char: string | undefined): boolean => {
-    if (!char) return false;
-    return /[\p{L}\p{N}_]/u.test(char);
-  };
-
-  const isAtWord = isWordChar(text[offset]) || (offset > 0 && isWordChar(text[offset - 1]));
-  if (!isAtWord) {
-    return editor.chain().focus().toggleBold().run();
-  }
-
-  // Scan backwards to word start
-  let start = offset;
-  if (!isWordChar(text[start]) && start > 0 && isWordChar(text[start - 1])) {
-    start = start - 1;
-  }
-  while (start > 0 && isWordChar(text[start - 1])) {
-    start--;
-  }
-
-  // Scan forwards to word end
-  let end = offset;
-  if (isWordChar(text[end])) {
-    while (end < text.length && isWordChar(text[end])) {
-      end++;
-    }
-  } else if (offset > 0 && isWordChar(text[offset - 1])) {
-    end = offset;
-  }
-
-  if (start >= end) {
-    return editor.chain().focus().toggleBold().run();
-  }
-
-  const from = $from.start() + start;
-  const to = $from.start() + end;
-  const isCurrentlyBold = state.doc.rangeHasMark(from, to, boldMark);
-
-  const tr = state.tr;
-  if (isCurrentlyBold) {
-    tr.removeMark(from, to, boldMark);
-  } else {
-    tr.addMark(from, to, boldMark.create());
-  }
-
-  // Preserve cursor position
-  const currentPos = $from.pos;
-  const clampedPos = Math.min(Math.max(from, currentPos), to);
-  const safeSel = createSafeSelection(tr.doc, clampedPos, clampedPos);
-  if (safeSel) {
-    tr.setSelection(safeSel);
-  }
-
-  dispatch(tr);
-  return true;
-}
+import {
+  type SmartMarkType,
+  toggleSmartMark,
+  toggleSmartBold,
+  toggleSmartItalic,
+  toggleSmartUnderline,
+} from "../utils/formatting";
+export {
+  type SmartMarkType,
+  toggleSmartMark,
+  toggleSmartBold,
+  toggleSmartItalic,
+  toggleSmartUnderline,
+};
 
 // Preserve consecutive blank lines during markdown parsing
 export function preserveBlankLines(md: string): string {
@@ -158,6 +94,26 @@ export const CustomBold = Bold.extend({
     return {
       "Mod-b": () => toggleSmartBold(this.editor),
       "Mod-B": () => toggleSmartBold(this.editor),
+    };
+  },
+});
+
+// Custom Italic extension with smart word boundary formatting
+export const CustomItalic = Italic.extend({
+  addKeyboardShortcuts() {
+    return {
+      "Mod-i": () => toggleSmartItalic(this.editor),
+      "Mod-I": () => toggleSmartItalic(this.editor),
+    };
+  },
+});
+
+// Custom Underline extension with smart word boundary formatting
+export const CustomUnderline = Underline.extend({
+  addKeyboardShortcuts() {
+    return {
+      "Mod-u": () => toggleSmartUnderline(this.editor),
+      "Mod-U": () => toggleSmartUnderline(this.editor),
     };
   },
 });
@@ -241,9 +197,12 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
           codeBlock: false,
           paragraph: false,
           bold: false,
+          italic: false,
         }),
         CustomParagraph,
         CustomBold,
+        CustomItalic,
+        CustomUnderline,
         CodeBlockLowlight.extend({
           addNodeView() {
             return ReactNodeViewRenderer(CodeBlockComponent);
@@ -255,7 +214,6 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
         TaskItem.configure({
           nested: true,
         }),
-        Underline,
         Link.configure({
           openOnClick: false,
           HTMLAttributes: {

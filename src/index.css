@@ -65,12 +65,22 @@ body {
 
 /* Tiptap Editor Prose Styling */
 .ProseMirror {
+  position: relative;
+  word-wrap: break-word;
+  white-space: break-spaces;
+  -webkit-font-variant-ligatures: none;
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0;
   outline: none;
   min-height: 100%;
   color: #DDE3EA;
   user-select: text;
   caret-color: var(--accent-color, #0399F7);
 }
+
+.ProseMirror-hideselection *::selection { background: transparent; }
+.ProseMirror-hideselection *::-moz-selection { background: transparent; }
+.ProseMirror-hideselection { caret-color: transparent; }
 
 .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
@@ -111,7 +121,6 @@ body {
   margin-top: 0.4rem;
   margin-bottom: 0.4rem;
   line-height: 1.65;
-  min-height: 1.5em;
 }
 
 .ProseMirror blockquote {

@@ -17,6 +17,8 @@ globalThis.Node = dom.window.Node;
 globalThis.Element = dom.window.Element;
 globalThis.HTMLElement = dom.window.HTMLElement;
 globalThis.DOMParser = dom.window.DOMParser;
+globalThis.requestAnimationFrame = (cb) => setTimeout(cb, 0);
+globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
 
 const StarterKit = (await import("@tiptap/starter-kit")).default;
 const Underline = (await import("@tiptap/extension-underline")).default;
@@ -83,6 +85,41 @@ const CustomTaskList = TaskList.extend({
   },
 });
 
+const Bold = (await import("@tiptap/extension-bold")).default;
+const Italic = (await import("@tiptap/extension-italic")).default;
+const {
+  toggleSmartBold,
+  toggleSmartItalic,
+  toggleSmartUnderline,
+} = await import("../src/utils/formatting.ts");
+
+const CustomBold = Bold.extend({
+  addKeyboardShortcuts() {
+    return {
+      "Mod-b": () => toggleSmartBold(this.editor),
+      "Mod-B": () => toggleSmartBold(this.editor),
+    };
+  },
+});
+
+const CustomItalic = Italic.extend({
+  addKeyboardShortcuts() {
+    return {
+      "Mod-i": () => toggleSmartItalic(this.editor),
+      "Mod-I": () => toggleSmartItalic(this.editor),
+    };
+  },
+});
+
+const CustomUnderline = Underline.extend({
+  addKeyboardShortcuts() {
+    return {
+      "Mod-u": () => toggleSmartUnderline(this.editor),
+      "Mod-U": () => toggleSmartUnderline(this.editor),
+    };
+  },
+});
+
 function createTestEditor(content = "") {
   return new Editor({
     extensions: [
@@ -90,12 +127,16 @@ function createTestEditor(content = "") {
         heading: { levels: [1, 2, 3] },
         codeBlock: false,
         paragraph: false,
+        bold: false,
+        italic: false,
       }),
       CustomParagraph,
+      CustomBold,
+      CustomItalic,
+      CustomUnderline,
       CodeBlockLowlight.configure({ lowlight }),
       CustomTaskList,
       TaskItem.configure({ nested: true }),
-      Underline,
       Link.configure({ openOnClick: false }),
       Markdown.configure({
         html: true,
@@ -168,7 +209,7 @@ describe("Editor Markdown Roundtrip Tests", () => {
     const md = "<u>Underlined</u>";
     const ed = createTestEditor(md);
     const output = ed.storage.markdown.getMarkdown().trim();
-    console.log("UNDERLINE OUTPUT:", output);
+    assert.strictEqual(output, md);
     ed.destroy();
   });
 
@@ -212,58 +253,73 @@ describe("Editor Markdown Roundtrip Tests", () => {
     const ed = createTestEditor(malicious);
     const html = ed.getHTML();
     const md = ed.storage.markdown.getMarkdown();
-    console.log("SECURITY TEST HTML:", html);
-    console.log("SECURITY TEST MD:", md);
     assert.strictEqual(html.includes("<script"), false, "Must not contain script tags");
     assert.strictEqual(html.includes("<iframe"), false, "Must not contain iframe tags");
     assert.strictEqual(html.includes("onerror"), false, "Must not contain onerror handlers");
     ed.destroy();
   });
 
-  test("toggleSmartBold bolds word when cursor is inside", () => {
+  test("toggleSmartBold bolds and un-bolds word when cursor is inside", () => {
     const ed = createTestEditor("hello world");
-    // Position cursor inside "world": text is in a paragraph
-    // <p>hello world</p> -> pos 1 is 'h', pos 7 is 'w', pos 9 is 'r'
+    // Position cursor inside "world"
     ed.commands.setTextSelection(9);
 
-    const { state, dispatch } = ed.view;
-    const { selection, schema } = state;
-    const boldMark = schema.marks.bold;
-    const { $from } = selection;
-    const parent = $from.parent;
-    const text = parent.textContent;
-    const offset = $from.parentOffset;
+    toggleSmartBold(ed);
+    assert.strictEqual(ed.storage.markdown.getMarkdown().trim(), "hello **world**");
 
-    const isWordChar = (char) => !!char && /[\p{L}\p{N}_]/u.test(char);
-    let start = offset;
-    if (!isWordChar(text[start]) && start > 0 && isWordChar(text[start - 1])) {
-      start = start - 1;
-    }
-    while (start > 0 && isWordChar(text[start - 1])) start--;
-    let end = offset;
-    if (isWordChar(text[end])) {
-      while (end < text.length && isWordChar(text[end])) end++;
-    } else if (offset > 0 && isWordChar(text[offset - 1])) {
-      end = offset;
-    }
+    // Repeated toggle un-bolds the word
+    toggleSmartBold(ed);
+    assert.strictEqual(ed.storage.markdown.getMarkdown().trim(), "hello world");
+    ed.destroy();
+  });
 
-    const from = $from.start() + start;
-    const to = $from.start() + end;
-    const tr = state.tr;
-    tr.addMark(from, to, boldMark.create());
-    dispatch(tr);
+  test("toggleSmartItalic italicizes and un-italicizes word when cursor is inside", () => {
+    const ed = createTestEditor("hello world");
+    ed.commands.setTextSelection(9);
 
-    const md = ed.storage.markdown.getMarkdown().trim();
-    assert.strictEqual(md, "hello **world**");
+    toggleSmartItalic(ed);
+    assert.strictEqual(ed.storage.markdown.getMarkdown().trim(), "hello *world*");
 
-    // Repeated Ctrl+B un-bolds the word
-    const state2 = ed.view.state;
-    const tr2 = state2.tr;
-    tr2.removeMark(from, to, boldMark);
-    ed.view.dispatch(tr2);
+    // Repeated toggle un-italicizes the word
+    toggleSmartItalic(ed);
+    assert.strictEqual(ed.storage.markdown.getMarkdown().trim(), "hello world");
+    ed.destroy();
+  });
 
-    const md2 = ed.storage.markdown.getMarkdown().trim();
-    assert.strictEqual(md2, "hello world");
+  test("toggleSmartUnderline underlines and un-underlines word when cursor is inside", () => {
+    const ed = createTestEditor("hello world");
+    ed.commands.setTextSelection(9);
+
+    toggleSmartUnderline(ed);
+    assert.strictEqual(ed.storage.markdown.getMarkdown().trim(), "hello <u>world</u>");
+
+    // Repeated toggle un-underlines the word
+    toggleSmartUnderline(ed);
+    assert.strictEqual(ed.storage.markdown.getMarkdown().trim(), "hello world");
+    ed.destroy();
+  });
+
+  test("explicit text selection applies marks to selection range without word expansion", () => {
+    const ed = createTestEditor("hello beautiful world");
+    // Select "beautiful" (from pos 7 to pos 16)
+    ed.commands.setTextSelection({ from: 7, to: 16 });
+
+    toggleSmartItalic(ed);
+    assert.strictEqual(ed.storage.markdown.getMarkdown().trim(), "hello *beautiful* world");
+
+    toggleSmartBold(ed);
+    assert.strictEqual(ed.storage.markdown.getMarkdown().trim(), "hello ***beautiful*** world");
+    ed.destroy();
+  });
+
+  test("collapsed cursor outside a word preserves normal mark toggle for subsequent typing", () => {
+    const ed = createTestEditor("");
+    // Cursor in empty paragraph
+    ed.commands.setTextSelection(1);
+
+    toggleSmartBold(ed);
+    ed.commands.insertContent("world");
+    assert.strictEqual(ed.storage.markdown.getMarkdown().trim(), "**world**");
     ed.destroy();
   });
 });
