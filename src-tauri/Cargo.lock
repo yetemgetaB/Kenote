@@ -2083,7 +2083,7 @@ dependencies = [
 
 [[package]]
 name = "kenote"
-version = "0.5.4"
+version = "0.5.5"
 dependencies = [
  "chrono",
  "dirs 5.0.1",

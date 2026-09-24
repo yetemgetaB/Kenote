@@ -60,19 +60,16 @@ jobs:
           releaseBody: |
             ## KeNote v__VERSION__
 
-            ### ✨ Improved
-            - **Tactile Shortcut Keycaps**: Redesigned keyboard shortcuts with tactile keycap styling across Settings.
-            - **Customizable Global Launch**: Global Launch shortcut can now be customized directly from Settings.
-            - **Interactive Shortcut Recorder**: Compact shortcut recorder popover with live key preview and Escape-to-cancel.
-            - **Configurable & Fixed Grouping**: Clear separation of customizable shortcuts and core fixed shortcuts.
-            - **Reset to Default**: Easily restore default shortcut settings (`Alt + Shift + K`) with a single click.
-            - **Conflict Feedback**: Clear warnings and conflict feedback when a shortcut is already in use.
-            - **Extended Function Keys**: Added support for extended function keys F13 through F24.
-            - **Hardware Shortcut Handling**: Improved compatibility with hardware keyboard shortcuts (e.g. `Ctrl + Alt + F13`).
+            ### 🚀 Windows Startup & Background Ready
+            - **Start KeNote with Windows**: Added an optional setting in Settings → General to start KeNote automatically on Windows login.
+            - **Quiet Background Launch**: Starts quietly in the background without stealing focus or interrupting your workflow.
+            - **Instant Global Launch**: Global Launch shortcut (`Alt + Shift + K` or custom) is ready immediately after Windows startup.
+            - **Preserved Single Instance**: Opening KeNote while already running in the background instantly brings your existing window to the front.
+            - **Normal Process Termination**: Explicitly quitting KeNote terminates the process normally.
 
-            ### 🛠️ Reliability
-            - **Safe Rollback**: Failed shortcut registrations safely roll back to the previous working shortcut.
-            - **Persistent Configuration**: Custom shortcuts persist across application restarts.
+            ### 🛠️ Improvements & Fixes
+            - **OS-Level Authoritative Sync**: Startup state is queried and updated directly with the operating system for accurate status reporting.
+            - **Custom Shortcut Compatibility**: Fully compatible with your existing customized Global Launch shortcut.
 
             ### 📦 Download & Install
             - **Windows**: Download the `.msi` or `-setup.exe` installer below.
