@@ -62,9 +62,10 @@ import {
   DEFAULT_EDITOR_ZOOM,
 } from "../utils/zoom";
 import {
-  parseKeyboardEventToShortcut,
-  formatShortcutDisplay,
+  DEFAULT_GLOBAL_SHORTCUT,
 } from "../utils/shortcut";
+import { ShortcutKeyCaps } from "./ShortcutKeyCaps";
+import { ShortcutRecorderPopover } from "./ShortcutRecorderPopover";
 
 interface SettingsViewProps {
   settings: AppSettings;
@@ -126,7 +127,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [telemetryEnabled, setTelemetryEnabledState] = useState(settings.telemetry_enabled ?? true);
   const [globalShortcut, setGlobalShortcut] = useState(settings.global_shortcut || "Alt+Shift+K");
   const [isRecordingShortcut, setIsRecordingShortcut] = useState(false);
-  const [recordedKeysDisplay, setRecordedKeysDisplay] = useState<string>("");
   const [shortcutError, setShortcutError] = useState<string | null>(null);
   const [isSavingShortcut, setIsSavingShortcut] = useState(false);
   const currentVersion = APP_VERSION;
@@ -139,73 +139,47 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setGlobalShortcut(settings.global_shortcut || "Alt+Shift+K");
   }, [settings.global_zoom, settings.editor_zoom, settings.telemetry_enabled, settings.global_shortcut]);
 
-  // Handle global shortcut recording keyboard events
-  useEffect(() => {
-    if (!isRecordingShortcut) return;
+  const handleSaveGlobalShortcut = async (newShortcut: string) => {
+    setIsSavingShortcut(true);
+    setShortcutError(null);
 
-    const handleKeyDown = async (e: KeyboardEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
+    try {
+      const registered = await api.updateGlobalShortcut(newShortcut);
+      setGlobalShortcut(registered);
+      const updated: AppSettings = {
+        ...settings,
+        global_shortcut: registered,
+      };
+      onUpdateSettings(updated);
+      setIsRecordingShortcut(false);
+    } catch (err: unknown) {
+      const msg = typeof err === "string" ? err : err instanceof Error ? err.message : "Failed to register shortcut. Your existing shortcut remains active.";
+      setShortcutError(msg);
+      throw new Error(msg);
+    } finally {
+      setIsSavingShortcut(false);
+    }
+  };
 
-      if (e.key === "Escape") {
-        setIsRecordingShortcut(false);
-        setShortcutError(null);
-        setRecordedKeysDisplay("");
-        return;
-      }
-
-      const parsed = parseKeyboardEventToShortcut(e);
-
-      if (parsed.isEscape) {
-        setIsRecordingShortcut(false);
-        setShortcutError(null);
-        setRecordedKeysDisplay("");
-        return;
-      }
-
-      if (parsed.isModifierOnly) {
-        setRecordedKeysDisplay(parsed.display);
-        return;
-      }
-
-      if (!parsed.isValid || !parsed.shortcut) {
-        if (parsed.error) {
-          setShortcutError(parsed.error);
-        }
-        return;
-      }
-
-      setRecordedKeysDisplay(parsed.display);
-      const newShortcut = parsed.shortcut;
-
-      setIsSavingShortcut(true);
-      setShortcutError(null);
-
-      try {
-        const registered = await api.updateGlobalShortcut(newShortcut);
-        setGlobalShortcut(registered);
-        const updated: AppSettings = {
-          ...settings,
-          global_shortcut: registered,
-        };
-        onUpdateSettings(updated);
-        setIsRecordingShortcut(false);
-        setRecordedKeysDisplay("");
-      } catch (err: unknown) {
-        const msg = typeof err === "string" ? err : err instanceof Error ? err.message : "Failed to register shortcut. It might be used by another app.";
-        setShortcutError(msg);
-        setIsRecordingShortcut(false);
-        setRecordedKeysDisplay("");
-      } finally {
-        setIsSavingShortcut(false);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown, true);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown, true);
-    };
-  }, [isRecordingShortcut, settings, onUpdateSettings]);
+  const handleResetGlobalShortcut = async () => {
+    if (globalShortcut === DEFAULT_GLOBAL_SHORTCUT || isSavingShortcut) return;
+    setIsSavingShortcut(true);
+    setShortcutError(null);
+    try {
+      const registered = await api.updateGlobalShortcut(DEFAULT_GLOBAL_SHORTCUT);
+      setGlobalShortcut(registered);
+      const updated: AppSettings = {
+        ...settings,
+        global_shortcut: registered,
+      };
+      onUpdateSettings(updated);
+    } catch (err: unknown) {
+      const msg = typeof err === "string" ? err : err instanceof Error ? err.message : "Failed to reset shortcut.";
+      setShortcutError(msg);
+    } finally {
+      setIsSavingShortcut(false);
+    }
+  };
 
   // Load trashed notes when navigating to trash tab or initially
   useEffect(() => {
@@ -826,107 +800,112 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </div>
 
               {/* Keyboard Shortcuts Reference */}
-              <div className="p-4 bg-[#1B212B] border border-[#2B3442] rounded-xl space-y-2.5 shadow-sm">
+              <div className="p-4 bg-[#1B212B] border border-[#2B3442] rounded-xl space-y-3.5 shadow-sm">
                 <div>
                   <h3 className="text-xs font-semibold text-white uppercase tracking-wider">
                     Keybindings
                   </h3>
                   <p className="text-[11px] text-gray-400 mt-0.5">
-                    Essential keyboard shortcuts.
+                    Navigate and control KeNote with your keyboard.
                   </p>
                 </div>
 
-                <div className="space-y-1.5 text-xs">
-                  <div className="flex justify-between items-center py-1 border-b border-[#252C38]">
-                    <span className="text-gray-400">New Note</span>
-                    <kbd className="font-mono bg-[#141820] px-2 py-0.5 rounded text-gray-300 border border-[#2F3746] text-[11px]">
-                      Ctrl + N
-                    </kbd>
+                {/* Configurable Shortcuts Group */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between pb-1 border-b border-[#252C38]">
+                    <span className="text-[11px] font-semibold text-gray-300 uppercase tracking-wider">
+                      Configurable
+                    </span>
+                    <span className="text-[10px] text-gray-500">Click to customize</span>
                   </div>
-                  <div className="flex justify-between items-center py-1 border-b border-[#252C38]">
-                    <span className="text-gray-400">Browse Notes</span>
-                    <kbd className="font-mono bg-[#141820] px-2 py-0.5 rounded text-gray-300 border border-[#2F3746] text-[11px]">
-                      Ctrl + O
-                    </kbd>
+
+                  <div className="relative flex justify-between items-center py-1 text-xs">
+                    <div>
+                      <span className="text-gray-300 font-medium">Global Launch</span>
+                      <p className="text-[11px] text-gray-500">Toggle KeNote window from anywhere</p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {globalShortcut !== DEFAULT_GLOBAL_SHORTCUT && (
+                        <button
+                          type="button"
+                          onClick={handleResetGlobalShortcut}
+                          disabled={isSavingShortcut}
+                          title={`Reset to default (${DEFAULT_GLOBAL_SHORTCUT.replace(/\+/g, " + ")})`}
+                          className="p-1 text-gray-400 hover:text-white rounded hover:bg-[#252D3D] transition-colors cursor-pointer"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+
+                      <ShortcutKeyCaps
+                        shortcut={globalShortcut}
+                        isClickable
+                        isRecording={isRecordingShortcut}
+                        onClick={() => {
+                          setIsRecordingShortcut(true);
+                          setShortcutError(null);
+                        }}
+                        hint="Click to customize Global Launch shortcut"
+                      />
+
+                      <ShortcutRecorderPopover
+                        isOpen={isRecordingShortcut}
+                        onClose={() => {
+                          setIsRecordingShortcut(false);
+                          setShortcutError(null);
+                        }}
+                        onSave={handleSaveGlobalShortcut}
+                        currentShortcut={globalShortcut}
+                        error={shortcutError}
+                        isSaving={isSavingShortcut}
+                      />
+                    </div>
                   </div>
-                  <div className="flex justify-between items-center py-1 border-b border-[#252C38]">
-                    <span className="text-gray-400">Actions Palette</span>
-                    <kbd className="font-mono bg-[#141820] px-2 py-0.5 rounded text-gray-300 border border-[#2F3746] text-[11px]">
-                      Ctrl + K
-                    </kbd>
+                </div>
+
+                {/* Fixed Shortcuts Group */}
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center justify-between pb-1 border-b border-[#252C38]">
+                    <span className="text-[11px] font-semibold text-gray-300 uppercase tracking-wider">
+                      Fixed
+                    </span>
+                    <span className="text-[10px] text-gray-500">Core shortcuts</span>
                   </div>
-                  <div className="flex justify-between items-center py-1 border-b border-[#252C38]">
-                    <span className="text-gray-400">Quick Switcher</span>
-                    <kbd className="font-mono bg-[#141820] px-2 py-0.5 rounded text-gray-300 border border-[#2F3746] text-[11px]">
-                      Ctrl + Tab
-                    </kbd>
-                  </div>
-                  <div className="flex justify-between items-center py-1 border-b border-[#252C38]">
-                    <span className="text-gray-400">Pin Window on Top</span>
-                    <kbd className="font-mono bg-[#141820] px-2 py-0.5 rounded text-gray-300 border border-[#2F3746] text-[11px]">
-                      Ctrl + P
-                    </kbd>
-                  </div>
-                  <div className="flex flex-col py-1.5 border-b border-[#252C38] gap-1">
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-400">Global Launch</span>
-                      <div className="flex items-center gap-2">
-                        {isRecordingShortcut ? (
-                          <div className="flex items-center gap-2">
-                            <span className="text-[11px] text-sky-400 animate-pulse font-mono">
-                              {recordedKeysDisplay ? `${recordedKeysDisplay}...` : "Press shortcut..."}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setIsRecordingShortcut(false);
-                                setShortcutError(null);
-                                setRecordedKeysDisplay("");
-                              }}
-                              className="text-[11px] text-gray-400 hover:text-white px-2 py-0.5 rounded bg-[#141820] hover:bg-[#252D3D] border border-[#2F3746] transition-colors cursor-pointer"
-                            >
-                              Cancel (Esc)
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <kbd className="font-mono bg-[#141820] px-2 py-0.5 rounded text-gray-300 border border-[#2F3746] text-[11px]">
-                              {formatShortcutDisplay(globalShortcut)}
-                            </kbd>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setIsRecordingShortcut(true);
-                                setShortcutError(null);
-                                setRecordedKeysDisplay("");
-                              }}
-                              disabled={isSavingShortcut}
-                              className="text-[11px] text-gray-300 hover:text-white px-2 py-0.5 rounded bg-[#141820] hover:bg-[#252D3D] border border-[#2F3746] transition-colors cursor-pointer"
-                            >
-                              Change Shortcut
-                            </button>
-                          </div>
-                        )}
+
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex justify-between items-center py-1 border-b border-[#252C38]">
+                      <span className="text-gray-400">New Note</span>
+                      <ShortcutKeyCaps shortcut="Ctrl+N" size="sm" />
+                    </div>
+                    <div className="flex justify-between items-center py-1 border-b border-[#252C38]">
+                      <span className="text-gray-400">Browse Notes</span>
+                      <ShortcutKeyCaps shortcut="Ctrl+O" size="sm" />
+                    </div>
+                    <div className="flex justify-between items-center py-1 border-b border-[#252C38]">
+                      <span className="text-gray-400">Actions Palette</span>
+                      <ShortcutKeyCaps shortcut="Ctrl+K" size="sm" />
+                    </div>
+                    <div className="flex justify-between items-center py-1 border-b border-[#252C38]">
+                      <span className="text-gray-400">Quick Switcher</span>
+                      <ShortcutKeyCaps shortcut="Ctrl+Tab" size="sm" />
+                    </div>
+                    <div className="flex justify-between items-center py-1 border-b border-[#252C38]">
+                      <span className="text-gray-400">Pin Window on Top</span>
+                      <ShortcutKeyCaps shortcut="Ctrl+P" size="sm" />
+                    </div>
+                    <div className="flex justify-between items-center py-1 border-b border-[#252C38]">
+                      <span className="text-gray-400">Zoom In / Out / Reset</span>
+                      <div className="flex items-center gap-1.5">
+                        <ShortcutKeyCaps shortcut="Ctrl++" size="sm" />
+                        <ShortcutKeyCaps shortcut="Ctrl+-" size="sm" />
+                        <ShortcutKeyCaps shortcut="Ctrl+0" size="sm" />
                       </div>
                     </div>
-                    {shortcutError && (
-                      <div className="text-[11px] text-red-400 flex items-center gap-1.5 mt-0.5">
-                        <AlertCircle className="w-3.5 h-3.5 shrink-0 text-red-400" />
-                        <span>{shortcutError}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex justify-between items-center py-1 border-b border-[#252C38]">
-                    <span className="text-gray-400">Zoom In / Out / Reset</span>
-                    <kbd className="font-mono bg-[#141820] px-2 py-0.5 rounded text-gray-300 border border-[#2F3746] text-[11px]">
-                      Ctrl + / - / 0
-                    </kbd>
-                  </div>
-                  <div className="flex justify-between items-center py-1">
-                    <span className="text-gray-400">Open Settings</span>
-                    <kbd className="font-mono bg-[#141820] px-2 py-0.5 rounded text-gray-300 border border-[#2F3746] text-[11px]">
-                      Ctrl + ,
-                    </kbd>
+                    <div className="flex justify-between items-center py-1">
+                      <span className="text-gray-400">Open Settings</span>
+                      <ShortcutKeyCaps shortcut="Ctrl+," size="sm" />
+                    </div>
                   </div>
                 </div>
               </div>

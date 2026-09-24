@@ -6,6 +6,8 @@ import {
   parseKeyboardEventToShortcut,
   isValidGlobalShortcut,
   formatShortcutDisplay,
+  splitShortcutToKeys,
+  checkInternalShortcutConflict,
 } from "../src/utils/shortcut.ts";
 import { DEFAULT_SETTINGS } from "../src/types/note.ts";
 
@@ -21,9 +23,17 @@ describe("Global Launch Shortcut Unit Tests", () => {
       assert.equal(formatShortcutDisplay(null), "Alt + Shift + K");
       assert.equal(formatShortcutDisplay(undefined), "Alt + Shift + K");
     });
+
+    it("splits shortcut string into individual key tokens", () => {
+      assert.deepEqual(splitShortcutToKeys("Alt+Shift+K"), ["Alt", "Shift", "K"]);
+      assert.deepEqual(splitShortcutToKeys("Ctrl+Space"), ["Ctrl", "Space"]);
+      assert.deepEqual(splitShortcutToKeys("Ctrl+Alt+F13"), ["Ctrl", "Alt", "F13"]);
+      assert.deepEqual(splitShortcutToKeys(["Ctrl", "K"]), ["Ctrl", "K"]);
+      assert.deepEqual(splitShortcutToKeys(null), []);
+    });
   });
 
-  describe("2. Key Normalization", () => {
+  describe("2. Key Normalization & Extended Function Keys (F1-F24)", () => {
     it("normalizes alphanumeric keys to uppercase", () => {
       assert.equal(normalizeKey("k"), "K");
       assert.equal(normalizeKey("K"), "K");
@@ -31,9 +41,18 @@ describe("Global Launch Shortcut Unit Tests", () => {
       assert.equal(normalizeKey("1"), "1");
     });
 
-    it("normalizes function keys properly", () => {
+    it("normalizes standard function keys F1-F12", () => {
       assert.equal(normalizeKey("F1"), "F1");
       assert.equal(normalizeKey("f12"), "F12");
+    });
+
+    it("normalizes extended function keys F13-F24", () => {
+      assert.equal(normalizeKey("F13"), "F13");
+      assert.equal(normalizeKey("f13"), "F13");
+      assert.equal(normalizeKey("F24"), "F24");
+      // Keycode fallback when key is generic/unidentified
+      assert.equal(normalizeKey("Unidentified", "F13"), "F13");
+      assert.equal(normalizeKey("", "F20"), "F20");
     });
 
     it("normalizes Space and special keys", () => {
@@ -82,6 +101,23 @@ describe("Global Launch Shortcut Unit Tests", () => {
       assert.equal(result.isValid, true);
       assert.equal(result.shortcut, "Ctrl+Space");
       assert.equal(result.display, "Ctrl + Space");
+      assert.equal(result.isModifierOnly, false);
+      assert.equal(result.isEscape, false);
+    });
+
+    it("correctly parses Ctrl+Alt+F13 combination", () => {
+      const result = parseKeyboardEventToShortcut({
+        key: "F13",
+        code: "F13",
+        ctrlKey: true,
+        altKey: true,
+        shiftKey: false,
+        metaKey: false,
+      });
+
+      assert.equal(result.isValid, true);
+      assert.equal(result.shortcut, "Ctrl+Alt+F13");
+      assert.equal(result.display, "Ctrl + Alt + F13");
       assert.equal(result.isModifierOnly, false);
       assert.equal(result.isEscape, false);
     });
@@ -138,6 +174,19 @@ describe("Global Launch Shortcut Unit Tests", () => {
       assert.equal(result.shortcut, null);
       assert.match(result.error || "", /modifier/i);
     });
+
+    it("detects and flags internal shortcut conflicts", () => {
+      const result = parseKeyboardEventToShortcut({
+        key: "k",
+        ctrlKey: true,
+        altKey: false,
+        shiftKey: false,
+        metaKey: false,
+      });
+
+      assert.equal(result.isValid, false);
+      assert.match(result.error || "", /Command Palette/i);
+    });
   });
 
   describe("4. Shortcut String Validation", () => {
@@ -146,6 +195,7 @@ describe("Global Launch Shortcut Unit Tests", () => {
       assert.equal(isValidGlobalShortcut("Ctrl+Space"), true);
       assert.equal(isValidGlobalShortcut("Ctrl+Alt+A"), true);
       assert.equal(isValidGlobalShortcut("Super+Shift+K"), true);
+      assert.equal(isValidGlobalShortcut("Ctrl+Alt+F13"), true);
     });
 
     it("rejects invalid accelerator strings", () => {
@@ -158,7 +208,13 @@ describe("Global Launch Shortcut Unit Tests", () => {
     });
   });
 
-  describe("5. Mock Shortcut Replacement & Error Handling Workflow", () => {
+  describe("5. Conflict Detection & Replacement Safety", () => {
+    it("identifies internal KeNote conflicts", () => {
+      assert.equal(checkInternalShortcutConflict("Ctrl+K"), "Ctrl + K is already assigned to Command Palette in KeNote.");
+      assert.equal(checkInternalShortcutConflict("Ctrl+N"), "Ctrl + N is already assigned to New Note in KeNote.");
+      assert.equal(checkInternalShortcutConflict("Alt+Shift+K"), null);
+    });
+
     it("preserves previous shortcut when registration fails", async () => {
       let registeredShortcut = "Alt+Shift+K";
 
@@ -168,9 +224,8 @@ describe("Global Launch Shortcut Unit Tests", () => {
         }
         const previous = registeredShortcut;
         if (shouldFail) {
-          // Simulate failure and recovery
           registeredShortcut = previous;
-          throw new Error("Shortcut is already registered by another application");
+          throw new Error("Failed to register shortcut. Your existing shortcut remains active.");
         }
         registeredShortcut = newShortcut;
         return registeredShortcut;
@@ -184,9 +239,14 @@ describe("Global Launch Shortcut Unit Tests", () => {
       // Failed update preserves previous
       await assert.rejects(async () => {
         await mockUpdateShortcut("Ctrl+C", true);
-      }, /already registered/i);
+      }, /remains active/i);
 
       assert.equal(registeredShortcut, "Ctrl+Space", "Previous shortcut must be preserved on failure");
+
+      // Reset restores default
+      const resReset = await mockUpdateShortcut(DEFAULT_GLOBAL_SHORTCUT, false);
+      assert.equal(resReset, DEFAULT_GLOBAL_SHORTCUT);
+      assert.equal(registeredShortcut, DEFAULT_GLOBAL_SHORTCUT);
     });
   });
 });

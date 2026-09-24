@@ -1018,6 +1018,7 @@ mod tests {
         assert!("Ctrl+Space".parse::<Shortcut>().is_ok());
         assert!("Super+Shift+K".parse::<Shortcut>().is_ok());
         assert!("Ctrl+Alt+A".parse::<Shortcut>().is_ok());
+        assert!("Ctrl+Alt+F13".parse::<Shortcut>().is_ok());
         assert!("".parse::<Shortcut>().is_err());
         assert!("InvalidKeyCombinationName".parse::<Shortcut>().is_err());
     }

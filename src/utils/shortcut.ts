@@ -14,30 +14,44 @@ export interface ParsedShortcutResult {
 
 export const DEFAULT_GLOBAL_SHORTCUT = "Alt+Shift+K";
 
+export const INTERNAL_SHORTCUTS: Record<string, string> = {
+  "Ctrl+K": "Command Palette",
+  "Ctrl+N": "New Note",
+  "Ctrl+O": "Browse Notes",
+  "Ctrl+P": "Pin Window on Top",
+  "Ctrl+Tab": "Quick Switcher",
+  "Ctrl+,": "Settings",
+};
+
 /**
  * Normalizes a keyboard event key/code to a standard Tauri-compatible key identifier.
  */
-export function normalizeKey(key: string, code?: string): string | null {
-  if (!key) return null;
+export function normalizeKey(key?: string | null, code?: string): string | null {
+  const safeKey = key || "";
 
   // Ignore bare modifier keypresses
-  if (["Control", "Shift", "Alt", "Meta", "OS", "AltGraph"].includes(key)) {
+  if (["Control", "Shift", "Alt", "Meta", "OS", "AltGraph"].includes(safeKey)) {
     return null;
   }
 
+  // Handle Function keys F1-F24 (via code or key, e.g. hardware F13 on HP EliteBook)
+  if (code && /^F([1-9]|1[0-9]|2[0-4])$/i.test(code)) {
+    return code.toUpperCase();
+  }
+  if (safeKey && /^F([1-9]|1[0-9]|2[0-4])$/i.test(safeKey)) {
+    return safeKey.toUpperCase();
+  }
+
+  if (!safeKey && !code) return null;
+
   // Handle Space
-  if (key === " " || key === "Space" || code === "Space") {
+  if (safeKey === " " || safeKey === "Space" || code === "Space") {
     return "Space";
   }
 
-  // Handle Function keys F1-F24
-  if (/^F([1-9]|1[0-9]|2[0-4])$/i.test(key)) {
-    return key.toUpperCase();
-  }
-
   // Handle single alphanumeric characters
-  if (key.length === 1 && /^[a-zA-Z0-9]$/.test(key)) {
-    return key.toUpperCase();
+  if (safeKey.length === 1 && /^[a-zA-Z0-9]$/.test(safeKey)) {
+    return safeKey.toUpperCase();
   }
 
   // Handle navigation & editing keys
@@ -58,8 +72,8 @@ export function normalizeKey(key: string, code?: string): string | null {
     Escape: "Escape",
   };
 
-  if (specialKeyMap[key]) {
-    return specialKeyMap[key];
+  if (safeKey && specialKeyMap[safeKey]) {
+    return specialKeyMap[safeKey];
   }
 
   // Handle punctuation/symbol codes if available
@@ -82,7 +96,42 @@ export function normalizeKey(key: string, code?: string): string | null {
     }
   }
 
-  return key.length === 1 ? key.toUpperCase() : key;
+  if (!safeKey) return null;
+  return safeKey.length === 1 ? safeKey.toUpperCase() : safeKey;
+}
+
+/**
+ * Checks if a proposed shortcut conflicts with an internal fixed KeNote shortcut.
+ */
+export function checkInternalShortcutConflict(shortcut: string): string | null {
+  const norm = normalizeShortcutString(shortcut);
+  if (INTERNAL_SHORTCUTS[norm]) {
+    return `${formatShortcutDisplay(norm)} is already assigned to ${INTERNAL_SHORTCUTS[norm]} in KeNote.`;
+  }
+  return null;
+}
+
+/**
+ * Normalizes a shortcut string to standard modifier order: Ctrl -> Alt -> Shift -> Super -> Key.
+ */
+export function normalizeShortcutString(shortcut: string): string {
+  if (!shortcut || typeof shortcut !== "string") return "";
+  const parts = shortcut.split("+").map((p) => p.trim()).filter(Boolean);
+  const mods: string[] = [];
+  let baseKey = "";
+
+  for (const part of parts) {
+    const lower = part.toLowerCase();
+    if (lower === "ctrl" || lower === "control") mods.push("Ctrl");
+    else if (lower === "alt") mods.push("Alt");
+    else if (lower === "shift") mods.push("Shift");
+    else if (lower === "super" || lower === "meta" || lower === "win") mods.push("Super");
+    else baseKey = part;
+  }
+
+  const order = ["Ctrl", "Alt", "Shift", "Super"];
+  const orderedMods = order.filter((m) => mods.includes(m));
+  return baseKey ? `${[...orderedMods, baseKey].join("+")}` : orderedMods.join("+");
 }
 
 /**
@@ -114,7 +163,7 @@ export function parseKeyboardEventToShortcut(e: KeyboardEvent | {
   if (e.shiftKey) modifiers.push("Shift");
   if (e.metaKey) modifiers.push("Super");
 
-  if (isModKey || modifiers.length === 0 && !e.key) {
+  if (isModKey || (modifiers.length === 0 && !e.key)) {
     return {
       shortcut: null,
       display: modifiers.length > 0 ? modifiers.join(" + ") : "",
@@ -150,6 +199,18 @@ export function parseKeyboardEventToShortcut(e: KeyboardEvent | {
 
   const shortcutString = `${modifiers.join("+")}+${baseKey}`;
   const displayString = `${modifiers.join(" + ")} + ${baseKey}`;
+
+  const conflict = checkInternalShortcutConflict(shortcutString);
+  if (conflict) {
+    return {
+      shortcut: shortcutString,
+      display: displayString,
+      isModifierOnly: false,
+      isEscape: false,
+      isValid: false,
+      error: conflict,
+    };
+  }
 
   return {
     shortcut: shortcutString,
@@ -193,4 +254,16 @@ export function formatShortcutDisplay(shortcut?: string | null): string {
     return "Alt + Shift + K";
   }
   return shortcut.replace(/\+/g, " + ");
+}
+
+/**
+ * Splits a shortcut string ("Alt+Shift+K") or array into individual key tokens (["Alt", "Shift", "K"]).
+ */
+export function splitShortcutToKeys(shortcut?: string | string[] | null): string[] {
+  if (!shortcut) return [];
+  if (Array.isArray(shortcut)) return shortcut.filter(Boolean);
+  return shortcut
+    .split("+")
+    .map((k) => k.trim())
+    .filter(Boolean);
 }
