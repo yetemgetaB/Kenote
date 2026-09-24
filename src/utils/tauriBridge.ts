@@ -85,6 +85,17 @@ export const api = {
     }
   },
 
+  async updateGlobalShortcut(newShortcut: string): Promise<string> {
+    if (isTauri()) {
+      return await invokeTauri<string>("update_global_shortcut", { newShortcutStr: newShortcut });
+    } else {
+      const settings = await this.getSettings();
+      const updated = { ...settings, global_shortcut: newShortcut };
+      await this.saveSettings(updated);
+      return newShortcut;
+    }
+  },
+
   async getNotesDirectory(): Promise<string> {
     try {
       return await invokeTauri<string>("get_notes_directory");

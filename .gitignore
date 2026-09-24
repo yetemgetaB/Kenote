@@ -31,3 +31,5 @@ kenote_data
 extracted_icon.png
 *.key
 *.key.pub
+graphify-out/
+

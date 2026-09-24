@@ -3,6 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use tauri::{LogicalPosition, LogicalSize, Manager, WebviewWindow, WindowEvent};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NoteMetadata {
@@ -37,6 +38,12 @@ pub struct AppSettings {
     pub quick_switcher_order: Option<String>,
     #[serde(default)]
     pub quick_switcher_shortcut: Option<String>,
+    #[serde(default = "default_zoom")]
+    pub global_zoom: Option<u32>,
+    #[serde(default = "default_zoom")]
+    pub editor_zoom: Option<u32>,
+    #[serde(default = "default_global_shortcut")]
+    pub global_shortcut: Option<String>,
     pub window_width: Option<f64>,
     pub window_height: Option<f64>,
     pub window_x: Option<i32>,
@@ -45,6 +52,14 @@ pub struct AppSettings {
     pub discovery_source: Option<String>,
     #[serde(default = "default_telemetry_enabled")]
     pub telemetry_enabled: Option<bool>,
+}
+
+fn default_zoom() -> Option<u32> {
+    Some(100)
+}
+
+fn default_global_shortcut() -> Option<String> {
+    Some("Alt+Shift+K".to_string())
 }
 
 fn default_telemetry_enabled() -> Option<bool> {
@@ -67,6 +82,9 @@ impl Default for AppSettings {
             quick_switcher_mode: Some("overlay".to_string()),
             quick_switcher_order: Some("mru".to_string()),
             quick_switcher_shortcut: Some("ctrl_tab".to_string()),
+            global_zoom: Some(100),
+            editor_zoom: Some(100),
+            global_shortcut: Some("Alt+Shift+K".to_string()),
             window_width: Some(520.0),
             window_height: Some(720.0),
             window_x: None,
@@ -588,9 +606,84 @@ fn save_window_state(window: WebviewWindow) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn update_global_shortcut(app: tauri::AppHandle, new_shortcut_str: String) -> Result<String, String> {
+    let trimmed = new_shortcut_str.trim();
+    if trimmed.is_empty() {
+        return Err("Shortcut cannot be empty".to_string());
+    }
+
+    let new_shortcut = trimmed.parse::<Shortcut>().map_err(|e| format!("Invalid shortcut format: {}", e))?;
+    
+    let mut settings = get_settings();
+    let old_shortcut_str = settings.global_shortcut.as_deref().unwrap_or("Alt+Shift+K").to_string();
+
+    if old_shortcut_str == trimmed && app.global_shortcut().is_registered(new_shortcut.clone()) {
+        return Ok(trimmed.to_string());
+    }
+
+    let old_shortcut = old_shortcut_str.parse::<Shortcut>().ok();
+
+    // Safely replace shortcut: unregister old first
+    if let Some(ref old) = old_shortcut {
+        let _ = app.global_shortcut().unregister(old.clone());
+    }
+
+    let app_handle = app.clone();
+    let reg_result = app.global_shortcut().on_shortcut(new_shortcut.clone(), move |_app, _shortcut, event| {
+        if event.state() == ShortcutState::Pressed {
+            toggle_main_window(&app_handle);
+        }
+    });
+
+    match reg_result {
+        Ok(_) => {
+            settings.global_shortcut = Some(trimmed.to_string());
+            let _ = save_settings(settings);
+            Ok(trimmed.to_string())
+        }
+        Err(err) => {
+            // Restore previous shortcut
+            if let Some(old) = old_shortcut {
+                let app_handle_restore = app.clone();
+                let _ = app.global_shortcut().on_shortcut(old, move |_app, _shortcut, event| {
+                    if event.state() == ShortcutState::Pressed {
+                        toggle_main_window(&app_handle_restore);
+                    }
+                });
+            }
+            Err(format!("Failed to register shortcut '{}': {}", trimmed, err))
+        }
+    }
+}
+
+pub fn toggle_main_window(app: &tauri::AppHandle) {
+    if let Some(win) = app.get_webview_window("main") {
+        let is_visible = win.is_visible().unwrap_or(false);
+        let is_minimized = win.is_minimized().unwrap_or(false);
+        let is_focused = win.is_focused().unwrap_or(false);
+
+        if is_visible && !is_minimized && is_focused {
+            let _ = win.hide();
+        } else {
+            let _ = win.show();
+            let _ = win.unminimize();
+            let _ = win.set_focus();
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.show();
+                let _ = win.unminimize();
+                let _ = win.set_focus();
+            }
+        }))
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
@@ -613,7 +706,8 @@ pub fn run() {
             minimize_window,
             close_window,
             reveal_in_explorer,
-            save_window_state
+            save_window_state,
+            update_global_shortcut
         ])
         .setup(|app| {
             // Restore window size and position from settings
@@ -724,6 +818,24 @@ console.log("Hello from Kenote!");
                     let _ = fs::write(notes_dir.join("note_welcome.md"), default_note);
                 }
             }
+
+            // Register OS-level global shortcut for window toggle
+            let shortcut_str = settings
+                .global_shortcut
+                .as_deref()
+                .unwrap_or("Alt+Shift+K");
+
+            if let Ok(shortcut) = shortcut_str.parse::<Shortcut>() {
+                let app_handle = app.handle().clone();
+                if let Err(e) = app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, event| {
+                    if event.state() == ShortcutState::Pressed {
+                        toggle_main_window(&app_handle);
+                    }
+                }) {
+                    eprintln!("Failed to register global shortcut {}: {}", shortcut_str, e);
+                }
+            }
+
             Ok(())
         })
         .run(tauri::generate_context!())
@@ -861,6 +973,53 @@ mod tests {
 
         let default_settings = AppSettings::default();
         assert!(!default_settings.always_on_top);
+    }
+
+    #[test]
+    fn test_zoom_and_shortcut_settings_serialization() {
+        // Test defaults
+        let default_settings = AppSettings::default();
+        assert_eq!(default_settings.global_zoom, Some(100));
+        assert_eq!(default_settings.editor_zoom, Some(100));
+        assert_eq!(default_settings.global_shortcut, Some("Alt+Shift+K".to_string()));
+
+        // Test custom values serialization & deserialization
+        let custom = AppSettings {
+            global_zoom: Some(125),
+            editor_zoom: Some(150),
+            global_shortcut: Some("Ctrl+Shift+N".to_string()),
+            ..AppSettings::default()
+        };
+        let json = serde_json::to_string(&custom).expect("Should serialize");
+        let deserialized: AppSettings = serde_json::from_str(&json).expect("Should deserialize");
+        assert_eq!(deserialized.global_zoom, Some(125));
+        assert_eq!(deserialized.editor_zoom, Some(150));
+        assert_eq!(deserialized.global_shortcut, Some("Ctrl+Shift+N".to_string()));
+
+        // Backwards compatibility: deserialize older json missing zoom fields
+        let legacy_json = r##"{
+            "accent_color": "#0399F7",
+            "font_size": "15px",
+            "font_family": "system-ui",
+            "line_height": "1.6",
+            "auto_save_interval": 500,
+            "always_on_top": false,
+            "has_completed_onboarding": true
+        }"##;
+        let from_legacy: AppSettings = serde_json::from_str(legacy_json).expect("Should deserialize legacy JSON");
+        assert_eq!(from_legacy.global_zoom, Some(100));
+        assert_eq!(from_legacy.editor_zoom, Some(100));
+        assert_eq!(from_legacy.global_shortcut, Some("Alt+Shift+K".to_string()));
+    }
+
+    #[test]
+    fn test_global_shortcut_parsing() {
+        assert!("Alt+Shift+K".parse::<Shortcut>().is_ok());
+        assert!("Ctrl+Space".parse::<Shortcut>().is_ok());
+        assert!("Super+Shift+K".parse::<Shortcut>().is_ok());
+        assert!("Ctrl+Alt+A".parse::<Shortcut>().is_ok());
+        assert!("".parse::<Shortcut>().is_err());
+        assert!("InvalidKeyCombinationName".parse::<Shortcut>().is_err());
     }
 }
 

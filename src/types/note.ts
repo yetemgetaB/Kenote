@@ -23,6 +23,9 @@ export interface AppSettings {
   quick_switcher_mode?: "overlay" | "instant" | "disabled";
   quick_switcher_order?: "mru" | "pinned_updated";
   quick_switcher_shortcut?: "ctrl_tab" | "alt_tab" | "ctrl_pagedown";
+  global_zoom?: number;
+  editor_zoom?: number;
+  global_shortcut?: string;
   window_width?: number;
   window_height?: number;
   window_x?: number;
@@ -43,6 +46,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   quick_switcher_mode: "overlay",
   quick_switcher_order: "mru",
   quick_switcher_shortcut: "ctrl_tab",
+  global_zoom: 100,
+  editor_zoom: 100,
+  global_shortcut: "Alt+Shift+K",
   telemetry_enabled: true,
 };
 

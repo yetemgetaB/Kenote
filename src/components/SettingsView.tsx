@@ -46,7 +46,25 @@ import {
   AlignLeft,
   CheckCircle2,
   AlertCircle,
+  ZoomIn,
+  Minus,
+  Plus,
 } from "lucide-react";
+import {
+  clampGlobalZoom,
+  clampEditorZoom,
+  incrementGlobalZoom,
+  decrementGlobalZoom,
+  incrementEditorZoom,
+  decrementEditorZoom,
+  applyGlobalZoom,
+  DEFAULT_GLOBAL_ZOOM,
+  DEFAULT_EDITOR_ZOOM,
+} from "../utils/zoom";
+import {
+  parseKeyboardEventToShortcut,
+  formatShortcutDisplay,
+} from "../utils/shortcut";
 
 interface SettingsViewProps {
   settings: AppSettings;
@@ -92,6 +110,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [quickSwitcherShortcut, setQuickSwitcherShortcut] = useState<
     "ctrl_tab" | "alt_tab" | "ctrl_pagedown"
   >(settings.quick_switcher_shortcut || "ctrl_tab");
+  const [globalZoom, setGlobalZoom] = useState(settings.global_zoom ?? DEFAULT_GLOBAL_ZOOM);
+  const [editorZoom, setEditorZoom] = useState(settings.editor_zoom ?? DEFAULT_EDITOR_ZOOM);
 
   // Trash list state
   const [trashedNotes, setTrashedNotes] = useState<NoteMetadata[]>([]);
@@ -104,12 +124,88 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [updateErrorMessage, setUpdateErrorMessage] = useState<string | null>(null);
   const [trashActionError, setTrashActionError] = useState<string | null>(null);
   const [telemetryEnabled, setTelemetryEnabledState] = useState(settings.telemetry_enabled ?? true);
+  const [globalShortcut, setGlobalShortcut] = useState(settings.global_shortcut || "Alt+Shift+K");
+  const [isRecordingShortcut, setIsRecordingShortcut] = useState(false);
+  const [recordedKeysDisplay, setRecordedKeysDisplay] = useState<string>("");
+  const [shortcutError, setShortcutError] = useState<string | null>(null);
+  const [isSavingShortcut, setIsSavingShortcut] = useState(false);
   const currentVersion = APP_VERSION;
 
-  // Sync telemetry state if settings prop changes externally
+  // Sync zoom, telemetry, and shortcut state if settings prop changes externally
   useEffect(() => {
+    setGlobalZoom(settings.global_zoom ?? DEFAULT_GLOBAL_ZOOM);
+    setEditorZoom(settings.editor_zoom ?? DEFAULT_EDITOR_ZOOM);
     setTelemetryEnabledState(settings.telemetry_enabled ?? true);
-  }, [settings.telemetry_enabled]);
+    setGlobalShortcut(settings.global_shortcut || "Alt+Shift+K");
+  }, [settings.global_zoom, settings.editor_zoom, settings.telemetry_enabled, settings.global_shortcut]);
+
+  // Handle global shortcut recording keyboard events
+  useEffect(() => {
+    if (!isRecordingShortcut) return;
+
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (e.key === "Escape") {
+        setIsRecordingShortcut(false);
+        setShortcutError(null);
+        setRecordedKeysDisplay("");
+        return;
+      }
+
+      const parsed = parseKeyboardEventToShortcut(e);
+
+      if (parsed.isEscape) {
+        setIsRecordingShortcut(false);
+        setShortcutError(null);
+        setRecordedKeysDisplay("");
+        return;
+      }
+
+      if (parsed.isModifierOnly) {
+        setRecordedKeysDisplay(parsed.display);
+        return;
+      }
+
+      if (!parsed.isValid || !parsed.shortcut) {
+        if (parsed.error) {
+          setShortcutError(parsed.error);
+        }
+        return;
+      }
+
+      setRecordedKeysDisplay(parsed.display);
+      const newShortcut = parsed.shortcut;
+
+      setIsSavingShortcut(true);
+      setShortcutError(null);
+
+      try {
+        const registered = await api.updateGlobalShortcut(newShortcut);
+        setGlobalShortcut(registered);
+        const updated: AppSettings = {
+          ...settings,
+          global_shortcut: registered,
+        };
+        onUpdateSettings(updated);
+        setIsRecordingShortcut(false);
+        setRecordedKeysDisplay("");
+      } catch (err: unknown) {
+        const msg = typeof err === "string" ? err : err instanceof Error ? err.message : "Failed to register shortcut. It might be used by another app.";
+        setShortcutError(msg);
+        setIsRecordingShortcut(false);
+        setRecordedKeysDisplay("");
+      } finally {
+        setIsSavingShortcut(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown, true);
+    };
+  }, [isRecordingShortcut, settings, onUpdateSettings]);
 
   // Load trashed notes when navigating to trash tab or initially
   useEffect(() => {
@@ -195,6 +291,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       line_height: newLineHeight,
       font_family: newFamily,
     };
+    onUpdateSettings(updated);
+    api.saveSettings(updated);
+  };
+
+  const handleSaveGlobalZoom = (newZoom: number) => {
+    const clamped = clampGlobalZoom(newZoom);
+    setGlobalZoom(clamped);
+    applyGlobalZoom(clamped);
+    const updated = { ...settings, global_zoom: clamped };
+    onUpdateSettings(updated);
+    api.saveSettings(updated);
+  };
+
+  const handleSaveEditorZoom = (newZoom: number) => {
+    const clamped = clampEditorZoom(newZoom);
+    setEditorZoom(clamped);
+    const updated = { ...settings, editor_zoom: clamped };
     onUpdateSettings(updated);
     api.saveSettings(updated);
   };
@@ -543,6 +656,102 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Zoom & Scaling Settings Card */}
+              <div className="p-4 bg-[#1B212B] border border-[#2B3442] rounded-2xl space-y-4 shadow-sm">
+                <div>
+                  <h3 className="text-xs font-semibold text-white uppercase tracking-wider">
+                    Zoom & Scaling
+                  </h3>
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    Adjust interface and document display scale independently.
+                  </p>
+                </div>
+
+                {/* Global Zoom */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-medium text-gray-300 flex items-center space-x-1.5">
+                      <ZoomIn size={13} className="text-[var(--accent-color,#0399F7)]" />
+                      <span>Global Zoom (Application)</span>
+                    </label>
+                    <span className="font-mono text-[11px] text-gray-300 bg-[#141820] px-2 py-0.5 rounded-md border border-[#2B3442]">
+                      {globalZoom}%
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => handleSaveGlobalZoom(decrementGlobalZoom(globalZoom))}
+                      className="p-2 rounded-lg bg-[#141820] border border-[#2B3442] text-gray-300 hover:text-white hover:border-[#384557] focus:outline-none shrink-0"
+                      title="Zoom Out (Ctrl -)"
+                    >
+                      <Minus size={14} />
+                    </button>
+                    <div className="flex-1 text-center text-xs text-gray-400">
+                      Entire UI, navigation, and dialogs
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveGlobalZoom(incrementGlobalZoom(globalZoom))}
+                      className="p-2 rounded-lg bg-[#141820] border border-[#2B3442] text-gray-300 hover:text-white hover:border-[#384557] focus:outline-none shrink-0"
+                      title="Zoom In (Ctrl +)"
+                    >
+                      <Plus size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveGlobalZoom(DEFAULT_GLOBAL_ZOOM)}
+                      className="px-2.5 py-1.5 rounded-lg bg-[#141820] border border-[#2B3442] text-[11px] text-gray-400 hover:text-white hover:border-[#384557] focus:outline-none shrink-0"
+                      title="Reset Global Zoom (Ctrl 0)"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </div>
+
+                {/* Editor Zoom */}
+                <div className="space-y-2 pt-2 border-t border-[#252C38]">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-medium text-gray-300 flex items-center space-x-1.5">
+                      <FileText size={13} className="text-[var(--accent-color,#0399F7)]" />
+                      <span>Editor Zoom (Document Only)</span>
+                    </label>
+                    <span className="font-mono text-[11px] text-gray-300 bg-[#141820] px-2 py-0.5 rounded-md border border-[#2B3442]">
+                      {editorZoom}%
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => handleSaveEditorZoom(decrementEditorZoom(editorZoom))}
+                      className="p-2 rounded-lg bg-[#141820] border border-[#2B3442] text-gray-300 hover:text-white hover:border-[#384557] focus:outline-none shrink-0"
+                      title="Editor Zoom Out"
+                    >
+                      <Minus size={14} />
+                    </button>
+                    <div className="flex-1 text-center text-xs text-gray-400">
+                      Note markdown text content only
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveEditorZoom(incrementEditorZoom(editorZoom))}
+                      className="p-2 rounded-lg bg-[#141820] border border-[#2B3442] text-gray-300 hover:text-white hover:border-[#384557] focus:outline-none shrink-0"
+                      title="Editor Zoom In"
+                    >
+                      <Plus size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveEditorZoom(DEFAULT_EDITOR_ZOOM)}
+                      className="px-2.5 py-1.5 rounded-lg bg-[#141820] border border-[#2B3442] text-[11px] text-gray-400 hover:text-white hover:border-[#384557] focus:outline-none shrink-0"
+                      title="Reset Editor Zoom"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -656,6 +865,61 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     <span className="text-gray-400">Pin Window on Top</span>
                     <kbd className="font-mono bg-[#141820] px-2 py-0.5 rounded text-gray-300 border border-[#2F3746] text-[11px]">
                       Ctrl + P
+                    </kbd>
+                  </div>
+                  <div className="flex flex-col py-1.5 border-b border-[#252C38] gap-1">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400">Global Launch</span>
+                      <div className="flex items-center gap-2">
+                        {isRecordingShortcut ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-sky-400 animate-pulse font-mono">
+                              {recordedKeysDisplay ? `${recordedKeysDisplay}...` : "Press shortcut..."}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsRecordingShortcut(false);
+                                setShortcutError(null);
+                                setRecordedKeysDisplay("");
+                              }}
+                              className="text-[11px] text-gray-400 hover:text-white px-2 py-0.5 rounded bg-[#141820] hover:bg-[#252D3D] border border-[#2F3746] transition-colors cursor-pointer"
+                            >
+                              Cancel (Esc)
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <kbd className="font-mono bg-[#141820] px-2 py-0.5 rounded text-gray-300 border border-[#2F3746] text-[11px]">
+                              {formatShortcutDisplay(globalShortcut)}
+                            </kbd>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsRecordingShortcut(true);
+                                setShortcutError(null);
+                                setRecordedKeysDisplay("");
+                              }}
+                              disabled={isSavingShortcut}
+                              className="text-[11px] text-gray-300 hover:text-white px-2 py-0.5 rounded bg-[#141820] hover:bg-[#252D3D] border border-[#2F3746] transition-colors cursor-pointer"
+                            >
+                              Change Shortcut
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {shortcutError && (
+                      <div className="text-[11px] text-red-400 flex items-center gap-1.5 mt-0.5">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0 text-red-400" />
+                        <span>{shortcutError}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-[#252C38]">
+                    <span className="text-gray-400">Zoom In / Out / Reset</span>
+                    <kbd className="font-mono bg-[#141820] px-2 py-0.5 rounded text-gray-300 border border-[#2F3746] text-[11px]">
+                      Ctrl + / - / 0
                     </kbd>
                   </div>
                   <div className="flex justify-between items-center py-1">

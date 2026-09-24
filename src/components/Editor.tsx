@@ -136,6 +136,7 @@ interface EditorProps {
   fontSize?: string;
   lineHeight?: string;
   fontFamily?: string;
+  editorZoom?: number;
   onEditorReady?: (editor: TiptapEditor) => void;
 }
 
@@ -148,6 +149,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
       fontSize = "15px",
       lineHeight = "1.6",
       fontFamily = "system-ui",
+      editorZoom = 100,
       onEditorReady,
     },
     ref
@@ -238,7 +240,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
       editorProps: {
         attributes: {
           class:
-            "focus:outline-none min-h-[calc(100vh-100px)] px-6 py-5 prose prose-invert max-w-none text-[#D8E1E8]",
+            "focus:outline-none min-h-full px-6 py-5 prose prose-invert max-w-none text-[#D8E1E8]",
           style: `font-size: ${fontSize}; line-height: ${lineHeight}; font-family: ${fontFamily};`,
         },
         handleClick: (_view, _pos, event) => {
@@ -376,7 +378,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
 
     return (
       <div className="flex-1 w-full overflow-y-auto custom-scrollbar relative">
-        <EditorContent editor={editor} />
+        <EditorContent editor={editor} style={{ zoom: `${editorZoom / 100}` }} />
       </div>
     );
   }

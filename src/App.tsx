@@ -13,6 +13,15 @@ import { NoteMetadata, AppSettings, DEFAULT_SETTINGS } from "./types/note";
 import { api, isValidExternalUrl } from "./utils/tauriBridge";
 import { applyAccentColor } from "./utils/theme";
 import {
+  incrementGlobalZoom,
+  decrementGlobalZoom,
+  incrementEditorZoom,
+  decrementEditorZoom,
+  applyGlobalZoom,
+  DEFAULT_GLOBAL_ZOOM,
+  DEFAULT_EDITOR_ZOOM,
+} from "./utils/zoom";
+import {
   setTelemetryEnabled,
   trackAppLaunch,
   trackNoteCreated,
@@ -38,6 +47,8 @@ import {
   SettingsIcon,
   TrashIcon,
   SaveIcon,
+  ZoomInIcon,
+  ZoomOutIcon,
 } from "./components/Icons";
 
 export function App() {
@@ -432,6 +443,7 @@ export function App() {
         settingsRef.current = loadedSettings;
         setIsAlwaysOnTop(loadedSettings.always_on_top);
         applyAccentColor(loadedSettings.accent_color);
+        applyGlobalZoom(loadedSettings.global_zoom ?? DEFAULT_GLOBAL_ZOOM);
 
         const telemetryEnabled = loadedSettings.telemetry_enabled ?? true;
         setTelemetryEnabled(telemetryEnabled);
@@ -727,6 +739,7 @@ export function App() {
     settingsRef.current = newSettings;
     setSettings(newSettings);
     applyAccentColor(newSettings.accent_color);
+    applyGlobalZoom(newSettings.global_zoom ?? DEFAULT_GLOBAL_ZOOM);
 
     // If custom_notes_dir changed, refresh notes directory and load notes from new directory
     if (newSettings.custom_notes_dir !== prevCustomDir) {
@@ -789,6 +802,61 @@ export function App() {
       mruNotes.push(remaining);
     }
     return mruNotes;
+  }, []);
+
+  // Global Zoom Handlers
+  const handleGlobalZoomIn = useCallback(() => {
+    const cur = settingsRef.current.global_zoom ?? DEFAULT_GLOBAL_ZOOM;
+    const next = incrementGlobalZoom(cur);
+    applyGlobalZoom(next);
+    const updated = { ...settingsRef.current, global_zoom: next };
+    settingsRef.current = updated;
+    setSettings(updated);
+    api.saveSettings(updated);
+  }, []);
+
+  const handleGlobalZoomOut = useCallback(() => {
+    const cur = settingsRef.current.global_zoom ?? DEFAULT_GLOBAL_ZOOM;
+    const next = decrementGlobalZoom(cur);
+    applyGlobalZoom(next);
+    const updated = { ...settingsRef.current, global_zoom: next };
+    settingsRef.current = updated;
+    setSettings(updated);
+    api.saveSettings(updated);
+  }, []);
+
+  const handleGlobalZoomReset = useCallback(() => {
+    applyGlobalZoom(DEFAULT_GLOBAL_ZOOM);
+    const updated = { ...settingsRef.current, global_zoom: DEFAULT_GLOBAL_ZOOM };
+    settingsRef.current = updated;
+    setSettings(updated);
+    api.saveSettings(updated);
+  }, []);
+
+  // Editor Zoom Handlers
+  const handleEditorZoomIn = useCallback(() => {
+    const cur = settingsRef.current.editor_zoom ?? DEFAULT_EDITOR_ZOOM;
+    const next = incrementEditorZoom(cur);
+    const updated = { ...settingsRef.current, editor_zoom: next };
+    settingsRef.current = updated;
+    setSettings(updated);
+    api.saveSettings(updated);
+  }, []);
+
+  const handleEditorZoomOut = useCallback(() => {
+    const cur = settingsRef.current.editor_zoom ?? DEFAULT_EDITOR_ZOOM;
+    const next = decrementEditorZoom(cur);
+    const updated = { ...settingsRef.current, editor_zoom: next };
+    settingsRef.current = updated;
+    setSettings(updated);
+    api.saveSettings(updated);
+  }, []);
+
+  const handleEditorZoomReset = useCallback(() => {
+    const updated = { ...settingsRef.current, editor_zoom: DEFAULT_EDITOR_ZOOM };
+    settingsRef.current = updated;
+    setSettings(updated);
+    api.saveSettings(updated);
   }, []);
 
   // Global Keyboard Shortcuts & Quick Switcher modifier release
@@ -876,8 +944,18 @@ export function App() {
         }
       }
 
-      // Other Standard Shortcuts
-      if (isCmdOrCtrl && e.key.toLowerCase() === "n") {
+      // 3. Global Zoom Keyboard Shortcuts (Ctrl +, Ctrl -, Ctrl 0)
+      if (isCmdOrCtrl && (e.key === "=" || e.key === "+" || e.code === "NumpadAdd")) {
+        e.preventDefault();
+        handleGlobalZoomIn();
+      } else if (isCmdOrCtrl && (e.key === "-" || e.key === "_" || e.code === "NumpadSubtract")) {
+        e.preventDefault();
+        handleGlobalZoomOut();
+      } else if (isCmdOrCtrl && (e.key === "0" || e.code === "Numpad0")) {
+        e.preventDefault();
+        handleGlobalZoomReset();
+      } else if (isCmdOrCtrl && e.key.toLowerCase() === "n") {
+        // Other Standard Shortcuts
         e.preventDefault();
         setIsSettingsOpen(false);
         handleNewNote();
@@ -999,6 +1077,45 @@ export function App() {
       perform: () => setIsSettingsOpen(true),
     },
     {
+      id: "zoom_in",
+      title: "Zoom In",
+      shortcut: ["Ctrl", "+"],
+      icon: <ZoomInIcon size={16} />,
+      perform: () => handleGlobalZoomIn(),
+    },
+    {
+      id: "zoom_out",
+      title: "Zoom Out",
+      shortcut: ["Ctrl", "-"],
+      icon: <ZoomOutIcon size={16} />,
+      perform: () => handleGlobalZoomOut(),
+    },
+    {
+      id: "reset_zoom",
+      title: "Reset Zoom",
+      shortcut: ["Ctrl", "0"],
+      icon: <ZoomInIcon size={16} />,
+      perform: () => handleGlobalZoomReset(),
+    },
+    {
+      id: "editor_zoom_in",
+      title: "Editor Zoom In",
+      icon: <ZoomInIcon size={16} />,
+      perform: () => handleEditorZoomIn(),
+    },
+    {
+      id: "editor_zoom_out",
+      title: "Editor Zoom Out",
+      icon: <ZoomOutIcon size={16} />,
+      perform: () => handleEditorZoomOut(),
+    },
+    {
+      id: "reset_editor_zoom",
+      title: "Reset Editor Zoom",
+      icon: <ZoomInIcon size={16} />,
+      perform: () => handleEditorZoomReset(),
+    },
+    {
       id: "delete_active_note",
       title: "Delete Current Note",
       icon: <TrashIcon size={16} className="text-red-400" />,
@@ -1011,7 +1128,7 @@ export function App() {
   ];
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-[#16191E] text-[#E2E8F0] select-none overflow-hidden font-sans border border-[#262D38]/80 rounded-none shadow-2xl">
+    <div className="flex flex-col h-full w-full bg-[#16191E] text-[#E2E8F0] select-none overflow-hidden font-sans border border-[#262D38]/80 rounded-none shadow-2xl">
       {/* Titlebar Header */}
       <Titlebar
         title={activeTitle}
@@ -1049,6 +1166,7 @@ export function App() {
               fontSize={settings.font_size}
               lineHeight={settings.line_height}
               fontFamily={settings.font_family}
+              editorZoom={settings.editor_zoom ?? DEFAULT_EDITOR_ZOOM}
               onEditorReady={handleEditorReady}
             />
           </main>
