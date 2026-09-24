@@ -62,6 +62,7 @@ export type CommandActionId = (typeof COMMAND_ACTIONS)[number];
 export const FEATURE_ACTIONS = [
   "quick_switcher",
   "toggle_always_on_top",
+  "toggle_autostart",
   "change_accent_color",
   "change_typography",
   "change_notes_directory",

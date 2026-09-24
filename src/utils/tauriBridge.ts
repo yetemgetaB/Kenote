@@ -31,6 +31,7 @@ async function invokeTauri<T>(cmd: string, args?: Record<string, unknown>): Prom
 // In-browser mock storage fallback
 const STORAGE_KEY_NOTES = "kenote_notes_mock";
 const STORAGE_KEY_SETTINGS = "kenote_settings_mock";
+const STORAGE_KEY_AUTOSTART = "kenote_autostart_mock";
 
 const defaultMockNotes: NoteMetadata[] = [
   {
@@ -94,6 +95,26 @@ export const api = {
       await this.saveSettings(updated);
       return newShortcut;
     }
+  },
+
+  async isAutostartEnabled(): Promise<boolean> {
+    if (isTauri()) {
+      return await invokeTauri<boolean>("is_autostart_enabled");
+    }
+    return localStorage.getItem(STORAGE_KEY_AUTOSTART) === "true";
+  },
+
+  async setAutostartEnabled(enabled: boolean): Promise<boolean> {
+    if (isTauri()) {
+      if (enabled) {
+        await invokeTauri("enable_autostart");
+      } else {
+        await invokeTauri("disable_autostart");
+      }
+      return await this.isAutostartEnabled();
+    }
+    localStorage.setItem(STORAGE_KEY_AUTOSTART, String(enabled));
+    return enabled;
   },
 
   async getNotesDirectory(): Promise<string> {

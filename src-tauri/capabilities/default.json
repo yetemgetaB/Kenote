@@ -19,6 +19,7 @@
     "opener:default",
     "updater:default",
     "process:default",
-    "global-shortcut:default"
+    "global-shortcut:default",
+    "autostart:default"
   ]
 }

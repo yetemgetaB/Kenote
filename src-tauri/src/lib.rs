@@ -3,6 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use tauri::{LogicalPosition, LogicalSize, Manager, WebviewWindow, WindowEvent};
+use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -657,6 +658,32 @@ fn update_global_shortcut(app: tauri::AppHandle, new_shortcut_str: String) -> Re
     }
 }
 
+#[tauri::command]
+fn enable_autostart(app: tauri::AppHandle) -> Result<(), String> {
+    app.autolaunch().enable().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn disable_autostart(app: tauri::AppHandle) -> Result<(), String> {
+    app.autolaunch().disable().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn is_autostart_enabled(app: tauri::AppHandle) -> Result<bool, String> {
+    app.autolaunch().is_enabled().map_err(|e| e.to_string())
+}
+
+pub fn is_autostart_launch<I, S>(args: I) -> bool
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    args.into_iter().any(|arg| {
+        let a = arg.as_ref();
+        a == "--autostart" || a == "--silent" || a == "--hidden"
+    })
+}
+
 pub fn toggle_main_window(app: &tauri::AppHandle) {
     if let Some(win) = app.get_webview_window("main") {
         let is_visible = win.is_visible().unwrap_or(false);
@@ -683,6 +710,10 @@ pub fn run() {
                 let _ = win.set_focus();
             }
         }))
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            Some(vec!["--autostart"]),
+        ))
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
@@ -707,9 +738,14 @@ pub fn run() {
             close_window,
             reveal_in_explorer,
             save_window_state,
-            update_global_shortcut
+            update_global_shortcut,
+            enable_autostart,
+            disable_autostart,
+            is_autostart_enabled
         ])
         .setup(|app| {
+            let is_autostart = is_autostart_launch(std::env::args());
+
             // Restore window size and position from settings
             let settings = get_settings();
             if let Some(win) = app.get_webview_window("main") {
@@ -758,8 +794,10 @@ pub fn run() {
                     let _ = win.set_always_on_top(true);
                 }
 
-                // Display window smoothly now that position, size, and pin state are configured
-                let _ = win.show();
+                // Only show window on normal user launch; stay background-ready if autostarted
+                if !is_autostart {
+                    let _ = win.show();
+                }
 
                 let win_clone = win.clone();
                 win.on_window_event(move |event| {
@@ -1021,6 +1059,17 @@ mod tests {
         assert!("Ctrl+Alt+F13".parse::<Shortcut>().is_ok());
         assert!("".parse::<Shortcut>().is_err());
         assert!("InvalidKeyCombinationName".parse::<Shortcut>().is_err());
+    }
+
+    #[test]
+    fn test_is_autostart_launch() {
+        assert!(is_autostart_launch(vec!["kenote.exe", "--autostart"]));
+        assert!(is_autostart_launch(vec!["kenote.exe", "--silent"]));
+        assert!(is_autostart_launch(vec!["kenote.exe", "--hidden"]));
+        assert!(is_autostart_launch(vec!["kenote.exe", "-a", "--autostart"]));
+        assert!(!is_autostart_launch(vec!["kenote.exe"]));
+        assert!(!is_autostart_launch(vec!["kenote.exe", "--normal"]));
+        assert!(!is_autostart_launch(Vec::<String>::new()));
     }
 }
 

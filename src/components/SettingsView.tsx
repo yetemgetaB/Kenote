@@ -129,7 +129,29 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [isRecordingShortcut, setIsRecordingShortcut] = useState(false);
   const [shortcutError, setShortcutError] = useState<string | null>(null);
   const [isSavingShortcut, setIsSavingShortcut] = useState(false);
+  const [autostartEnabled, setAutostartEnabledState] = useState(false);
+  const [isLoadingAutostart, setIsLoadingAutostart] = useState(false);
+  const [autostartError, setAutostartError] = useState<string | null>(null);
   const currentVersion = APP_VERSION;
+
+  // Query OS autostart state on mount
+  useEffect(() => {
+    let isMounted = true;
+    const fetchAutostart = async () => {
+      try {
+        const enabled = await api.isAutostartEnabled();
+        if (isMounted) {
+          setAutostartEnabledState(enabled);
+        }
+      } catch (e) {
+        console.error("Failed to check autostart status:", e);
+      }
+    };
+    fetchAutostart();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Sync zoom, telemetry, and shortcut state if settings prop changes externally
   useEffect(() => {
@@ -194,6 +216,26 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     } catch (e) {
       console.error("Failed to load trashed notes:", e);
       setTrashActionError("Failed to load trashed notes.");
+    }
+  };
+
+  const handleToggleAutostart = async (enabled: boolean) => {
+    if (isLoadingAutostart) return;
+    setIsLoadingAutostart(true);
+    setAutostartError(null);
+    const prev = autostartEnabled;
+    setAutostartEnabledState(enabled);
+
+    try {
+      const finalState = await api.setAutostartEnabled(enabled);
+      setAutostartEnabledState(finalState);
+      trackFeatureUsed("toggle_autostart");
+    } catch (err: unknown) {
+      setAutostartEnabledState(prev);
+      const msg = typeof err === "string" ? err : err instanceof Error ? err.message : "Failed to update Windows startup setting.";
+      setAutostartError(msg);
+    } finally {
+      setIsLoadingAutostart(false);
     }
   };
 
@@ -908,6 +950,44 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Start with Windows Card */}
+              <div className="p-4 bg-[#1B212B] border border-[#2B3442] rounded-xl space-y-3 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="pr-4">
+                    <h3 className="text-xs font-semibold text-white uppercase tracking-wider">
+                      Start with Windows
+                    </h3>
+                    <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">
+                      Launch KeNote quietly in the background when Windows starts so your global shortcut is always ready.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={autostartEnabled}
+                    disabled={isLoadingAutostart}
+                    onClick={() => handleToggleAutostart(!autostartEnabled)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      isLoadingAutostart ? "opacity-50 cursor-not-allowed" : ""
+                    } ${
+                      autostartEnabled ? "bg-[var(--accent-color,#0399F7)]" : "bg-[#2A3342]"
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        autostartEnabled ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+                {autostartError && (
+                  <div className="flex items-center space-x-1.5 text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 px-3 py-2 rounded-lg">
+                    <AlertCircle size={14} className="shrink-0" />
+                    <span>{autostartError}</span>
+                  </div>
+                )}
               </div>
 
               {/* Anonymous Usage Statistics Card */}
