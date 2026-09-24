@@ -58,16 +58,21 @@ jobs:
           tagName: v__VERSION__
           releaseName: "Kenote v__VERSION__"
           releaseBody: |
-            ## Kenote v__VERSION__
+            ## KeNote v__VERSION__
 
-            ### ✨ What's New
-            - **Automatic Update Checking**: Silently checks for signed updates on startup.
-            - **Improved Updater Experience**: Clean Update Now and Later controls with real progress indicators.
-            - **Formatted Release Notes**: In-app rich markdown rendering for release changelogs.
+            ### ✨ Improved
+            - **Tactile Shortcut Keycaps**: Redesigned keyboard shortcuts with tactile keycap styling across Settings.
+            - **Customizable Global Launch**: Global Launch shortcut can now be customized directly from Settings.
+            - **Interactive Shortcut Recorder**: Compact shortcut recorder popover with live key preview and Escape-to-cancel.
+            - **Configurable & Fixed Grouping**: Clear separation of customizable shortcuts and core fixed shortcuts.
+            - **Reset to Default**: Easily restore default shortcut settings (`Alt + Shift + K`) with a single click.
+            - **Conflict Feedback**: Clear warnings and conflict feedback when a shortcut is already in use.
+            - **Extended Function Keys**: Added support for extended function keys F13 through F24.
+            - **Hardware Shortcut Handling**: Improved compatibility with hardware keyboard shortcuts (e.g. `Ctrl + Alt + F13`).
 
-            ### 🚀 Improvements
-            - **Post-Update Confirmation**: Confirms successful updates after restart.
-            - **Reliable Session Handling**: Eliminates redundant update prompts within the same session.
+            ### 🛠️ Reliability
+            - **Safe Rollback**: Failed shortcut registrations safely roll back to the previous working shortcut.
+            - **Persistent Configuration**: Custom shortcuts persist across application restarts.
 
             ### 📦 Download & Install
             - **Windows**: Download the `.msi` or `-setup.exe` installer below.
