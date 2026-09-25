@@ -112,3 +112,60 @@ export function toggleSmartItalic(editor: TiptapEditor | null): boolean {
 export function toggleSmartUnderline(editor: TiptapEditor | null): boolean {
   return toggleSmartMark(editor, "underline");
 }
+
+/**
+ * Clear Formatting helper:
+ * - Non-empty selection: Removes all schema-defined inline marks (bold, italic, underline, strike, code, link)
+ *   from the selected range without modifying structural nodes or deleting text.
+ * - Collapsed selection: Clears stored marks so upcoming typed text is unformatted,
+ *   without expanding selection or altering existing document text.
+ */
+export function clearFormatting(editor: TiptapEditor | null): boolean {
+  if (!editor || editor.isDestroyed) return false;
+
+  const { state, dispatch } = editor.view;
+  const { selection, schema } = state;
+
+  if (selection.empty) {
+    const tr = state.tr.setStoredMarks([]);
+    dispatch(tr);
+    return true;
+  }
+
+  const { from, to } = selection;
+  const tr = state.tr;
+
+  // Schema-aware explicit removal of all registered inline marks
+  Object.values(schema.marks).forEach((markType) => {
+    tr.removeMark(from, to, markType);
+  });
+
+  // Preserve selection range safely
+  const safeSel = createSafeSelection(tr.doc, from, to);
+  if (safeSel) {
+    tr.setSelection(safeSel);
+  }
+
+  dispatch(tr);
+  return true;
+}
+
+/**
+ * Checks if the selection or active state has any formatting marks applied.
+ */
+export function hasFormatting(editor: TiptapEditor | null): boolean {
+  if (!editor || editor.isDestroyed) return false;
+
+  const { state } = editor.view;
+  const { selection, schema } = state;
+
+  if (selection.empty) {
+    const stored = state.storedMarks;
+    if (stored && stored.length > 0) return true;
+    return selection.$from.marks().length > 0;
+  }
+
+  const { from, to } = selection;
+  return Object.values(schema.marks).some((markType) => state.doc.rangeHasMark(from, to, markType));
+}
+

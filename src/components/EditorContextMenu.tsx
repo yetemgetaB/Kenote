@@ -1,5 +1,20 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Editor as TiptapEditor } from "@tiptap/react";
+import {
+  CutIcon,
+  CopyIcon,
+  PasteIcon,
+  BoldIcon,
+  ItalicIcon,
+  UnderlineIcon,
+  ClearFormattingIcon,
+} from "./Icons";
+import {
+  toggleSmartBold,
+  toggleSmartItalic,
+  toggleSmartUnderline,
+  clearFormatting,
+} from "../utils/formatting";
 
 export interface EditorContextMenuProps {
   isOpen: boolean;
@@ -25,8 +40,8 @@ export const EditorContextMenu: React.FC<EditorContextMenuProps> = ({
 
     const menuEl = menuRef.current;
     const padding = 8;
-    const menuWidth = menuEl?.offsetWidth || 190;
-    const menuHeight = menuEl?.offsetHeight || 220;
+    const menuWidth = menuEl?.offsetWidth || 200;
+    const menuHeight = menuEl?.offsetHeight || 260;
 
     const clampedX = Math.max(padding, Math.min(x, window.innerWidth - menuWidth - padding));
     const clampedY = Math.max(padding, Math.min(y, window.innerHeight - menuHeight - padding));
@@ -75,11 +90,92 @@ export const EditorContextMenu: React.FC<EditorContextMenuProps> = ({
 
   if (!isOpen || !editor) return null;
 
-  const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
+  const isMac =
+    typeof navigator !== "undefined" &&
+    /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
   const modKey = isMac ? "⌘" : "Ctrl+";
 
   const { selection } = editor.state;
   const hasSelection = !selection.empty;
+
+  // Actions
+  const handleCut = async () => {
+    onClose();
+    if (!hasSelection) return;
+    try {
+      const selectedText = editor.state.doc.textBetween(selection.from, selection.to, "\n");
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(selectedText);
+        editor.chain().focus().deleteSelection().run();
+      } else {
+        editor.commands.focus();
+        document.execCommand("cut");
+      }
+    } catch {
+      editor.commands.focus();
+      document.execCommand("cut");
+    }
+  };
+
+  const handleCopy = async () => {
+    onClose();
+    if (!hasSelection) return;
+    try {
+      const selectedText = editor.state.doc.textBetween(selection.from, selection.to, "\n");
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(selectedText);
+        editor.commands.focus();
+      } else {
+        editor.commands.focus();
+        document.execCommand("copy");
+      }
+    } catch {
+      editor.commands.focus();
+      document.execCommand("copy");
+    }
+  };
+
+  const handlePaste = async () => {
+    onClose();
+    try {
+      if (navigator.clipboard?.readText) {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          editor.chain().focus().insertContent(text).run();
+          return;
+        }
+      }
+      editor.commands.focus();
+      document.execCommand("paste");
+    } catch {
+      editor.commands.focus();
+      document.execCommand("paste");
+    }
+  };
+
+  const handleBold = () => {
+    onClose();
+    toggleSmartBold(editor);
+    editor.commands.focus();
+  };
+
+  const handleItalic = () => {
+    onClose();
+    toggleSmartItalic(editor);
+    editor.commands.focus();
+  };
+
+  const handleUnderline = () => {
+    onClose();
+    toggleSmartUnderline(editor);
+    editor.commands.focus();
+  };
+
+  const handleClearFormatting = () => {
+    onClose();
+    clearFormatting(editor);
+    editor.commands.focus();
+  };
 
   return (
     <div
@@ -92,25 +188,25 @@ export const EditorContextMenu: React.FC<EditorContextMenuProps> = ({
         top: `${position.top}px`,
         zIndex: 9999,
       }}
-      className="w-48 bg-[#1E242E] border border-[#2B3340] rounded-lg shadow-xl shadow-black/40 p-1 select-none animate-in fade-in zoom-in-95 duration-75 text-xs text-[#D8E1E8]"
+      className="w-52 bg-[#1E242E] border border-[#2B3340] rounded-lg shadow-xl shadow-black/40 p-1 select-none animate-in fade-in zoom-in-95 duration-75 text-xs text-[#D8E1E8]"
       onContextMenu={(e) => e.preventDefault()}
     >
-      {/* Action list placeholder / items for foundation */}
+      {/* Clipboard Group */}
       <button
         role="menuitem"
         disabled={!hasSelection}
         onMouseDown={(e) => e.preventDefault()}
-        onClick={() => {
-          onClose();
-          document.execCommand("cut");
-        }}
+        onClick={handleCut}
         className={`w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between transition-colors ${
           hasSelection
             ? "hover:bg-[#262E3B] hover:text-white cursor-pointer"
-            : "text-[#64748B] opacity-50 cursor-not-allowed"
+            : "text-[#64748B] opacity-50 cursor-not-allowed pointer-events-none"
         }`}
       >
-        <span>Cut</span>
+        <div className="flex items-center space-x-2">
+          <CutIcon size={14} className="opacity-70" />
+          <span>Cut</span>
+        </div>
         <span className="text-[10px] text-[#64748B] font-mono">{modKey}X</span>
       </button>
 
@@ -118,79 +214,86 @@ export const EditorContextMenu: React.FC<EditorContextMenuProps> = ({
         role="menuitem"
         disabled={!hasSelection}
         onMouseDown={(e) => e.preventDefault()}
-        onClick={() => {
-          onClose();
-          document.execCommand("copy");
-        }}
+        onClick={handleCopy}
         className={`w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between transition-colors ${
           hasSelection
             ? "hover:bg-[#262E3B] hover:text-white cursor-pointer"
-            : "text-[#64748B] opacity-50 cursor-not-allowed"
+            : "text-[#64748B] opacity-50 cursor-not-allowed pointer-events-none"
         }`}
       >
-        <span>Copy</span>
+        <div className="flex items-center space-x-2">
+          <CopyIcon size={14} className="opacity-70" />
+          <span>Copy</span>
+        </div>
         <span className="text-[10px] text-[#64748B] font-mono">{modKey}C</span>
       </button>
 
       <button
         role="menuitem"
         onMouseDown={(e) => e.preventDefault()}
-        onClick={async () => {
-          onClose();
-          try {
-            const text = await navigator.clipboard.readText();
-            if (text) {
-              editor.commands.insertContent(text);
-            }
-          } catch {
-            document.execCommand("paste");
-          }
-        }}
+        onClick={handlePaste}
         className="w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between hover:bg-[#262E3B] hover:text-white cursor-pointer transition-colors"
       >
-        <span>Paste</span>
+        <div className="flex items-center space-x-2">
+          <PasteIcon size={14} className="opacity-70" />
+          <span>Paste</span>
+        </div>
         <span className="text-[10px] text-[#64748B] font-mono">{modKey}V</span>
       </button>
 
+      {/* Separator */}
       <div className="h-px bg-[#262D38] my-1" />
 
+      {/* Formatting Group */}
       <button
         role="menuitem"
         onMouseDown={(e) => e.preventDefault()}
-        onClick={() => {
-          onClose();
-          editor.chain().focus().toggleBold().run();
-        }}
+        onClick={handleBold}
         className="w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between hover:bg-[#262E3B] hover:text-white cursor-pointer transition-colors"
       >
-        <span>Bold</span>
+        <div className="flex items-center space-x-2">
+          <BoldIcon size={14} className="opacity-70" />
+          <span>Bold</span>
+        </div>
         <span className="text-[10px] text-[#64748B] font-mono">{modKey}B</span>
       </button>
 
       <button
         role="menuitem"
         onMouseDown={(e) => e.preventDefault()}
-        onClick={() => {
-          onClose();
-          editor.chain().focus().toggleItalic().run();
-        }}
+        onClick={handleItalic}
         className="w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between hover:bg-[#262E3B] hover:text-white cursor-pointer transition-colors"
       >
-        <span>Italic</span>
+        <div className="flex items-center space-x-2">
+          <ItalicIcon size={14} className="opacity-70" />
+          <span>Italic</span>
+        </div>
         <span className="text-[10px] text-[#64748B] font-mono">{modKey}I</span>
       </button>
 
       <button
         role="menuitem"
         onMouseDown={(e) => e.preventDefault()}
-        onClick={() => {
-          onClose();
-          editor.chain().focus().toggleUnderline().run();
-        }}
+        onClick={handleUnderline}
         className="w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between hover:bg-[#262E3B] hover:text-white cursor-pointer transition-colors"
       >
-        <span>Underline</span>
+        <div className="flex items-center space-x-2">
+          <UnderlineIcon size={14} className="opacity-70" />
+          <span>Underline</span>
+        </div>
         <span className="text-[10px] text-[#64748B] font-mono">{modKey}U</span>
+      </button>
+
+      <button
+        role="menuitem"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={handleClearFormatting}
+        className="w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between hover:bg-[#262E3B] hover:text-white cursor-pointer transition-colors"
+      >
+        <div className="flex items-center space-x-2">
+          <ClearFormattingIcon size={14} className="opacity-70" />
+          <span>Clear Formatting</span>
+        </div>
       </button>
     </div>
   );

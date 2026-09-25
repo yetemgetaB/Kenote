@@ -96,6 +96,8 @@ const {
   toggleSmartBold,
   toggleSmartItalic,
   toggleSmartUnderline,
+  clearFormatting,
+  hasFormatting,
 } = await import("../src/utils/formatting.ts");
 
 const CustomBold = Bold.extend({
@@ -548,3 +550,155 @@ describe("Document Statistics & Title Semantics Tests", () => {
     ed.destroy();
   });
 });
+
+describe("Clear Formatting & Context Actions Tests", () => {
+  test("removes bold formatting from selected text", () => {
+    const ed = createTestEditor("**Bold text**");
+    ed.commands.selectAll();
+    assert.strictEqual(hasFormatting(ed), true);
+    clearFormatting(ed);
+    assert.strictEqual(hasFormatting(ed), false);
+    assert.strictEqual(ed.storage.markdown.getMarkdown().trim(), "Bold text");
+    assert.strictEqual(ed.getText().trim(), "Bold text");
+    ed.destroy();
+  });
+
+  test("removes italic formatting from selected text", () => {
+    const ed = createTestEditor("*Italic text*");
+    ed.commands.selectAll();
+    assert.strictEqual(hasFormatting(ed), true);
+    clearFormatting(ed);
+    assert.strictEqual(hasFormatting(ed), false);
+    assert.strictEqual(ed.storage.markdown.getMarkdown().trim(), "Italic text");
+    ed.destroy();
+  });
+
+  test("removes underline formatting from selected text", () => {
+    const ed = createTestEditor("<u>Underlined text</u>");
+    ed.commands.selectAll();
+    assert.strictEqual(hasFormatting(ed), true);
+    clearFormatting(ed);
+    assert.strictEqual(hasFormatting(ed), false);
+    assert.strictEqual(ed.storage.markdown.getMarkdown().trim(), "Underlined text");
+    ed.destroy();
+  });
+
+  test("removes strike and inline code formatting from selected text", () => {
+    const ed = createTestEditor("~~Strikethrough~~ and `inline code`");
+    ed.commands.selectAll();
+    clearFormatting(ed);
+    assert.strictEqual(hasFormatting(ed), false);
+    assert.strictEqual(ed.storage.markdown.getMarkdown().trim(), "Strikethrough and inline code");
+    ed.destroy();
+  });
+
+  test("removes link mark while preserving text and not triggering navigation", () => {
+    const ed = createTestEditor("[Google Search](https://google.com)");
+    ed.commands.selectAll();
+    assert.strictEqual(hasFormatting(ed), true);
+    clearFormatting(ed);
+    assert.strictEqual(hasFormatting(ed), false);
+    assert.strictEqual(ed.storage.markdown.getMarkdown().trim(), "Google Search");
+    assert.strictEqual(ed.getText().trim(), "Google Search");
+    ed.destroy();
+  });
+
+  test("removes multiple mixed marks (bold + italic + underline + link)", () => {
+    const ed = createTestEditor("**_[<u>Link</u>](https://example.com)_**");
+    ed.commands.selectAll();
+    assert.strictEqual(hasFormatting(ed), true);
+    clearFormatting(ed);
+    assert.strictEqual(hasFormatting(ed), false);
+    assert.strictEqual(ed.storage.markdown.getMarkdown().trim(), "Link");
+    ed.destroy();
+  });
+
+  test("clears formatting on partial selection only", () => {
+    const ed = createTestEditor("Hello **beautiful** world");
+    // Select only 'beautiful' (positions 7 to 16)
+    ed.commands.setTextSelection({ from: 7, to: 16 });
+    clearFormatting(ed);
+    assert.strictEqual(ed.storage.markdown.getMarkdown().trim(), "Hello beautiful world");
+    ed.destroy();
+  });
+
+  test("preserves heading structure when clearing formatting", () => {
+    const ed = createTestEditor("# **Important** Heading");
+    ed.commands.selectAll();
+    clearFormatting(ed);
+    const md = ed.storage.markdown.getMarkdown().trim();
+    assert.strictEqual(md, "# Important Heading");
+    assert.strictEqual(ed.isActive("heading", { level: 1 }), true);
+    ed.destroy();
+  });
+
+  test("preserves bullet list and numbered list structure when clearing formatting", () => {
+    const ed = createTestEditor("- **Item 1**\n- *Item 2*");
+    ed.commands.selectAll();
+    clearFormatting(ed);
+    const md = ed.storage.markdown.getMarkdown().trim();
+    assert.strictEqual(md, "- Item 1\n- Item 2");
+    assert.strictEqual(ed.isActive("bulletList"), true);
+    ed.destroy();
+  });
+
+  test("preserves task list structure when clearing formatting", () => {
+    const ed = createTestEditor("- [ ] **Task 1**\n- [x] *Task 2*");
+    ed.commands.selectAll();
+    clearFormatting(ed);
+    const md = ed.storage.markdown.getMarkdown().trim();
+    assert.strictEqual(md, "- [ ] Task 1\n- [x] Task 2");
+    assert.strictEqual(ed.isActive("taskList"), true);
+    ed.destroy();
+  });
+
+  test("preserves blockquote and code block structure when clearing formatting", () => {
+    const ed = createTestEditor("> **Quote** text\n\n```js\nconst x = 1;\n```");
+    ed.commands.selectAll();
+    clearFormatting(ed);
+    const md = ed.storage.markdown.getMarkdown().trim();
+    assert.match(md, /> Quote text/);
+    assert.match(md, /```js[\s\S]*const x = 1;[\s\S]*```/);
+    ed.destroy();
+  });
+
+  test("collapsed selection does not modify text or surrounding word formatting", () => {
+    const ed = createTestEditor("Hello **world**");
+    // Place cursor inside 'world' at position 9
+    ed.commands.setTextSelection(9);
+    clearFormatting(ed);
+    // Document text and formatting must be intact
+    assert.strictEqual(ed.storage.markdown.getMarkdown().trim(), "Hello **world**");
+    assert.strictEqual(ed.state.selection.from, 9);
+    assert.strictEqual(ed.state.selection.to, 9);
+    ed.destroy();
+  });
+
+  test("collapsed selection clears stored marks for subsequent typing", () => {
+    const ed = createTestEditor("<p>Normal </p>");
+    ed.commands.setTextSelection(8);
+    // Manually add bold to stored marks
+    ed.view.dispatch(ed.state.tr.addStoredMark(ed.state.schema.marks.bold.create()));
+    assert.strictEqual(ed.state.storedMarks?.length, 1);
+
+    clearFormatting(ed);
+    assert.strictEqual(ed.state.storedMarks?.length, 0);
+    ed.destroy();
+  });
+
+  test("full markdown round-trip test: format -> clear -> serialize -> reload", () => {
+    const original = "# Title\n\n**Bold** and *Italic* and [Link](https://example.com)\n\n- [ ] Task";
+    const ed1 = createTestEditor(original);
+    ed1.commands.selectAll();
+    clearFormatting(ed1);
+    const postClearMd = ed1.storage.markdown.getMarkdown().trim();
+    ed1.destroy();
+
+    // Reloading into new editor instance
+    const ed2 = createTestEditor(postClearMd);
+    const reloadedMd = ed2.storage.markdown.getMarkdown().trim();
+    assert.strictEqual(reloadedMd, "# Title\n\nBold and Italic and Link\n\n- [ ] Task");
+    ed2.destroy();
+  });
+});
+

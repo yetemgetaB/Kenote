@@ -27,6 +27,8 @@ import {
   toggleSmartBold,
   toggleSmartItalic,
   toggleSmartUnderline,
+  clearFormatting,
+  hasFormatting,
 } from "../utils/formatting";
 export {
   type SmartMarkType,
@@ -34,6 +36,8 @@ export {
   toggleSmartBold,
   toggleSmartItalic,
   toggleSmartUnderline,
+  clearFormatting,
+  hasFormatting,
 };
 
 // Preserve consecutive blank lines during markdown parsing
