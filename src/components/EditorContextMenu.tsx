@@ -40,7 +40,7 @@ export const EditorContextMenu: React.FC<EditorContextMenuProps> = ({
 
     const menuEl = menuRef.current;
     const padding = 8;
-    const menuWidth = menuEl?.offsetWidth || 200;
+    const menuWidth = menuEl?.offsetWidth || 208;
     const menuHeight = menuEl?.offsetHeight || 260;
 
     const clampedX = Math.max(padding, Math.min(x, window.innerWidth - menuWidth - padding));
@@ -49,7 +49,7 @@ export const EditorContextMenu: React.FC<EditorContextMenuProps> = ({
     setPosition({ left: clampedX, top: clampedY });
   }, [isOpen, x, y]);
 
-  // Handle dismissal: Outside click, Escape key, and window blur / resize / scroll
+  // Handle dismissal & global keyboard shortcuts
   useEffect(() => {
     if (!isOpen) return;
 
@@ -97,6 +97,26 @@ export const EditorContextMenu: React.FC<EditorContextMenuProps> = ({
 
   const { selection } = editor.state;
   const hasSelection = !selection.empty;
+
+  // Arrow key navigation inside context menu
+  const handleMenuKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const items = Array.from(
+      menuRef.current?.querySelectorAll<HTMLButtonElement>('button[role="menuitem"]:not([disabled])') || []
+    );
+    if (!items.length) return;
+
+    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      const nextIndex = currentIndex < items.length - 1 ? currentIndex + 1 : 0;
+      items[nextIndex]?.focus();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const prevIndex = currentIndex > 0 ? currentIndex - 1 : items.length - 1;
+      items[prevIndex]?.focus();
+    }
+  };
 
   // Actions
   const handleCut = async () => {
@@ -181,23 +201,26 @@ export const EditorContextMenu: React.FC<EditorContextMenuProps> = ({
     <div
       ref={menuRef}
       role="menu"
+      tabIndex={-1}
       aria-label="Editor Context Menu"
+      onKeyDown={handleMenuKeyDown}
       style={{
         position: "fixed",
         left: `${position.left}px`,
         top: `${position.top}px`,
         zIndex: 9999,
       }}
-      className="w-52 bg-[#1E242E] border border-[#2B3340] rounded-lg shadow-xl shadow-black/40 p-1 select-none animate-in fade-in zoom-in-95 duration-75 text-xs text-[#D8E1E8]"
+      className="w-52 bg-[#1E242E] border border-[#2B3340] rounded-lg shadow-xl shadow-black/40 p-1 select-none animate-in fade-in zoom-in-95 duration-75 text-xs text-[#D8E1E8] focus:outline-none"
       onContextMenu={(e) => e.preventDefault()}
     >
       {/* Clipboard Group */}
       <button
         role="menuitem"
+        tabIndex={hasSelection ? 0 : -1}
         disabled={!hasSelection}
         onMouseDown={(e) => e.preventDefault()}
         onClick={handleCut}
-        className={`w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between transition-colors ${
+        className={`w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between transition-colors focus:bg-[#262E3B] focus:text-white focus:outline-none ${
           hasSelection
             ? "hover:bg-[#262E3B] hover:text-white cursor-pointer"
             : "text-[#64748B] opacity-50 cursor-not-allowed pointer-events-none"
@@ -212,10 +235,11 @@ export const EditorContextMenu: React.FC<EditorContextMenuProps> = ({
 
       <button
         role="menuitem"
+        tabIndex={hasSelection ? 0 : -1}
         disabled={!hasSelection}
         onMouseDown={(e) => e.preventDefault()}
         onClick={handleCopy}
-        className={`w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between transition-colors ${
+        className={`w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between transition-colors focus:bg-[#262E3B] focus:text-white focus:outline-none ${
           hasSelection
             ? "hover:bg-[#262E3B] hover:text-white cursor-pointer"
             : "text-[#64748B] opacity-50 cursor-not-allowed pointer-events-none"
@@ -230,9 +254,10 @@ export const EditorContextMenu: React.FC<EditorContextMenuProps> = ({
 
       <button
         role="menuitem"
+        tabIndex={0}
         onMouseDown={(e) => e.preventDefault()}
         onClick={handlePaste}
-        className="w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between hover:bg-[#262E3B] hover:text-white cursor-pointer transition-colors"
+        className="w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between hover:bg-[#262E3B] hover:text-white cursor-pointer transition-colors focus:bg-[#262E3B] focus:text-white focus:outline-none"
       >
         <div className="flex items-center space-x-2">
           <PasteIcon size={14} className="opacity-70" />
@@ -247,9 +272,10 @@ export const EditorContextMenu: React.FC<EditorContextMenuProps> = ({
       {/* Formatting Group */}
       <button
         role="menuitem"
+        tabIndex={0}
         onMouseDown={(e) => e.preventDefault()}
         onClick={handleBold}
-        className="w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between hover:bg-[#262E3B] hover:text-white cursor-pointer transition-colors"
+        className="w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between hover:bg-[#262E3B] hover:text-white cursor-pointer transition-colors focus:bg-[#262E3B] focus:text-white focus:outline-none"
       >
         <div className="flex items-center space-x-2">
           <BoldIcon size={14} className="opacity-70" />
@@ -260,9 +286,10 @@ export const EditorContextMenu: React.FC<EditorContextMenuProps> = ({
 
       <button
         role="menuitem"
+        tabIndex={0}
         onMouseDown={(e) => e.preventDefault()}
         onClick={handleItalic}
-        className="w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between hover:bg-[#262E3B] hover:text-white cursor-pointer transition-colors"
+        className="w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between hover:bg-[#262E3B] hover:text-white cursor-pointer transition-colors focus:bg-[#262E3B] focus:text-white focus:outline-none"
       >
         <div className="flex items-center space-x-2">
           <ItalicIcon size={14} className="opacity-70" />
@@ -273,9 +300,10 @@ export const EditorContextMenu: React.FC<EditorContextMenuProps> = ({
 
       <button
         role="menuitem"
+        tabIndex={0}
         onMouseDown={(e) => e.preventDefault()}
         onClick={handleUnderline}
-        className="w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between hover:bg-[#262E3B] hover:text-white cursor-pointer transition-colors"
+        className="w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between hover:bg-[#262E3B] hover:text-white cursor-pointer transition-colors focus:bg-[#262E3B] focus:text-white focus:outline-none"
       >
         <div className="flex items-center space-x-2">
           <UnderlineIcon size={14} className="opacity-70" />
@@ -286,9 +314,10 @@ export const EditorContextMenu: React.FC<EditorContextMenuProps> = ({
 
       <button
         role="menuitem"
+        tabIndex={0}
         onMouseDown={(e) => e.preventDefault()}
         onClick={handleClearFormatting}
-        className="w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between hover:bg-[#262E3B] hover:text-white cursor-pointer transition-colors"
+        className="w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between hover:bg-[#262E3B] hover:text-white cursor-pointer transition-colors focus:bg-[#262E3B] focus:text-white focus:outline-none"
       >
         <div className="flex items-center space-x-2">
           <ClearFormattingIcon size={14} className="opacity-70" />

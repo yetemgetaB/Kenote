@@ -700,5 +700,27 @@ describe("Clear Formatting & Context Actions Tests", () => {
     assert.strictEqual(reloadedMd, "# Title\n\nBold and Italic and Link\n\n- [ ] Task");
     ed2.destroy();
   });
+
+  test("paste over non-empty selection replaces selected content", () => {
+    const ed = createTestEditor("Hello world");
+    // Select 'world' (positions 7 to 12)
+    ed.commands.setTextSelection({ from: 7, to: 12 });
+    ed.chain().focus().insertContent("universe").run();
+    assert.strictEqual(ed.getText().trim(), "Hello universe");
+    ed.destroy();
+  });
+
+  test("cut on selected content deletes selection and sets valid cursor", () => {
+    const ed = createTestEditor("Quick brown fox");
+    // Select 'brown ' (positions 7 to 13)
+    ed.commands.setTextSelection({ from: 7, to: 13 });
+    const selectedText = ed.state.doc.textBetween(7, 13, "\n");
+    assert.strictEqual(selectedText, "brown ");
+    ed.chain().focus().deleteSelection().run();
+    assert.strictEqual(ed.getText().trim(), "Quick fox");
+    assert.strictEqual(ed.state.selection.from, 7);
+    assert.strictEqual(ed.state.selection.to, 7);
+    ed.destroy();
+  });
 });
 
