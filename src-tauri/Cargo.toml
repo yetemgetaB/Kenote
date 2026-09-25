@@ -1,6 +1,6 @@
 [package]
 name = "kenote"
-version = "0.5.5"
+version = "0.5.6"
 description = "Kenote - Minimal Raycast-like Note Taking App"
 authors = ["Kenote"]
 edition = "2021"

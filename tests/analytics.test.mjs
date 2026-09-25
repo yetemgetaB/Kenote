@@ -216,6 +216,7 @@ describe("Phase B1: Privacy-Safe Analytics Telemetry Tests", () => {
       const expected = [
         "quick_switcher",
         "toggle_always_on_top",
+        "toggle_autostart",
         "change_accent_color",
         "change_typography",
         "change_notes_directory",
