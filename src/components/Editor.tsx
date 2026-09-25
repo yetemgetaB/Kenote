@@ -159,9 +159,18 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
     },
     ref
   ) => {
+    const scrollContainerRef = useRef<HTMLDivElement | null>(null);
     const cursorSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const restoreRafRef = useRef<number | null>(null);
     const isSwitchingNoteRef = useRef<boolean>(false);
     const prevNoteIdRef = useRef<string | null | undefined>(noteId);
+
+    const cancelScheduledRestore = () => {
+      if (restoreRafRef.current !== null) {
+        cancelAnimationFrame(restoreRafRef.current);
+        restoreRafRef.current = null;
+      }
+    };
 
     const saveCursorImmediately = (currentNoteId: string | null | undefined, ed: TiptapEditor) => {
       if (!currentNoteId || !ed || ed.isDestroyed || isSwitchingNoteRef.current) return;
@@ -180,6 +189,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
     };
 
     const restoreCursor = (currentNoteId: string, ed: TiptapEditor) => {
+      cancelScheduledRestore();
       if (!ed || ed.isDestroyed) return;
       try {
         const key = "kenote_cursor_positions";
@@ -190,7 +200,33 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
           const safeSel = createSafeSelection(ed.state.doc, savedPos.from, savedPos.to);
           if (safeSel) {
             ed.view.dispatch(ed.state.tr.setSelection(safeSel));
-            ed.commands.scrollIntoView();
+
+            // Defer viewport alignment to post-layout so container scrollHeight and DOM node positions settle
+            restoreRafRef.current = requestAnimationFrame(() => {
+              restoreRafRef.current = requestAnimationFrame(() => {
+                restoreRafRef.current = null;
+                if (!ed || ed.isDestroyed || isSwitchingNoteRef.current) return;
+                if (currentNoteId !== prevNoteIdRef.current && prevNoteIdRef.current !== undefined) return;
+
+                // Bring cursor into view via ProseMirror
+                ed.commands.scrollIntoView();
+
+                // Explicit container viewport alignment fallback
+                try {
+                  const container = scrollContainerRef.current;
+                  const { from } = ed.state.selection;
+                  const coords = ed.view.coordsAtPos(from);
+                  if (container && coords) {
+                    const containerRect = container.getBoundingClientRect();
+                    if (coords.top < containerRect.top || coords.bottom > containerRect.bottom) {
+                      const targetScrollTop =
+                        container.scrollTop + (coords.top - containerRect.top) - containerRect.height / 2;
+                      container.scrollTo({ top: Math.max(0, targetScrollTop), behavior: "instant" });
+                    }
+                  }
+                } catch {}
+              });
+            });
           }
         }
       } catch (err) {
@@ -324,6 +360,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
 
     useEffect(() => {
       return () => {
+        cancelScheduledRestore();
         if (cursorSaveTimeoutRef.current) {
           clearTimeout(cursorSaveTimeoutRef.current);
         }
@@ -359,6 +396,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
       if (!editor || !noteId) return;
 
       if (prevNoteIdRef.current !== noteId) {
+        cancelScheduledRestore();
         setContextMenu(null);
         if (cursorSaveTimeoutRef.current) {
           clearTimeout(cursorSaveTimeoutRef.current);
@@ -386,6 +424,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
       },
       setMarkdown: (md: string) => {
         if (editor && !editor.isDestroyed) {
+          cancelScheduledRestore();
           if (cursorSaveTimeoutRef.current) {
             clearTimeout(cursorSaveTimeoutRef.current);
             cursorSaveTimeoutRef.current = null;
@@ -415,6 +454,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
 
     return (
       <div
+        ref={scrollContainerRef}
         className="flex-1 w-full overflow-y-auto custom-scrollbar relative"
         onContextMenu={(e) => {
           e.preventDefault();
