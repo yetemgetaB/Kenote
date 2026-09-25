@@ -1,4 +1,4 @@
-import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
+import { useEffect, useRef, forwardRef, useImperativeHandle, useState, useCallback } from "react";
 import { useEditor, EditorContent, ReactNodeViewRenderer, Editor as TiptapEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Paragraph from "@tiptap/extension-paragraph";
@@ -13,6 +13,7 @@ import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import { Markdown } from "tiptap-markdown";
 import { common, createLowlight } from "lowlight";
 import { CodeBlockComponent } from "./CodeBlockComponent";
+import { EditorContextMenu } from "./EditorContextMenu";
 import { api, isValidExternalUrl } from "../utils/tauriBridge";
 
 const lowlight = createLowlight(common);
@@ -243,6 +244,32 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
             "focus:outline-none min-h-full px-6 py-5 prose prose-invert max-w-none text-[#D8E1E8]",
           style: `font-size: ${fontSize}; line-height: ${lineHeight}; font-family: ${fontFamily};`,
         },
+        handleDOMEvents: {
+          contextmenu: (view, event) => {
+            event.preventDefault();
+            const pos = view.posAtCoords({ left: event.clientX, top: event.clientY });
+            if (pos) {
+              const { from, to, empty } = view.state.selection;
+              if (!empty && (pos.pos < from || pos.pos > to)) {
+                const safeSel = createSafeSelection(view.state.doc, pos.pos, pos.pos);
+                if (safeSel) {
+                  view.dispatch(view.state.tr.setSelection(safeSel));
+                }
+              } else if (empty) {
+                const safeSel = createSafeSelection(view.state.doc, pos.pos, pos.pos);
+                if (safeSel) {
+                  view.dispatch(view.state.tr.setSelection(safeSel));
+                }
+              }
+            }
+            setContextMenu({
+              isOpen: true,
+              x: event.clientX,
+              y: event.clientY,
+            });
+            return true;
+          },
+        },
         handleClick: (_view, _pos, event) => {
           const target = event.target as HTMLElement;
           const anchor = target?.closest("a");
@@ -286,6 +313,11 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
       },
     });
 
+    const [contextMenu, setContextMenu] = useState<{ isOpen: boolean; x: number; y: number } | null>(null);
+    const closeContextMenu = useCallback(() => {
+      setContextMenu(null);
+    }, []);
+
     useEffect(() => {
       return () => {
         if (cursorSaveTimeoutRef.current) {
@@ -323,6 +355,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
       if (!editor || !noteId) return;
 
       if (prevNoteIdRef.current !== noteId) {
+        setContextMenu(null);
         if (cursorSaveTimeoutRef.current) {
           clearTimeout(cursorSaveTimeoutRef.current);
           cursorSaveTimeoutRef.current = null;
@@ -377,8 +410,25 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
     }));
 
     return (
-      <div className="flex-1 w-full overflow-y-auto custom-scrollbar relative">
+      <div
+        className="flex-1 w-full overflow-y-auto custom-scrollbar relative"
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setContextMenu({
+            isOpen: true,
+            x: e.clientX,
+            y: e.clientY,
+          });
+        }}
+      >
         <EditorContent editor={editor} style={{ zoom: `${editorZoom / 100}` }} />
+        <EditorContextMenu
+          isOpen={!!contextMenu?.isOpen}
+          x={contextMenu?.x ?? 0}
+          y={contextMenu?.y ?? 0}
+          onClose={closeContextMenu}
+          editor={editor}
+        />
       </div>
     );
   }
