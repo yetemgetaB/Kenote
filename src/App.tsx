@@ -532,7 +532,7 @@ export function App() {
       try {
         trackUpdateCheck("automatic");
         const res = await checkForUpdate();
-        if (res.available && res.update && isStartupUpdateEligible()) {
+        if (res.available && res.update) {
           trackUpdateAvailable(res.update.version, "automatic");
           setAvailableUpdate(res.update);
           setIsUpdateModalOpen(true);
