@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.5.6";
+export const APP_VERSION = "0.5.7";
 
 // Compare semantic versions (returns true only if remote > current)
 export function isNewerVersion(remote: string, current: string): boolean {
