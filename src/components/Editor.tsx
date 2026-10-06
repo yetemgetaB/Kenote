@@ -16,6 +16,8 @@ import { CodeBlockComponent } from "./CodeBlockComponent";
 import { EditorContextMenu } from "./EditorContextMenu";
 import { api, isValidExternalUrl } from "../utils/tauriBridge";
 
+import { Section } from "../extensions/Section";
+
 const lowlight = createLowlight(common);
 
 import { createSafeSelection } from "../utils/selection";
@@ -271,6 +273,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
           placeholder: "Start writing...",
           emptyEditorClass: "is-editor-empty",
         }),
+        Section,
         Markdown.configure({
           html: true,
           transformPastedText: false,
