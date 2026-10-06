@@ -49,6 +49,7 @@ import {
   SaveIcon,
   ZoomInIcon,
   ZoomOutIcon,
+  SectionIcon,
 } from "./components/Icons";
 
 export function App() {
@@ -1027,6 +1028,14 @@ export function App() {
       shortcut: ["Ctrl", "S"],
       icon: <SaveIcon size={16} />,
       perform: () => flushPendingSave(),
+    },
+    {
+      id: "insert_section",
+      title: "Insert Section",
+      icon: <SectionIcon size={16} />,
+      perform: () => {
+        tiptapInstance?.commands.insertSection();
+      },
     },
     {
       id: "browse_notes",

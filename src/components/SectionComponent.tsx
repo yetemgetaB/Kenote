@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useRef, useEffect, useState } from "react";
 import { NodeViewContent, NodeViewWrapper, NodeViewProps } from "@tiptap/react";
 
 export const SectionComponent: React.FC<NodeViewProps> = ({
@@ -8,6 +8,20 @@ export const SectionComponent: React.FC<NodeViewProps> = ({
   getPos,
 }) => {
   const title = typeof node.attrs.title === "string" ? node.attrs.title : "";
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [hasAutoFocused, setHasAutoFocused] = useState(false);
+
+  useEffect(() => {
+    if (node.attrs._autoFocus && !hasAutoFocused) {
+      setHasAutoFocused(true);
+      requestAnimationFrame(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+          inputRef.current.select();
+        }
+      });
+    }
+  }, [node.attrs._autoFocus, hasAutoFocused]);
 
   const handleTitleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -50,6 +64,7 @@ export const SectionComponent: React.FC<NodeViewProps> = ({
       {/* Section Header */}
       <div className="kenote-section-header flex items-center px-3.5 py-2 bg-[#1C222B] border-b border-[#262D38] text-xs select-none">
         <input
+          ref={inputRef}
           type="text"
           value={title}
           onChange={handleTitleChange}

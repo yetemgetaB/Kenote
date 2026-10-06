@@ -1,4 +1,5 @@
 import { Node, mergeAttributes } from "@tiptap/core";
+import { Selection } from "@tiptap/pm/state";
 
 export interface SectionOptions {
   HTMLAttributes: Record<string, any>;
@@ -7,6 +8,10 @@ export interface SectionOptions {
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
     section: {
+      /**
+       * Insert a new section at the current selection or block position
+       */
+      insertSection: (attributes?: { title?: string }) => ReturnType;
       /**
        * Set or insert a section block
        */
@@ -160,6 +165,10 @@ export const Section = Node.create<SectionOptions>({
           "data-title": typeof attributes.title === "string" ? attributes.title : "Untitled Section",
         }),
       },
+      _autoFocus: {
+        default: false,
+        rendered: false,
+      },
     };
   },
 
@@ -183,6 +192,67 @@ export const Section = Node.create<SectionOptions>({
       }),
       0,
     ];
+  },
+
+  addCommands() {
+    return {
+      insertSection:
+        (attributes) =>
+        ({ state, dispatch, tr }) => {
+          const title = attributes?.title ?? "Untitled Section";
+          const sectionType = this.type;
+          const paragraphType = state.schema.nodes.paragraph;
+
+          if (!paragraphType) {
+            return false;
+          }
+
+          // Create a valid section node containing one empty paragraph
+          const sectionNode = sectionType.create(
+            { title, _autoFocus: true },
+            paragraphType.create()
+          );
+
+          if (!sectionNode) {
+            return false;
+          }
+
+          if (dispatch) {
+            const { selection } = state;
+            const { $from } = selection;
+
+            // If current block is an empty paragraph at document root level, replace it
+            const isRootEmptyParagraph =
+              $from.depth === 1 &&
+              $from.parent.type === paragraphType &&
+              $from.parent.content.size === 0;
+
+            if (isRootEmptyParagraph) {
+              const fromPos = $from.before();
+              const toPos = $from.after();
+              tr.replaceWith(fromPos, toPos, sectionNode);
+              const resolved = tr.doc.resolve(fromPos + 1);
+              tr.setSelection(Selection.near(resolved));
+            } else {
+              // Insert after current block at depth
+              const insertDepth = Math.max(1, $from.depth);
+              const insertPos = $from.after(insertDepth);
+              tr.insert(insertPos, sectionNode);
+              const resolved = tr.doc.resolve(insertPos + 1);
+              tr.setSelection(Selection.near(resolved));
+            }
+
+            dispatch(tr.scrollIntoView());
+          }
+
+          return true;
+        },
+      setSection:
+        (attributes) =>
+        ({ commands }) => {
+          return commands.insertSection(attributes);
+        },
+    };
   },
 
   addStorage() {

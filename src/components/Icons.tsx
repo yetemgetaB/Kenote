@@ -62,6 +62,26 @@ export const PlusIcon: React.FC<IconProps> = ({ size = 16, className = "", ...pr
   </svg>
 );
 
+// Section Container Icon
+export const SectionIcon: React.FC<IconProps> = ({ size = 16, className = "", ...props }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    {...props}
+  >
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <line x1="3" y1="9" x2="21" y2="9" />
+    <line x1="9" y1="21" x2="9" y2="9" />
+  </svg>
+);
+
 // Pin Window / Note Icon
 export const PinIcon: React.FC<IconProps & { filled?: boolean }> = ({ size = 16, filled = false, className = "", ...props }) => (
   <svg
