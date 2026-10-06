@@ -28,6 +28,7 @@ const { common, createLowlight } = await import("lowlight");
 const { Markdown } = await import("tiptap-markdown");
 const { Editor } = await import("@tiptap/core");
 const Paragraph = (await import("@tiptap/extension-paragraph")).default;
+const { Section } = await import("../src/extensions/Section.ts");
 
 const lowlight = createLowlight(common);
 
@@ -95,6 +96,7 @@ function createTestEditor(initialContent = "") {
       TaskItem.configure({ nested: true }),
       Underline,
       Link.configure({ openOnClick: false }),
+      Section,
       Markdown.configure({
         html: true,
         transformPastedText: false,
@@ -194,5 +196,40 @@ describe("Markdown Fidelity & Roundtrip Verification", () => {
     const out = ed.storage.markdown.getMarkdown().trim();
     assert.strictEqual(out, codeBlock);
     ed.destroy();
+  });
+
+  test("7. Preserves nested section containers and rich block content across round-trips", () => {
+    const sectionDoc = [
+      ':::kenote-section title="Parent Section"',
+      "",
+      "Top-level section text.",
+      "",
+      '::::kenote-section title="Child Section"',
+      "",
+      "Nested child section text.",
+      "",
+      "```rust",
+      "fn run() {",
+      '    println!("test");',
+      "}",
+      "```",
+      "",
+      "::::",
+      "",
+      ":::",
+    ].join("\n");
+
+    const ed1 = createTestEditor(sectionDoc);
+    const out1 = ed1.storage.markdown.getMarkdown().trim();
+    const ed2 = createTestEditor(out1);
+    const out2 = ed2.storage.markdown.getMarkdown().trim();
+
+    assert.strictEqual(out1, out2);
+    assert.strictEqual(ed2.state.doc.child(0).type.name, "section");
+    assert.strictEqual(ed2.state.doc.child(0).attrs.title, "Parent Section");
+    assert.strictEqual(ed2.state.doc.child(0).child(1).attrs.title, "Child Section");
+
+    ed1.destroy();
+    ed2.destroy();
   });
 });
