@@ -82,6 +82,42 @@ export const SectionIcon: React.FC<IconProps> = ({ size = 16, className = "", ..
   </svg>
 );
 
+// Chevron Down Icon (Collapse / Accordion open)
+export const ChevronDownIcon: React.FC<IconProps> = ({ size = 16, className = "", ...props }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    {...props}
+  >
+    <polyline points="6 9 12 15 18 9" />
+  </svg>
+);
+
+// Chevron Right Icon (Expand / Accordion closed)
+export const ChevronRightIcon: React.FC<IconProps> = ({ size = 16, className = "", ...props }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    {...props}
+  >
+    <polyline points="9 18 15 12 9 6" />
+  </svg>
+);
+
 // Pin Window / Note Icon
 export const PinIcon: React.FC<IconProps & { filled?: boolean }> = ({ size = 16, filled = false, className = "", ...props }) => (
   <svg
