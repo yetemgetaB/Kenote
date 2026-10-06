@@ -34,9 +34,9 @@ export const Section = Node.create<SectionOptions>({
     return {
       title: {
         default: "Untitled Section",
-        parseHTML: (element) => element.getAttribute("data-title") || "Untitled Section",
+        parseHTML: (element) => element.getAttribute("data-title") ?? "Untitled Section",
         renderHTML: (attributes) => ({
-          "data-title": attributes.title || "Untitled Section",
+          "data-title": typeof attributes.title === "string" ? attributes.title : "Untitled Section",
         }),
       },
     };

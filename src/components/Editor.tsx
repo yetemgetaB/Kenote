@@ -13,6 +13,7 @@ import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import { Markdown } from "tiptap-markdown";
 import { common, createLowlight } from "lowlight";
 import { CodeBlockComponent } from "./CodeBlockComponent";
+import { SectionComponent } from "./SectionComponent";
 import { EditorContextMenu } from "./EditorContextMenu";
 import { api, isValidExternalUrl } from "../utils/tauriBridge";
 
@@ -273,7 +274,11 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
           placeholder: "Start writing...",
           emptyEditorClass: "is-editor-empty",
         }),
-        Section,
+        Section.extend({
+          addNodeView() {
+            return ReactNodeViewRenderer(SectionComponent);
+          },
+        }),
         Markdown.configure({
           html: true,
           transformPastedText: false,
