@@ -238,6 +238,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
     };
 
     const editor = useEditor({
+      immediatelyRender: false,
       extensions: [
         StarterKit.configure({
           heading: {

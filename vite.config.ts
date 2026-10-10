@@ -18,6 +18,10 @@ export default defineConfig({
     port: 1420,
     strictPort: true,
     host: false,
+    watch: {
+      // Tell Vite to ignore watching `src-tauri` directory so Rust build artifacts don't cause EBUSY locks
+      ignored: ["**/src-tauri/**"],
+    },
   },
   build: {
     chunkSizeWarningLimit: 800,
