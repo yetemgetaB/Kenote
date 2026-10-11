@@ -1,5 +1,6 @@
 import React, { useCallback, useRef, useEffect, useState } from "react";
 import { NodeViewContent, NodeViewWrapper, NodeViewProps } from "@tiptap/react";
+import { Selection } from "@tiptap/pm/state";
 import { ChevronDownIcon, ChevronRightIcon, TrashIcon } from "./Icons";
 
 export const SectionComponent: React.FC<NodeViewProps> = ({
@@ -94,6 +95,50 @@ export const SectionComponent: React.FC<NodeViewProps> = ({
         e.preventDefault();
         (e.target as HTMLElement)?.blur();
         editor?.commands.focus();
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        e.stopPropagation();
+        if (isCollapsed) {
+          setIsCollapsed(false);
+        }
+        if (editor && !editor.isDestroyed && typeof getPos === "function") {
+          try {
+            const pos = getPos();
+            if (typeof pos === "number") {
+              editor.commands.focus(pos + 1);
+            }
+          } catch (err) {
+            console.warn("Could not focus section body on ArrowDown:", err);
+          }
+        }
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        e.stopPropagation();
+        if (editor && !editor.isDestroyed && typeof getPos === "function") {
+          try {
+            const pos = getPos();
+            if (typeof pos === "number") {
+              const $resolved = editor.state.doc.resolve(pos);
+              const parentDepth = $resolved.depth;
+              const isAtParentStart = pos <= $resolved.start(parentDepth);
+
+              if (isAtParentStart) {
+                const paragraphType = editor.state.schema.nodes.paragraph;
+                if (paragraphType) {
+                  editor.chain().insertContentAt(pos, { type: "paragraph" }).focus(pos + 1).run();
+                }
+              } else {
+                const sel = Selection.findFrom($resolved, -1);
+                if (sel) {
+                  editor.view.dispatch(editor.state.tr.setSelection(sel));
+                  editor.view.focus();
+                }
+              }
+            }
+          } catch (err) {
+            console.warn("Could not navigate above section on ArrowUp:", err);
+          }
+        }
       } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "s") {
         e.preventDefault();
         e.stopPropagation();

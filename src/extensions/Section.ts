@@ -278,8 +278,10 @@ export const Section = Node.create<SectionOptions>({
           }
 
           const sectionAfterPos = $from.after(sectionDepth);
+          const parentDepth = sectionDepth - 1;
+          const isAtParentEnd = sectionAfterPos >= $from.end(parentDepth);
 
-          if (sectionAfterPos >= state.doc.content.size) {
+          if (isAtParentEnd) {
             const paragraphType = state.schema.nodes.paragraph;
             if (paragraphType && dispatch) {
               const tr = state.tr.insert(sectionAfterPos, paragraphType.create());
@@ -288,10 +290,15 @@ export const Section = Node.create<SectionOptions>({
               return true;
             }
           } else if (dispatch) {
-            const resolved = state.doc.resolve(sectionAfterPos + 1);
-            const tr = state.tr.setSelection(Selection.near(resolved));
-            dispatch(tr.scrollIntoView());
-            return true;
+            const $after = state.doc.resolve(sectionAfterPos);
+            const sel =
+              Selection.findFrom($after, 1) ||
+              Selection.near(state.doc.resolve(Math.min(state.doc.content.size, sectionAfterPos + 1)));
+            if (sel) {
+              const tr = state.tr.setSelection(sel);
+              dispatch(tr.scrollIntoView());
+              return true;
+            }
           }
 
           return false;
@@ -315,20 +322,27 @@ export const Section = Node.create<SectionOptions>({
           }
 
           const sectionBeforePos = $from.before(sectionDepth);
+          const parentDepth = sectionDepth - 1;
+          const isAtParentStart = sectionBeforePos <= $from.start(parentDepth);
 
-          if (sectionBeforePos <= 0) {
+          if (isAtParentStart) {
             const paragraphType = state.schema.nodes.paragraph;
             if (paragraphType && dispatch) {
-              const tr = state.tr.insert(0, paragraphType.create());
-              tr.setSelection(Selection.near(tr.doc.resolve(1)));
+              const tr = state.tr.insert(sectionBeforePos, paragraphType.create());
+              tr.setSelection(Selection.near(tr.doc.resolve(sectionBeforePos + 1)));
               dispatch(tr.scrollIntoView());
               return true;
             }
           } else if (dispatch) {
-            const resolved = state.doc.resolve(sectionBeforePos - 1);
-            const tr = state.tr.setSelection(Selection.near(resolved));
-            dispatch(tr.scrollIntoView());
-            return true;
+            const $before = state.doc.resolve(sectionBeforePos);
+            const sel =
+              Selection.findFrom($before, -1) ||
+              Selection.near(state.doc.resolve(Math.max(0, sectionBeforePos - 1)));
+            if (sel) {
+              const tr = state.tr.setSelection(sel);
+              dispatch(tr.scrollIntoView());
+              return true;
+            }
           }
 
           return false;
