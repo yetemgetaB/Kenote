@@ -221,7 +221,7 @@ describe("Section Insertion & Command Tests (Stage 4)", () => {
     ed.destroy();
   });
 
-  test("6. Insert Section inside an existing Section creates a sibling Section after parent", () => {
+  test("6. Insert Section inside an existing Section creates a nested Section inside parent", () => {
     const ed = createTestEditor({
       type: "doc",
       content: [
@@ -240,18 +240,19 @@ describe("Section Insertion & Command Tests (Stage 4)", () => {
 
     // Place selection inside the parent's paragraph
     ed.commands.setTextSelection(5);
-    ed.commands.insertSection({ title: "Sibling Section" });
+    ed.commands.insertSection({ title: "Nested Child Section" });
 
-    // The document should now have 2 sibling sections at the top level
-    assert.strictEqual(ed.state.doc.childCount, 2);
+    // The document should have 1 top-level parent section, containing the original paragraph plus the new nested section
+    assert.strictEqual(ed.state.doc.childCount, 1);
     const parent = ed.state.doc.child(0);
     assert.strictEqual(parent.type.name, "section");
     assert.strictEqual(parent.attrs.title, "Parent Section");
+    assert.strictEqual(parent.childCount, 2);
 
-    const sibling = ed.state.doc.child(1);
-    assert.strictEqual(sibling.type.name, "section");
-    assert.strictEqual(sibling.attrs.title, "Sibling Section");
-    assert.strictEqual(sibling.child(0).type.name, "paragraph");
+    const child = parent.child(1);
+    assert.strictEqual(child.type.name, "section");
+    assert.strictEqual(child.attrs.title, "Nested Child Section");
+    assert.strictEqual(child.child(0).type.name, "paragraph");
 
     ed.destroy();
   });

@@ -229,35 +229,19 @@ export const Section = Node.create<SectionOptions>({
             const { selection } = state;
             const { $from } = selection;
 
-            // Check if cursor is currently inside a section node
-            let enclosingSectionDepth = -1;
-            for (let d = $from.depth; d > 0; d--) {
-              if ($from.node(d).type === sectionType) {
-                enclosingSectionDepth = d;
-                break;
-              }
-            }
-
-            // If current block is an empty paragraph at document root level, replace it
-            const isRootEmptyParagraph =
-              $from.depth === 1 &&
+            // If current block is an empty paragraph, replace it directly (works both at root level and nested inside another section!)
+            const isEmptyParagraph =
               $from.parent.type === paragraphType &&
               $from.parent.content.size === 0;
 
-            if (isRootEmptyParagraph) {
+            if (isEmptyParagraph) {
               const fromPos = $from.before();
               const toPos = $from.after();
               tr.replaceWith(fromPos, toPos, sectionNode);
               const resolved = tr.doc.resolve(fromPos + 1);
               tr.setSelection(Selection.near(resolved));
-            } else if (enclosingSectionDepth > 0) {
-              // When inside an existing section, insert as a sibling AFTER the enclosing section
-              const insertPos = $from.after(enclosingSectionDepth);
-              tr.insert(insertPos, sectionNode);
-              const resolved = tr.doc.resolve(insertPos + 1);
-              tr.setSelection(Selection.near(resolved));
             } else {
-              // Insert after current block at root/current depth
+              // Insert after current block at selection depth (so if inside a section, it inserts inside that section)
               const insertDepth = Math.max(1, $from.depth);
               const insertPos = $from.after(insertDepth);
               tr.insert(insertPos, sectionNode);
