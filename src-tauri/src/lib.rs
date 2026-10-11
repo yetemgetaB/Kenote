@@ -794,9 +794,13 @@ pub fn run() {
                     let _ = win.set_always_on_top(true);
                 }
 
-                // Only show window on normal user launch; stay background-ready if autostarted
-                if !is_autostart {
+                // Show window and bring to focus on normal user launch; stay background-ready if autostarted
+                if is_autostart {
+                    let _ = win.hide();
+                } else {
                     let _ = win.show();
+                    let _ = win.unminimize();
+                    let _ = win.set_focus();
                 }
 
                 let win_clone = win.clone();
@@ -863,14 +867,33 @@ console.log("Hello from Kenote!");
                 .as_deref()
                 .unwrap_or("Alt+Shift+K");
 
+            let app_handle = app.handle().clone();
+            let mut registered = false;
+
             if let Ok(shortcut) = shortcut_str.parse::<Shortcut>() {
-                let app_handle = app.handle().clone();
-                if let Err(e) = app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, event| {
+                let app_handle_clone = app_handle.clone();
+                if let Ok(()) = app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, event| {
                     if event.state() == ShortcutState::Pressed {
-                        toggle_main_window(&app_handle);
+                        toggle_main_window(&app_handle_clone);
                     }
                 }) {
-                    eprintln!("Failed to register global shortcut {}: {}", shortcut_str, e);
+                    registered = true;
+                } else {
+                    eprintln!("Failed to register custom global shortcut {}: attempting default Alt+Shift+K fallback", shortcut_str);
+                }
+            }
+
+            // Fallback to default Alt+Shift+K if custom shortcut failed or is invalid
+            if !registered && shortcut_str != "Alt+Shift+K" {
+                if let Ok(default_shortcut) = "Alt+Shift+K".parse::<Shortcut>() {
+                    let app_handle_clone = app_handle.clone();
+                    if let Err(e) = app.global_shortcut().on_shortcut(default_shortcut, move |_app, _shortcut, event| {
+                        if event.state() == ShortcutState::Pressed {
+                            toggle_main_window(&app_handle_clone);
+                        }
+                    }) {
+                        eprintln!("Failed to register fallback shortcut Alt+Shift+K: {}", e);
+                    }
                 }
             }
 
