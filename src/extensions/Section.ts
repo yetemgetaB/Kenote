@@ -158,6 +158,8 @@ export const Section = Node.create<SectionOptions>({
 
   defining: true,
 
+  isolating: true,
+
   addOptions() {
     return {
       HTMLAttributes: {},
@@ -354,6 +356,30 @@ export const Section = Node.create<SectionOptions>({
     return {
       "Mod-Shift-s": () => this.editor.commands.insertSection(),
       "Mod-Shift-S": () => this.editor.commands.insertSection(),
+      Enter: () => {
+        const { state } = this.editor;
+        const { selection } = state;
+        const { $from } = selection;
+
+        let insideSection = false;
+        let isSpecialBlock = false;
+        for (let d = $from.depth; d > 0; d--) {
+          const nodeName = $from.node(d).type.name;
+          if (nodeName === "taskItem" || nodeName === "codeBlock") {
+            isSpecialBlock = true;
+          }
+          if ($from.node(d).type === this.type) {
+            insideSection = true;
+            break;
+          }
+        }
+
+        if (!insideSection || isSpecialBlock) {
+          return false;
+        }
+
+        return this.editor.commands.splitBlock();
+      },
       ArrowDown: () => {
         const { state } = this.editor;
         const { selection } = state;
