@@ -16,6 +16,14 @@ declare module "@tiptap/core" {
        * Set or insert a section block
        */
       setSection: (attributes?: { title?: string }) => ReturnType;
+      /**
+       * Exit section downwards into the node after the section or create a new paragraph below
+       */
+      exitSectionDown: () => ReturnType;
+      /**
+       * Exit section upwards into the node before the section or create a new paragraph above
+       */
+      exitSectionUp: () => ReturnType;
     };
   }
 }
@@ -221,6 +229,15 @@ export const Section = Node.create<SectionOptions>({
             const { selection } = state;
             const { $from } = selection;
 
+            // Check if cursor is currently inside a section node
+            let enclosingSectionDepth = -1;
+            for (let d = $from.depth; d > 0; d--) {
+              if ($from.node(d).type === sectionType) {
+                enclosingSectionDepth = d;
+                break;
+              }
+            }
+
             // If current block is an empty paragraph at document root level, replace it
             const isRootEmptyParagraph =
               $from.depth === 1 &&
@@ -233,8 +250,14 @@ export const Section = Node.create<SectionOptions>({
               tr.replaceWith(fromPos, toPos, sectionNode);
               const resolved = tr.doc.resolve(fromPos + 1);
               tr.setSelection(Selection.near(resolved));
+            } else if (enclosingSectionDepth > 0) {
+              // When inside an existing section, insert as a sibling AFTER the enclosing section
+              const insertPos = $from.after(enclosingSectionDepth);
+              tr.insert(insertPos, sectionNode);
+              const resolved = tr.doc.resolve(insertPos + 1);
+              tr.setSelection(Selection.near(resolved));
             } else {
-              // Insert after current block at depth
+              // Insert after current block at root/current depth
               const insertDepth = Math.max(1, $from.depth);
               const insertPos = $from.after(insertDepth);
               tr.insert(insertPos, sectionNode);
@@ -252,6 +275,80 @@ export const Section = Node.create<SectionOptions>({
         ({ commands }) => {
           return commands.insertSection(attributes);
         },
+      exitSectionDown:
+        () =>
+        ({ state, dispatch }) => {
+          const { selection } = state;
+          const { $from } = selection;
+
+          let sectionDepth = -1;
+          for (let d = $from.depth; d > 0; d--) {
+            if ($from.node(d).type === this.type) {
+              sectionDepth = d;
+              break;
+            }
+          }
+
+          if (sectionDepth === -1) {
+            return false;
+          }
+
+          const sectionAfterPos = $from.after(sectionDepth);
+
+          if (sectionAfterPos >= state.doc.content.size) {
+            const paragraphType = state.schema.nodes.paragraph;
+            if (paragraphType && dispatch) {
+              const tr = state.tr.insert(sectionAfterPos, paragraphType.create());
+              tr.setSelection(Selection.near(tr.doc.resolve(sectionAfterPos + 1)));
+              dispatch(tr.scrollIntoView());
+              return true;
+            }
+          } else if (dispatch) {
+            const resolved = state.doc.resolve(sectionAfterPos + 1);
+            const tr = state.tr.setSelection(Selection.near(resolved));
+            dispatch(tr.scrollIntoView());
+            return true;
+          }
+
+          return false;
+        },
+      exitSectionUp:
+        () =>
+        ({ state, dispatch }) => {
+          const { selection } = state;
+          const { $from } = selection;
+
+          let sectionDepth = -1;
+          for (let d = $from.depth; d > 0; d--) {
+            if ($from.node(d).type === this.type) {
+              sectionDepth = d;
+              break;
+            }
+          }
+
+          if (sectionDepth === -1) {
+            return false;
+          }
+
+          const sectionBeforePos = $from.before(sectionDepth);
+
+          if (sectionBeforePos <= 0) {
+            const paragraphType = state.schema.nodes.paragraph;
+            if (paragraphType && dispatch) {
+              const tr = state.tr.insert(0, paragraphType.create());
+              tr.setSelection(Selection.near(tr.doc.resolve(1)));
+              dispatch(tr.scrollIntoView());
+              return true;
+            }
+          } else if (dispatch) {
+            const resolved = state.doc.resolve(sectionBeforePos - 1);
+            const tr = state.tr.setSelection(Selection.near(resolved));
+            dispatch(tr.scrollIntoView());
+            return true;
+          }
+
+          return false;
+        },
     };
   },
 
@@ -259,6 +356,64 @@ export const Section = Node.create<SectionOptions>({
     return {
       "Mod-Shift-s": () => this.editor.commands.insertSection(),
       "Mod-Shift-S": () => this.editor.commands.insertSection(),
+      ArrowDown: () => {
+        const { state } = this.editor;
+        const { selection } = state;
+        const { $from } = selection;
+
+        let sectionDepth = -1;
+        for (let d = $from.depth; d > 0; d--) {
+          if ($from.node(d).type === this.type) {
+            sectionDepth = d;
+            break;
+          }
+        }
+
+        if (sectionDepth === -1) {
+          return false;
+        }
+
+        const sectionEndPos = $from.end(sectionDepth);
+        const parentEndPos = $from.end();
+        const isAtSectionEnd =
+          $from.pos >= sectionEndPos - 1 ||
+          ($from.pos >= parentEndPos && $from.index(sectionDepth) === $from.node(sectionDepth).childCount - 1);
+
+        if (!isAtSectionEnd) {
+          return false;
+        }
+
+        return this.editor.commands.exitSectionDown();
+      },
+      ArrowUp: () => {
+        const { state } = this.editor;
+        const { selection } = state;
+        const { $from } = selection;
+
+        let sectionDepth = -1;
+        for (let d = $from.depth; d > 0; d--) {
+          if ($from.node(d).type === this.type) {
+            sectionDepth = d;
+            break;
+          }
+        }
+
+        if (sectionDepth === -1) {
+          return false;
+        }
+
+        const sectionStartPos = $from.start(sectionDepth);
+        const parentStartPos = $from.start();
+        const isAtSectionStart =
+          $from.pos <= sectionStartPos + 1 ||
+          ($from.pos <= parentStartPos && $from.index(sectionDepth) === 0);
+
+        if (!isAtSectionStart) {
+          return false;
+        }
+
+        return this.editor.commands.exitSectionUp();
+      },
     };
   },
 

@@ -17,6 +17,27 @@ globalThis.Node = dom.window.Node;
 globalThis.Element = dom.window.Element;
 globalThis.HTMLElement = dom.window.HTMLElement;
 globalThis.DOMParser = dom.window.DOMParser;
+globalThis.KeyboardEvent = dom.window.KeyboardEvent;
+globalThis.Range = dom.window.Range;
+globalThis.getComputedStyle = dom.window.getComputedStyle.bind(dom.window);
+
+// JSDOM does not provide getClientRects / getBoundingClientRect needed by ProseMirror coordsAtPos
+const mockRect = () => ({
+  top: 0,
+  left: 0,
+  right: 100,
+  bottom: 20,
+  width: 100,
+  height: 20,
+  x: 0,
+  y: 0,
+  toJSON: () => {},
+});
+dom.window.Element.prototype.getClientRects = () => [mockRect()];
+dom.window.Element.prototype.getBoundingClientRect = mockRect;
+dom.window.Range.prototype.getClientRects = () => [mockRect()];
+dom.window.Range.prototype.getBoundingClientRect = mockRect;
+
 globalThis.requestAnimationFrame = (cb) => {
   try {
     cb(Date.now());
@@ -200,7 +221,7 @@ describe("Section Insertion & Command Tests (Stage 4)", () => {
     ed.destroy();
   });
 
-  test("6. Insert Section inside an existing Section (creating a nested Section)", () => {
+  test("6. Insert Section inside an existing Section creates a sibling Section after parent", () => {
     const ed = createTestEditor({
       type: "doc",
       content: [
@@ -219,17 +240,81 @@ describe("Section Insertion & Command Tests (Stage 4)", () => {
 
     // Place selection inside the parent's paragraph
     ed.commands.setTextSelection(5);
-    ed.commands.insertSection({ title: "Child Section" });
+    ed.commands.insertSection({ title: "Sibling Section" });
 
+    // The document should now have 2 sibling sections at the top level
+    assert.strictEqual(ed.state.doc.childCount, 2);
     const parent = ed.state.doc.child(0);
     assert.strictEqual(parent.type.name, "section");
     assert.strictEqual(parent.attrs.title, "Parent Section");
-    assert.strictEqual(parent.childCount, 2);
 
-    const child = parent.child(1);
-    assert.strictEqual(child.type.name, "section");
-    assert.strictEqual(child.attrs.title, "Child Section");
-    assert.strictEqual(child.child(0).type.name, "paragraph");
+    const sibling = ed.state.doc.child(1);
+    assert.strictEqual(sibling.type.name, "section");
+    assert.strictEqual(sibling.attrs.title, "Sibling Section");
+    assert.strictEqual(sibling.child(0).type.name, "paragraph");
+
+    ed.destroy();
+  });
+
+  test("7. ArrowDown at the end of a Section breaks out into a new trailing paragraph", () => {
+    const ed = createTestEditor({
+      type: "doc",
+      content: [
+        {
+          type: "section",
+          attrs: { title: "Only Section" },
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "End of text" }],
+            },
+          ],
+        },
+      ],
+    });
+
+    // Move cursor to the end of the text
+    const endPos = ed.state.doc.content.size - 2;
+    ed.commands.setTextSelection(endPos);
+
+    // Trigger keyboard shortcut ArrowDown
+    const handled = ed.commands.keyboardShortcut("ArrowDown");
+    assert.strictEqual(handled, true);
+
+    // Document now has 2 children: section and a trailing paragraph outside it
+    assert.strictEqual(ed.state.doc.childCount, 2);
+    assert.strictEqual(ed.state.doc.child(0).type.name, "section");
+    assert.strictEqual(ed.state.doc.child(1).type.name, "paragraph");
+
+    ed.destroy();
+  });
+
+  test("8. ArrowUp at the start of a Section creates a leading paragraph before it", () => {
+    const ed = createTestEditor({
+      type: "doc",
+      content: [
+        {
+          type: "section",
+          attrs: { title: "First Section" },
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "Start of text" }],
+            },
+          ],
+        },
+      ],
+    });
+
+    // Move cursor to start of text inside section
+    ed.commands.setTextSelection(2);
+
+    const handled = ed.commands.keyboardShortcut("ArrowUp");
+    assert.strictEqual(handled, true);
+
+    assert.strictEqual(ed.state.doc.childCount, 2);
+    assert.strictEqual(ed.state.doc.child(0).type.name, "paragraph");
+    assert.strictEqual(ed.state.doc.child(1).type.name, "section");
 
     ed.destroy();
   });

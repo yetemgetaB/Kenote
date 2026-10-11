@@ -1,6 +1,16 @@
-import { describe, it, beforeEach, afterEach } from "node:test";
+import { describe, it, beforeEach, afterEach, after } from "node:test";
 import assert from "node:assert/strict";
 import posthog from "posthog-js";
+
+// Ensure PostHog background timers do not hang Node test runner
+const ph = posthog?.init ? posthog : posthog?.default ?? posthog?.posthog ?? posthog;
+if (ph) {
+  ph.init = () => {};
+  ph.capture = () => {};
+  ph.opt_in_capturing = () => {};
+  ph.opt_out_capturing = () => {};
+}
+
 import {
   ALLOWED_EVENTS,
   COMMAND_ACTIONS,

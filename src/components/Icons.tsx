@@ -62,7 +62,7 @@ export const PlusIcon: React.FC<IconProps> = ({ size = 16, className = "", ...pr
   </svg>
 );
 
-// Section Container Icon
+// Section Container Icon (Option A: Accordion / Disclosure Stack)
 export const SectionIcon: React.FC<IconProps> = ({ size = 16, className = "", ...props }) => (
   <svg
     width={size}
@@ -76,9 +76,12 @@ export const SectionIcon: React.FC<IconProps> = ({ size = 16, className = "", ..
     className={className}
     {...props}
   >
-    <rect x="3" y="3" width="18" height="18" rx="2" />
-    <line x1="3" y1="9" x2="21" y2="9" />
-    <line x1="9" y1="21" x2="9" y2="9" />
+    {/* Top card / header with chevron indicator */}
+    <rect x="3" y="3" width="18" height="9" rx="2" />
+    <polyline points="7 7.5 9 9.5 11 7.5" />
+    <line x1="14" y1="7.5" x2="18" y2="7.5" />
+    {/* Bottom card representing stacked / collapsible content */}
+    <path d="M5 16h14a2 2 0 0 0 2-2v0M5 20h14a2 2 0 0 0 2-2v0" />
   </svg>
 );
 
