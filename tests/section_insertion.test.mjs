@@ -354,4 +354,39 @@ describe("Section Insertion & Command Tests (Stage 4)", () => {
 
     ed.destroy();
   });
+
+  test("13. Input rule: typing '::: ' converts paragraph into section", () => {
+    const ed = createTestEditor("");
+    ed.commands.insertContent(":::");
+    const handled = ed.view.someProp("handleTextInput", (f) => f(ed.view, 4, 4, " "));
+    assert.strictEqual(handled, true);
+    assert.strictEqual(ed.state.doc.child(0).type.name, "section");
+    assert.strictEqual(ed.state.doc.child(0).attrs.title, "Untitled Section");
+    ed.destroy();
+  });
+
+  test("14. Input rule: typing '::: Custom Title ' creates section with title", () => {
+    const ed = createTestEditor("");
+    const text = "::: Deep Learning";
+    ed.commands.insertContent(text);
+    const pos = text.length + 1;
+    const handled = ed.view.someProp("handleTextInput", (f) => f(ed.view, pos, pos, " "));
+    assert.strictEqual(handled, true);
+    assert.strictEqual(ed.state.doc.child(0).type.name, "section");
+    assert.strictEqual(ed.state.doc.child(0).attrs.title, "Deep Learning");
+    ed.destroy();
+  });
+
+  test("15. Section extension registers Mod-Shift-s keyboard shortcut", () => {
+    const ed = createTestEditor("");
+    const sectionExt = ed.extensionManager.extensions.find((ext) => ext.name === "section");
+    assert.ok(sectionExt, "Section extension must be registered");
+    const shortcuts = sectionExt.config.addKeyboardShortcuts?.call({ editor: ed });
+    assert.ok(shortcuts?.["Mod-Shift-s"], "Mod-Shift-s shortcut must be registered");
+    assert.ok(shortcuts?.["Mod-Shift-S"], "Mod-Shift-S shortcut must be registered");
+
+    shortcuts["Mod-Shift-s"]();
+    assert.strictEqual(ed.state.doc.child(0).type.name, "section");
+    ed.destroy();
+  });
 });

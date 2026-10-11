@@ -23,7 +23,8 @@
 
 ## ✨ Features
 
-- 📝 **Live WYSIWYG Markdown Formatting**: Headings (`#`), bold (`**`), italics (`*`), strikethrough (`~~`), underline, blockquotes (`>`), task lists (`[ ]`), and tables render seamlessly live as you type.
+- 📝 **Live WYSIWYG Markdown Formatting**: Headings (`#`), bold (`**`), italics (`*`), strikethrough (`~~`), underline, blockquotes (`>`), and task lists (`[ ]`) render seamlessly live as you type.
+- 📂 **Collapsible Sections & Outlines**: Structure long notes into collapsible sections (`::: ` or `Ctrl + Shift + S`) with custom titles and smooth fold/unfold states.
 - ⚡ **Global Launch Shortcut**: Summon or hide Kenote from anywhere across your OS with customizable global hotkeys (`Alt + Shift + K` by default, with tactile keycap configuration).
 - 🗂️ **Note Switcher & Fast Search**: Browse, filter, pin, and manage all your notes instantly with `Ctrl + O`.
 - 🔁 **Quick Switcher HUD (MRU)**: Cycle through recently visited notes with a Raycast-style floating HUD overlay using `Ctrl + Tab` or `Alt + Tab`.
@@ -49,6 +50,7 @@
 | `Ctrl + Tab` / `Alt + Tab` | Quick Switcher HUD (Cycle Recent Notes) |
 | `Ctrl + P` | Toggle Pin Always On Top |
 | `Ctrl + S` | Force Save Note to Disk |
+| `Ctrl + Shift + S` | Insert Collapsible Section |
 | `Ctrl + ,` | Open Settings |
 | `Ctrl + Shift + C` | Copy Note as Markdown |
 | `Ctrl + +` / `Ctrl + =` | Zoom In UI |

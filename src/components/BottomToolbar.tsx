@@ -7,6 +7,7 @@ import {
   LinkIcon,
   ListIcon,
   CheckIcon,
+  SectionIcon,
 } from "./Icons";
 import { toggleSmartBold, toggleSmartItalic, toggleSmartUnderline } from "./Editor";
 
@@ -287,6 +288,17 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
           }`}
         >
           <QuoteIcon size={14} />
+        </button>
+
+        {/* Section Container Button */}
+        <button
+          onClick={() => editor.chain().focus().insertSection().run()}
+          title="Insert Collapsible Section (Ctrl+Shift+S)"
+          className={`p-1.5 rounded hover:text-white hover:bg-[#262E3B] transition-colors focus:outline-none ${
+            editor.isActive("section") ? "text-[var(--accent-color,#0399F7)] bg-[var(--accent-muted,rgba(3,153,247,0.15))]" : ""
+          }`}
+        >
+          <SectionIcon size={14} />
         </button>
 
         {/* Lists Menu */}

@@ -21,6 +21,7 @@ export const INTERNAL_SHORTCUTS: Record<string, string> = {
   "Ctrl+P": "Pin Window on Top",
   "Ctrl+Tab": "Quick Switcher",
   "Ctrl+,": "Settings",
+  "Ctrl+Shift+S": "Insert Section",
 };
 
 /**

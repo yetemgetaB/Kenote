@@ -8,6 +8,7 @@ import {
   ItalicIcon,
   UnderlineIcon,
   ClearFormattingIcon,
+  SectionIcon,
 } from "./Icons";
 import {
   toggleSmartBold,
@@ -197,6 +198,11 @@ export const EditorContextMenu: React.FC<EditorContextMenuProps> = ({
     editor.commands.focus();
   };
 
+  const handleInsertSection = () => {
+    onClose();
+    editor.chain().focus().insertSection().run();
+  };
+
   return (
     <div
       ref={menuRef}
@@ -323,6 +329,24 @@ export const EditorContextMenu: React.FC<EditorContextMenuProps> = ({
           <ClearFormattingIcon size={14} className="opacity-70" />
           <span>Clear Formatting</span>
         </div>
+      </button>
+
+      {/* Separator */}
+      <div className="h-px bg-[#262D38] my-1" />
+
+      {/* Section Container Option */}
+      <button
+        role="menuitem"
+        tabIndex={0}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={handleInsertSection}
+        className="w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between hover:bg-[#262E3B] hover:text-white cursor-pointer transition-colors focus:bg-[#262E3B] focus:text-white focus:outline-none"
+      >
+        <div className="flex items-center space-x-2">
+          <SectionIcon size={14} className="opacity-70" />
+          <span>Insert Section</span>
+        </div>
+        <span className="text-[10px] text-[#64748B] font-mono">{modKey}Shift+S</span>
       </button>
     </div>
   );

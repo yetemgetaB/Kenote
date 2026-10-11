@@ -1,4 +1,4 @@
-import { Node, mergeAttributes } from "@tiptap/core";
+import { Node, mergeAttributes, InputRule } from "@tiptap/core";
 import { Selection } from "@tiptap/pm/state";
 
 export interface SectionOptions {
@@ -253,6 +253,51 @@ export const Section = Node.create<SectionOptions>({
           return commands.insertSection(attributes);
         },
     };
+  },
+
+  addKeyboardShortcuts() {
+    return {
+      "Mod-Shift-s": () => this.editor.commands.insertSection(),
+      "Mod-Shift-S": () => this.editor.commands.insertSection(),
+    };
+  },
+
+  addInputRules() {
+    return [
+      new InputRule({
+        find: /^:::([^\n]*)\s$/,
+        handler: ({ state, range, match }) => {
+          const rawTitle = match[1]?.trim() || "";
+          const title = rawTitle || "Untitled Section";
+          const sectionType = this.type;
+          const paragraphType = state.schema.nodes.paragraph;
+
+          if (!paragraphType) {
+            return;
+          }
+
+          const sectionNode = sectionType.create(
+            { title, _autoFocus: !rawTitle },
+            paragraphType.create()
+          );
+
+          const { tr } = state;
+          const { $from } = state.selection;
+          const isRootEmptyParagraph =
+            $from.depth === 1 &&
+            $from.parent.type === paragraphType &&
+            $from.parent.content.size === range.to - range.from;
+
+          if (isRootEmptyParagraph) {
+            tr.replaceWith($from.before(), $from.after(), sectionNode);
+          } else {
+            tr.delete(range.from, range.to);
+            tr.insert(range.from, sectionNode);
+          }
+          tr.scrollIntoView();
+        },
+      }),
+    ];
   },
 
   addStorage() {

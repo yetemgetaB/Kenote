@@ -15,6 +15,7 @@ const COMMAND_MAP: Record<string, CommandActionId> = {
   check_for_updates: "check_for_updates",
   delete_active_note: "delete_note",
   delete_note: "delete_note",
+  insert_section: "insert_section",
 };
 
 export interface ActionItem {

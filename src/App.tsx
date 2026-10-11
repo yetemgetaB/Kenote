@@ -970,6 +970,9 @@ export function App() {
         setIsCommandPaletteOpen((prev) => !prev);
         setIsNoteSwitcherOpen(false);
         setIsSettingsOpen(false);
+      } else if (isCmdOrCtrl && e.shiftKey && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        tiptapInstance?.commands.insertSection();
       } else if (isCmdOrCtrl && e.key.toLowerCase() === "s") {
         e.preventDefault();
         flushPendingSave();
@@ -1032,6 +1035,7 @@ export function App() {
     {
       id: "insert_section",
       title: "Insert Section",
+      shortcut: ["Ctrl", "Shift", "S"],
       icon: <SectionIcon size={16} />,
       perform: () => {
         tiptapInstance?.commands.insertSection();
