@@ -970,10 +970,7 @@ export function App() {
         setIsCommandPaletteOpen((prev) => !prev);
         setIsNoteSwitcherOpen(false);
         setIsSettingsOpen(false);
-      } else if (isCmdOrCtrl && e.shiftKey && e.key.toLowerCase() === "s") {
-        e.preventDefault();
-        tiptapInstance?.commands.insertSection();
-      } else if (isCmdOrCtrl && e.key.toLowerCase() === "s") {
+      } else if (isCmdOrCtrl && e.key.toLowerCase() === "s" && !e.shiftKey) {
         e.preventDefault();
         flushPendingSave();
       } else if (isCmdOrCtrl && e.key.toLowerCase() === "p") {

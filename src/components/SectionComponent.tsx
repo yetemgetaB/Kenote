@@ -94,6 +94,23 @@ export const SectionComponent: React.FC<NodeViewProps> = ({
         e.preventDefault();
         (e.target as HTMLElement)?.blur();
         editor?.commands.focus();
+      } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        e.stopPropagation();
+        if (isCollapsed) {
+          setIsCollapsed(false);
+        }
+        if (editor && !editor.isDestroyed && typeof getPos === "function") {
+          try {
+            const pos = getPos();
+            if (typeof pos === "number") {
+              editor.commands.focus(pos + 1);
+              editor.commands.insertSection();
+            }
+          } catch (err) {
+            console.warn("Could not insert nested section from title:", err);
+          }
+        }
       }
     },
     [editor, getPos, handleDelete, isCollapsed, title]
