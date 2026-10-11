@@ -15,6 +15,7 @@ import { common, createLowlight } from "lowlight";
 import { CodeBlockComponent } from "./CodeBlockComponent";
 import { SectionComponent } from "./SectionComponent";
 import { EditorContextMenu } from "./EditorContextMenu";
+import { SlashMenu } from "./SlashMenu";
 import { api, isValidExternalUrl } from "../utils/tauriBridge";
 
 import { Section } from "../extensions/Section";
@@ -482,6 +483,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
           onClose={closeContextMenu}
           editor={editor}
         />
+        <SlashMenu editor={editor} />
       </div>
     );
   }

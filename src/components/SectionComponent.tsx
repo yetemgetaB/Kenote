@@ -43,6 +43,18 @@ export const SectionComponent: React.FC<NodeViewProps> = ({
     []
   );
 
+  const handleHeaderDoubleClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if ((e.target as HTMLElement)?.tagName?.toLowerCase() === "input") {
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      setIsCollapsed((prev) => !prev);
+    },
+    []
+  );
+
   const handleDelete = useCallback(
     (e?: React.MouseEvent) => {
       if (e) {
@@ -171,7 +183,9 @@ export const SectionComponent: React.FC<NodeViewProps> = ({
     >
       {/* Section Header */}
       <div
-        className={`kenote-section-header flex items-center justify-between px-3 py-2 bg-[#1C222B] text-xs select-none transition-colors ${
+        onDoubleClick={handleHeaderDoubleClick}
+        title="Double-click to collapse or expand"
+        className={`kenote-section-header flex items-center justify-between px-3 py-2 bg-[#1C222B] text-xs select-none transition-colors cursor-pointer ${
           isCollapsed ? "border-b-0" : "border-b border-[#262D38]"
         }`}
       >

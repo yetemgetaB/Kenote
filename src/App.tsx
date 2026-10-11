@@ -1031,7 +1031,8 @@ export function App() {
     },
     {
       id: "insert_section",
-      title: "Insert Section",
+      title: "Insert Stack / Section",
+      subtitle: "Create collapsible block or wrap selection (/stack)",
       shortcut: ["Ctrl", "Shift", "S"],
       icon: <SectionIcon size={16} />,
       perform: () => {

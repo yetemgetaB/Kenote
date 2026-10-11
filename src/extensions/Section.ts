@@ -1,5 +1,6 @@
 import { Node, mergeAttributes, InputRule } from "@tiptap/core";
 import { Selection } from "@tiptap/pm/state";
+import { wrapIn } from "@tiptap/pm/commands";
 
 export interface SectionOptions {
   HTMLAttributes: Record<string, any>;
@@ -215,6 +216,14 @@ export const Section = Node.create<SectionOptions>({
 
           if (!paragraphType) {
             return false;
+          }
+
+          // If text or blocks are currently selected, wrap them into a section
+          if (!state.selection.empty) {
+            const wrap = wrapIn(sectionType, { title, _autoFocus: true });
+            if (wrap(state, dispatch)) {
+              return true;
+            }
           }
 
           // Create a valid section node containing one empty paragraph

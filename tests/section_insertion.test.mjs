@@ -475,4 +475,30 @@ describe("Section Insertion & Command Tests (Stage 4)", () => {
     assert.strictEqual(ed.state.doc.child(0).type.name, "section");
     ed.destroy();
   });
+
+  test("16. insertSection wraps single selected paragraph into a section", () => {
+    const ed = createTestEditor("<p>Hello wrapped world</p>");
+    ed.commands.setTextSelection({ from: 1, to: 10 });
+    ed.commands.insertSection({ title: "My Wrapped Block" });
+
+    assert.strictEqual(ed.state.doc.child(0).type.name, "section");
+    assert.strictEqual(ed.state.doc.child(0).attrs.title, "My Wrapped Block");
+    assert.strictEqual(ed.state.doc.child(0).child(0).textContent, "Hello wrapped world");
+    ed.destroy();
+  });
+
+  test("17. insertSection wraps multiple selected paragraphs into a section", () => {
+    const ed = createTestEditor("<p>First line</p><p>Second line</p><p>Third untouched</p>");
+    // Select from First line to Second line
+    ed.commands.setTextSelection({ from: 2, to: 18 });
+    ed.commands.insertSection({ title: "Grouped Section" });
+
+    assert.strictEqual(ed.state.doc.child(0).type.name, "section");
+    assert.strictEqual(ed.state.doc.child(0).attrs.title, "Grouped Section");
+    assert.strictEqual(ed.state.doc.child(0).childCount, 2);
+    assert.strictEqual(ed.state.doc.child(0).child(0).textContent, "First line");
+    assert.strictEqual(ed.state.doc.child(0).child(1).textContent, "Second line");
+    assert.strictEqual(ed.state.doc.child(1).textContent, "Third untouched");
+    ed.destroy();
+  });
 });
