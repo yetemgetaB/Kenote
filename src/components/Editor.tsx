@@ -19,6 +19,7 @@ import { SlashMenu } from "./SlashMenu";
 import { api, isValidExternalUrl } from "../utils/tauriBridge";
 
 import { Section } from "../extensions/Section";
+import { InlineStackPill } from "../extensions/InlineStackPill";
 
 const lowlight = createLowlight(common);
 
@@ -281,6 +282,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
             return ReactNodeViewRenderer(SectionComponent);
           },
         }),
+        InlineStackPill,
         Markdown.configure({
           html: true,
           transformPastedText: false,
