@@ -28,11 +28,8 @@ export const SlashMenu: React.FC<SlashMenuProps> = ({ editor }) => {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [coords, setCoords] = useState<{ left: number; top: number; bottom: number } | null>(null);
-  const [argumentMode, setArgumentMode] = useState<SlashMenuItem | null>(null);
-  const [argumentValue, setArgumentValue] = useState("");
 
   const menuRef = useRef<HTMLDivElement>(null);
-  const argumentInputRef = useRef<HTMLInputElement>(null);
   const isDismissedRef = useRef(false);
 
   const items: SlashMenuItem[] = [
@@ -168,19 +165,8 @@ export const SlashMenu: React.FC<SlashMenuProps> = ({ editor }) => {
     setSelectedIndex(0);
   }, [query]);
 
-  // Focus argument input when entering argument pill mode
-  useEffect(() => {
-    if (argumentMode) {
-      setTimeout(() => {
-        argumentInputRef.current?.focus();
-      }, 50);
-    }
-  }, [argumentMode]);
-
   const closeMenu = useCallback(() => {
     setIsOpen(false);
-    setArgumentMode(null);
-    setArgumentValue("");
     isDismissedRef.current = true;
   }, []);
 
@@ -196,7 +182,6 @@ export const SlashMenu: React.FC<SlashMenuProps> = ({ editor }) => {
 
       if (match) {
         const slashStart = from - match[0].length;
-        // Delete the slash trigger text
         editor.chain().focus().deleteRange({ from: slashStart, to: from }).run();
       }
 
@@ -206,19 +191,35 @@ export const SlashMenu: React.FC<SlashMenuProps> = ({ editor }) => {
     [editor, closeMenu]
   );
 
-  // Enter argument pill mode
-  const enterArgumentMode = useCallback((item: SlashMenuItem) => {
-    setArgumentMode(item);
-    setArgumentValue("");
-  }, []);
+  // Transition into the inline line pill
+  const enterArgumentMode = useCallback(() => {
+    if (!editor || editor.isDestroyed) return;
+
+    const { from } = editor.state.selection;
+    const $from = editor.state.doc.resolve(from);
+    const textBefore = $from.parent.textBetween(0, $from.parentOffset, null, "\ufffc");
+    const match = textBefore.match(/\/([a-zA-Z0-9_-]*)$/);
+
+    closeMenu();
+
+    if (match) {
+      const slashStart = from - match[0].length;
+      editor
+        .chain()
+        .focus()
+        .deleteRange({ from: slashStart, to: from })
+        .activateInlineStackPill({ pos: slashStart })
+        .run();
+    } else {
+      editor.commands.activateInlineStackPill();
+    }
+  }, [editor, closeMenu]);
 
   // Listen to editor updates to detect slash command trigger
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
 
     const handleUpdate = () => {
-      if (argumentMode) return;
-
       const { selection } = editor.state;
       if (!selection.empty) {
         if (isOpen) closeMenu();
@@ -260,27 +261,13 @@ export const SlashMenu: React.FC<SlashMenuProps> = ({ editor }) => {
       editor.off("update", handleUpdate);
       editor.off("selectionUpdate", handleUpdate);
     };
-  }, [editor, isOpen, argumentMode, closeMenu]);
+  }, [editor, isOpen, closeMenu]);
 
   // Handle keyboard events when Slash Menu is active
   useEffect(() => {
-    if (!editor || editor.isDestroyed || (!isOpen && !argumentMode)) return;
+    if (!editor || editor.isDestroyed || !isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (argumentMode) {
-        if (e.key === "Escape") {
-          e.preventDefault();
-          e.stopPropagation();
-          closeMenu();
-          editor.commands.focus();
-        } else if (e.key === "Enter") {
-          e.preventDefault();
-          e.stopPropagation();
-          executeItem(argumentMode, argumentValue);
-        }
-        return;
-      }
-
       if (!isOpen) return;
 
       if (e.key === "ArrowDown") {
@@ -303,7 +290,7 @@ export const SlashMenu: React.FC<SlashMenuProps> = ({ editor }) => {
         if (selected && selected.hasArgument) {
           e.preventDefault();
           e.stopPropagation();
-          enterArgumentMode(selected);
+          enterArgumentMode();
         }
       } else if (e.key === "Escape") {
         e.preventDefault();
@@ -316,11 +303,11 @@ export const SlashMenu: React.FC<SlashMenuProps> = ({ editor }) => {
     return () => {
       window.removeEventListener("keydown", handleKeyDown, true);
     };
-  }, [editor, isOpen, argumentMode, filteredItems, selectedIndex, argumentValue, executeItem, enterArgumentMode, closeMenu]);
+  }, [editor, isOpen, filteredItems, selectedIndex, executeItem, enterArgumentMode, closeMenu]);
 
   // Click outside listener
   useEffect(() => {
-    if (!isOpen && !argumentMode) return;
+    if (!isOpen) return;
 
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -332,9 +319,9 @@ export const SlashMenu: React.FC<SlashMenuProps> = ({ editor }) => {
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isOpen, argumentMode, closeMenu]);
+  }, [isOpen, closeMenu]);
 
-  if (!isOpen && !argumentMode) {
+  if (!isOpen) {
     return null;
   }
 
@@ -342,43 +329,6 @@ export const SlashMenu: React.FC<SlashMenuProps> = ({ editor }) => {
   const left = coords ? Math.max(16, Math.min(coords.left, window.innerWidth - 300)) : 100;
   const isNearBottom = coords ? coords.bottom + 280 > window.innerHeight : false;
   const top = coords ? (isNearBottom ? coords.top - 260 : coords.bottom + 6) : 100;
-
-  // Render Argument Pill mode
-  if (argumentMode) {
-    return (
-      <div
-        ref={menuRef}
-        style={{ left: `${left}px`, top: `${coords ? coords.bottom + 6 : 100}px` }}
-        className="fixed z-50 flex items-center gap-1.5 p-1.5 bg-[#1C222B] border border-[#3B82F6] rounded-lg shadow-xl shadow-black/40 backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
-      >
-        {/* Command Pill Tag */}
-        <div className="flex items-center gap-1 px-2 py-1 rounded bg-[#2A3241] text-[#38BDF8] text-xs font-semibold select-none shrink-0 border border-[#38BDF8]/20">
-          <SectionIcon size={14} className="text-[#38BDF8]" />
-          <span>Stack</span>
-        </div>
-
-        {/* Argument Input */}
-        <input
-          ref={argumentInputRef}
-          type="text"
-          value={argumentValue}
-          onChange={(e) => setArgumentValue(e.target.value)}
-          placeholder="Stack title (optional)..."
-          className="bg-transparent text-xs text-[#F1F5F9] placeholder:text-[#64748B] focus:outline-none px-1.5 py-1 w-48 border-none"
-        />
-
-        {/* Enter Hint Pill */}
-        <button
-          type="button"
-          onClick={() => executeItem(argumentMode, argumentValue)}
-          className="flex items-center gap-1 px-2 py-0.5 rounded bg-[#3B82F6]/20 text-[#60A5FA] hover:bg-[#3B82F6]/30 text-[10px] font-mono cursor-pointer transition-colors border border-[#3B82F6]/30"
-          title="Press Enter to create stack"
-        >
-          <span>↵ Enter</span>
-        </button>
-      </div>
-    );
-  }
 
   // Render Slash Menu List
   return (
@@ -407,7 +357,7 @@ export const SlashMenu: React.FC<SlashMenuProps> = ({ editor }) => {
                 onMouseEnter={() => setSelectedIndex(idx)}
                 onClick={() => {
                   if (item.hasArgument) {
-                    enterArgumentMode(item);
+                    enterArgumentMode();
                   } else {
                     executeItem(item);
                   }
