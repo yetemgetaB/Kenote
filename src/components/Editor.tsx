@@ -24,6 +24,7 @@ import { InlineStackPill } from "../extensions/InlineStackPill";
 const lowlight = createLowlight(common);
 
 import { createSafeSelection } from "../utils/selection";
+import { findWordRangeAtPos } from "../utils/wordSelection";
 export { createSafeSelection };
 
 import {
@@ -295,6 +296,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
           class:
             "focus:outline-none min-h-full px-6 py-5 prose prose-invert max-w-none text-[#D8E1E8]",
           style: `font-size: ${fontSize}; line-height: ${lineHeight}; font-family: ${fontFamily};`,
+          spellcheck: "true",
         },
         handleDOMEvents: {
           contextmenu: (view, event) => {
@@ -302,15 +304,20 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
             const pos = view.posAtCoords({ left: event.clientX, top: event.clientY });
             if (pos) {
               const { from, to, empty } = view.state.selection;
-              if (!empty && (pos.pos < from || pos.pos > to)) {
-                const safeSel = createSafeSelection(view.state.doc, pos.pos, pos.pos);
-                if (safeSel) {
-                  view.dispatch(view.state.tr.setSelection(safeSel));
-                }
-              } else if (empty) {
-                const safeSel = createSafeSelection(view.state.doc, pos.pos, pos.pos);
-                if (safeSel) {
-                  view.dispatch(view.state.tr.setSelection(safeSel));
+              const isInsideSelection = !empty && pos.pos >= from && pos.pos <= to;
+
+              if (!isInsideSelection) {
+                const wordRange = findWordRangeAtPos(view.state.doc, pos.pos);
+                if (wordRange) {
+                  const safeSel = createSafeSelection(view.state.doc, wordRange.from, wordRange.to);
+                  if (safeSel) {
+                    view.dispatch(view.state.tr.setSelection(safeSel));
+                  }
+                } else {
+                  const safeSel = createSafeSelection(view.state.doc, pos.pos, pos.pos);
+                  if (safeSel) {
+                    view.dispatch(view.state.tr.setSelection(safeSel));
+                  }
                 }
               }
             }
