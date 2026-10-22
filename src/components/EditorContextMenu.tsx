@@ -9,8 +9,6 @@ import {
   UnderlineIcon,
   ClearFormattingIcon,
   SectionIcon,
-  SparklesIcon,
-  PlusIcon,
 } from "./Icons";
 import {
   toggleSmartBold,
@@ -243,16 +241,12 @@ export const EditorContextMenu: React.FC<EditorContextMenuProps> = ({
         top: `${position.top}px`,
         zIndex: 9999,
       }}
-      className="w-56 bg-[#1E242E] border border-[#2B3340] rounded-lg shadow-xl shadow-black/40 p-1 select-none animate-in fade-in zoom-in-95 duration-75 text-xs text-[#D8E1E8] focus:outline-none"
+      className="w-52 bg-[#1C2128] border border-[#2B3340] rounded-lg shadow-xl shadow-black/50 p-1 select-none text-xs text-[#D8E1E8] focus:outline-none"
       onContextMenu={(e) => e.preventDefault()}
     >
-      {/* Spelling Suggestions Group */}
+      {/* Spelling Suggestions */}
       {spellingSuggestions.length > 0 && (
         <>
-          <div className="px-2 py-1 text-[10px] font-semibold tracking-wider uppercase text-[#64748B] flex items-center justify-between">
-            <span>Spelling</span>
-            <SparklesIcon size={12} className="text-amber-400 opacity-80" />
-          </div>
           {spellingSuggestions.map((suggestion, idx) => (
             <button
               key={idx}
@@ -260,7 +254,7 @@ export const EditorContextMenu: React.FC<EditorContextMenuProps> = ({
               tabIndex={0}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleApplySuggestion(suggestion)}
-              className="w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between hover:bg-[#262E3B] hover:text-white cursor-pointer transition-colors focus:bg-[#262E3B] focus:text-white focus:outline-none font-medium text-[#E2E8F0]"
+              className="w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between hover:bg-[#262E3B] hover:text-white cursor-pointer focus:bg-[#262E3B] focus:text-white focus:outline-none font-semibold text-white"
             >
               <span>{suggestion}</span>
             </button>
@@ -270,10 +264,9 @@ export const EditorContextMenu: React.FC<EditorContextMenuProps> = ({
             tabIndex={0}
             onMouseDown={(e) => e.preventDefault()}
             onClick={handleAddToDictionary}
-            className="w-full px-2.5 py-1.5 text-left rounded-md flex items-center space-x-2 text-[#94A3B8] hover:bg-[#262E3B] hover:text-white cursor-pointer transition-colors focus:bg-[#262E3B] focus:text-white focus:outline-none text-[11px]"
+            className="w-full px-2.5 py-1.5 text-left rounded-md flex items-center hover:bg-[#262E3B] hover:text-white cursor-pointer focus:bg-[#262E3B] focus:text-white focus:outline-none text-[#94A3B8]"
           >
-            <PlusIcon size={12} className="opacity-70 flex-shrink-0" />
-            <span className="truncate">Add &ldquo;{cleanWord}&rdquo; to Dictionary</span>
+            <span>Add to dictionary</span>
           </button>
           {/* Separator */}
           <div className="h-px bg-[#262D38] my-1" />
