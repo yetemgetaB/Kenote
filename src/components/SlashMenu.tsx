@@ -240,7 +240,8 @@ export const SlashMenu: React.FC<SlashMenuProps> = ({ editor }) => {
         setQuery(q);
 
         try {
-          const coordsAtCursor = editor.view.coordsAtPos(from);
+          const slashStart = Math.max(0, from - match[0].length);
+          const coordsAtCursor = editor.view.coordsAtPos(slashStart);
           setCoords(coordsAtCursor);
           setIsOpen(true);
         } catch {
@@ -328,13 +329,24 @@ export const SlashMenu: React.FC<SlashMenuProps> = ({ editor }) => {
   // Calculate position (fixed relative to viewport coords)
   const left = coords ? Math.max(16, Math.min(coords.left, window.innerWidth - 300)) : 100;
   const isNearBottom = coords ? coords.bottom + 280 > window.innerHeight : false;
-  const top = coords ? (isNearBottom ? coords.top - 260 : coords.bottom + 6) : 100;
+
+  const positionStyles: React.CSSProperties = coords
+    ? isNearBottom
+      ? {
+          left: `${left}px`,
+          bottom: `${Math.max(16, window.innerHeight - coords.top + 6)}px`,
+        }
+      : {
+          left: `${left}px`,
+          top: `${coords.bottom + 6}px`,
+        }
+    : { left: "100px", top: "100px" };
 
   // Render Slash Menu List
   return (
     <div
       ref={menuRef}
-      style={{ left: `${left}px`, top: `${top}px` }}
+      style={positionStyles}
       className="fixed z-50 w-72 max-h-64 overflow-y-auto bg-[#1C222B]/95 border border-[#2E3748] rounded-xl shadow-2xl shadow-black/50 backdrop-blur-md p-1.5 custom-scrollbar animate-in fade-in zoom-in-95 duration-100"
     >
       <div className="px-2 py-1 text-[10px] font-semibold tracking-wider uppercase text-[#64748B] border-b border-[#262D38]/60 mb-1 flex items-center justify-between">
