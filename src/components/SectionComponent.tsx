@@ -1,7 +1,16 @@
 import React, { useCallback, useRef, useEffect, useState } from "react";
 import { NodeViewContent, NodeViewWrapper, NodeViewProps } from "@tiptap/react";
 import { Selection } from "@tiptap/pm/state";
-import { ChevronDownIcon, ChevronRightIcon, TrashIcon } from "./Icons";
+import {
+  ChevronDownIcon,
+  ChevronRightIcon,
+  TrashIcon,
+  MoreHorizontalIcon,
+  CopyIcon,
+  CodeBlockIcon,
+  FileTextIcon,
+  UnwrapIcon,
+} from "./Icons";
 
 export const SectionComponent: React.FC<NodeViewProps> = ({
   editor,
@@ -12,8 +21,10 @@ export const SectionComponent: React.FC<NodeViewProps> = ({
 }) => {
   const title = typeof node.attrs.title === "string" ? node.attrs.title : "";
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const [hasAutoFocused, setHasAutoFocused] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
     if (node.attrs._autoFocus && !hasAutoFocused) {
@@ -26,6 +37,30 @@ export const SectionComponent: React.FC<NodeViewProps> = ({
       });
     }
   }, [node.attrs._autoFocus, hasAutoFocused]);
+
+  // Click outside and escape handler for options menu
+  useEffect(() => {
+    if (!isMenuOpen) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isMenuOpen]);
 
   const handleTitleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -45,7 +80,7 @@ export const SectionComponent: React.FC<NodeViewProps> = ({
 
   const handleHeaderDoubleClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      if ((e.target as HTMLElement)?.tagName?.toLowerCase() === "input") {
+      if ((e.target as HTMLElement)?.tagName?.toLowerCase() === "input" || menuRef.current?.contains(e.target as Node)) {
         return;
       }
       e.preventDefault();
@@ -61,6 +96,7 @@ export const SectionComponent: React.FC<NodeViewProps> = ({
         e.preventDefault();
         e.stopPropagation();
       }
+      setIsMenuOpen(false);
       if (typeof deleteNode === "function") {
         deleteNode();
       } else if (editor && typeof getPos === "function") {
@@ -78,6 +114,85 @@ export const SectionComponent: React.FC<NodeViewProps> = ({
     [deleteNode, editor, getPos, node.nodeSize]
   );
 
+  const handleDuplicate = useCallback(() => {
+    if (!editor || typeof getPos !== "function") return;
+    try {
+      const pos = getPos();
+      if (typeof pos === "number") {
+        const afterPos = pos + node.nodeSize;
+        editor.commands.insertContentAt(afterPos, node.toJSON());
+      }
+    } catch (err) {
+      console.warn("Could not duplicate section:", err);
+    }
+    setIsMenuOpen(false);
+  }, [editor, getPos, node]);
+
+  const handleCopyMarkdown = useCallback(async () => {
+    if (!editor || typeof getPos !== "function") return;
+    try {
+      const markdownStorage = (editor.storage as any)?.markdown;
+      let md = "";
+      if (markdownStorage?.serializer) {
+        md = markdownStorage.serializer.serialize(node);
+      } else {
+        const innerText = node.textContent;
+        md = `::: kenote-section title="${title}"\n${innerText}\n:::`;
+      }
+      await navigator.clipboard.writeText(md.trim());
+    } catch (err) {
+      console.warn("Could not copy section markdown:", err);
+    }
+    setIsMenuOpen(false);
+  }, [editor, getPos, node, title]);
+
+  const handleCopyPlainText = useCallback(async () => {
+    try {
+      const headerText = title ? `${title}\n\n` : "";
+      const plainText = `${headerText}${node.textContent}`.trim();
+      await navigator.clipboard.writeText(plainText);
+    } catch (err) {
+      console.warn("Could not copy plain text:", err);
+    }
+    setIsMenuOpen(false);
+  }, [node, title]);
+
+  const handleUnwrap = useCallback(() => {
+    if (!editor || typeof getPos !== "function") return;
+    try {
+      const pos = getPos();
+      if (typeof pos === "number") {
+        const tr = editor.state.tr;
+        const nodesToInsert: any[] = [];
+        const hasCustomTitle = title.trim() !== "" && title.trim() !== "Untitled Section";
+
+        if (hasCustomTitle && editor.state.schema.nodes.heading) {
+          nodesToInsert.push(
+            editor.state.schema.nodes.heading.create(
+              { level: 3 },
+              editor.state.schema.text(title.trim())
+            )
+          );
+        }
+
+        for (let i = 0; i < node.childCount; i++) {
+          nodesToInsert.push(node.child(i));
+        }
+
+        if (nodesToInsert.length === 0 && editor.state.schema.nodes.paragraph) {
+          nodesToInsert.push(editor.state.schema.nodes.paragraph.create());
+        }
+
+        tr.replaceWith(pos, pos + node.nodeSize, nodesToInsert);
+        editor.view.dispatch(tr);
+        editor.commands.focus(pos + 1);
+      }
+    } catch (err) {
+      console.warn("Could not unwrap section:", err);
+    }
+    setIsMenuOpen(false);
+  }, [editor, getPos, node, title]);
+
   const handleTitleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === "Enter") {
@@ -92,7 +207,6 @@ export const SectionComponent: React.FC<NodeViewProps> = ({
           try {
             const pos = getPos();
             if (typeof pos === "number") {
-              // Focus directly inside the first textblock of the section body
               editor.commands.focus(pos + 1);
             }
           } catch (err) {
@@ -175,7 +289,7 @@ export const SectionComponent: React.FC<NodeViewProps> = ({
 
   return (
     <NodeViewWrapper
-      className={`kenote-section-wrapper relative my-3.5 rounded-lg border border-[#262D38] bg-[#181D24]/75 overflow-hidden transition-all duration-150 shadow-sm group/section ${
+      className={`kenote-section-wrapper relative my-3.5 rounded-lg border border-[#262D38] bg-[#181D24]/75 overflow-visible transition-all duration-150 shadow-sm group/section ${
         isCollapsed ? "kenote-section-collapsed" : "kenote-section-expanded"
       }`}
       data-type="section"
@@ -185,8 +299,8 @@ export const SectionComponent: React.FC<NodeViewProps> = ({
       <div
         onDoubleClick={handleHeaderDoubleClick}
         title="Double-click to collapse or expand"
-        className={`kenote-section-header flex items-center justify-between px-3 py-2 bg-[#1C222B] text-xs select-none transition-colors cursor-pointer ${
-          isCollapsed ? "border-b-0" : "border-b border-[#262D38]"
+        className={`kenote-section-header flex items-center justify-between px-3 py-2 bg-[#1C222B] text-xs select-none transition-colors cursor-pointer rounded-t-lg ${
+          isCollapsed ? "border-b-0 rounded-b-lg" : "border-b border-[#262D38]"
         }`}
       >
         <div className="flex items-center flex-1 mr-2 min-w-0">
@@ -218,27 +332,89 @@ export const SectionComponent: React.FC<NodeViewProps> = ({
           />
         </div>
 
-        {/* Delete Section button on right of header */}
-        <button
-          type="button"
-          contentEditable={false}
-          onClick={handleDelete}
-          onMouseDown={(e) => e.preventDefault()}
-          aria-label="Delete section"
-          title="Delete section"
-          className="p-1 -mr-1 text-[#64748B] hover:text-red-400 hover:bg-[#2A3241] rounded transition-all opacity-0 group-hover/section:opacity-100 focus:opacity-100 focus:outline-none flex items-center justify-center cursor-pointer shrink-0"
-        >
-          <TrashIcon size={13} />
-        </button>
+        {/* More Options Dropdown Menu */}
+        <div className="relative shrink-0" ref={menuRef}>
+          <button
+            type="button"
+            contentEditable={false}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsMenuOpen((prev) => !prev);
+            }}
+            onMouseDown={(e) => e.preventDefault()}
+            aria-label="Section options"
+            title="Section options"
+            className="p-1 -mr-1 text-[#64748B] hover:text-[#F1F5F9] hover:bg-[#2A3241] rounded transition-all opacity-0 group-hover/section:opacity-100 focus:opacity-100 focus:outline-none flex items-center justify-center cursor-pointer"
+          >
+            <MoreHorizontalIcon size={14} />
+          </button>
+
+          {isMenuOpen && (
+            <div
+              contentEditable={false}
+              className="absolute right-0 top-full mt-1 w-44 bg-[#1E242E] border border-[#2B3340] rounded-lg shadow-2xl py-1 text-xs select-none z-50 animate-in fade-in zoom-in-95 duration-100"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={handleDuplicate}
+                className="w-full px-2.5 py-1.5 text-left text-[#D8E1E8] hover:bg-[#2A3240] hover:text-white flex items-center gap-2 transition-colors cursor-pointer"
+              >
+                <CopyIcon size={13} className="text-[#94A3B8]" />
+                <span>Duplicate Stack</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCopyMarkdown}
+                className="w-full px-2.5 py-1.5 text-left text-[#D8E1E8] hover:bg-[#2A3240] hover:text-white flex items-center gap-2 transition-colors cursor-pointer"
+              >
+                <CodeBlockIcon size={13} className="text-[#94A3B8]" />
+                <span>Copy as Markdown</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCopyPlainText}
+                className="w-full px-2.5 py-1.5 text-left text-[#D8E1E8] hover:bg-[#2A3240] hover:text-white flex items-center gap-2 transition-colors cursor-pointer"
+              >
+                <FileTextIcon size={13} className="text-[#94A3B8]" />
+                <span>Copy as Plain Text</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleUnwrap}
+                className="w-full px-2.5 py-1.5 text-left text-[#D8E1E8] hover:bg-[#2A3240] hover:text-white flex items-center gap-2 transition-colors cursor-pointer"
+              >
+                <UnwrapIcon size={13} className="text-[#94A3B8]" />
+                <span>Unwrap Stack</span>
+              </button>
+
+              <div className="my-1 border-t border-[#2B3340]/70" />
+
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="w-full px-2.5 py-1.5 text-left text-red-400 hover:bg-red-500/10 hover:text-red-300 flex items-center gap-2 transition-colors cursor-pointer"
+              >
+                <TrashIcon size={13} className="text-red-400" />
+                <span>Delete Stack</span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Section Content Hole */}
-      <NodeViewContent
-        className={`kenote-section-content p-3.5 text-[#D8E1E8] min-h-[2rem] ${
-          isCollapsed ? "hidden" : ""
+      <div
+        className={`kenote-section-body px-4 py-3 bg-[#13171D]/50 text-[#D8E1E8] transition-all duration-150 ${
+          isCollapsed ? "hidden" : "block"
         }`}
-        style={{ display: isCollapsed ? "none" : undefined }}
-      />
+      >
+        <NodeViewContent className="kenote-section-content min-h-[1.5rem] focus:outline-none" />
+      </div>
     </NodeViewWrapper>
   );
 };
