@@ -162,7 +162,9 @@ function setupMarkdownItSection(md: any) {
   md.renderer.rules.kenote_section_open = function (tokens: any[], idx: number) {
     const token = tokens[idx];
     const title = token.attrGet("data-title") || "";
-    return `<div data-type="section" data-title="${md.utils.escapeHtml(title)}">\n`;
+    const color = token.attrGet("data-color") || "default";
+    const collapsed = token.attrGet("data-collapsed") || "false";
+    return `<div data-type="section" data-title="${md.utils.escapeHtml(title)}" data-color="${md.utils.escapeHtml(color)}" data-collapsed="${collapsed}">\n`;
   };
 
   md.renderer.rules.kenote_section_close = function () {

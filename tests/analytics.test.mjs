@@ -212,6 +212,8 @@ describe("Phase B1: Privacy-Safe Analytics Telemetry Tests", () => {
         "check_for_updates",
         "delete_note",
         "insert_section",
+        "collapse_all_sections",
+        "expand_all_sections",
       ];
       assert.deepEqual([...COMMAND_ACTIONS].sort(), expected.sort());
 
