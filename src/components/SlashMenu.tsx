@@ -6,6 +6,12 @@ import {
   QuoteIcon,
   CheckIcon,
   ListIcon,
+  CalendarIcon,
+  ClockIcon,
+  LightbulbIcon,
+  AlertTriangleIcon,
+  InfoCircleIcon,
+  ShieldAlertIcon,
 } from "./Icons";
 
 export interface SlashMenuItem {
@@ -113,6 +119,71 @@ export const SlashMenu: React.FC<SlashMenuProps> = ({ editor }) => {
       },
     },
     {
+      id: "ordered_list",
+      title: "Numbered List",
+      description: "Numbered list for ordered sequences or steps",
+      keywords: ["number", "ordered", "1.", "list", "numbered", "sequence", "steps"],
+      shortcut: "1.",
+      icon: (
+        <span className="text-xs font-bold font-mono text-[#FBBF24] px-1 py-0.5 rounded bg-[#FBBF24]/10">
+          1.
+        </span>
+      ),
+      execute: (ed) => {
+        ed.chain().focus().toggleOrderedList().run();
+      },
+    },
+    {
+      id: "callout",
+      title: "Callout / Note",
+      description: "Highlighted note callout block",
+      keywords: ["callout", "note", "alert", "info"],
+      icon: <InfoCircleIcon size={16} className="text-[#38BDF8]" />,
+      execute: (ed) => {
+        ed.chain().focus().toggleBlockquote().insertContent("[!NOTE]\n").run();
+      },
+    },
+    {
+      id: "tip",
+      title: "Callout: Tip",
+      description: "Helpful tip or best practice highlight",
+      keywords: ["tip", "hint", "callout", "best practice", "idea"],
+      icon: <LightbulbIcon size={16} className="text-[#34D399]" />,
+      execute: (ed) => {
+        ed.chain().focus().toggleBlockquote().insertContent("[!TIP]\n").run();
+      },
+    },
+    {
+      id: "warning",
+      title: "Callout: Warning",
+      description: "Warning alert for critical notices",
+      keywords: ["warning", "warn", "alert", "danger", "caution"],
+      icon: <AlertTriangleIcon size={16} className="text-[#FBBF24]" />,
+      execute: (ed) => {
+        ed.chain().focus().toggleBlockquote().insertContent("[!WARNING]\n").run();
+      },
+    },
+    {
+      id: "important",
+      title: "Callout: Important",
+      description: "Crucial highlight or must-know information",
+      keywords: ["important", "crucial", "alert", "key", "priority"],
+      icon: <InfoCircleIcon size={16} className="text-[#A78BFA]" />,
+      execute: (ed) => {
+        ed.chain().focus().toggleBlockquote().insertContent("[!IMPORTANT]\n").run();
+      },
+    },
+    {
+      id: "caution",
+      title: "Callout: Caution",
+      description: "High-risk caution alert for potential pitfalls",
+      keywords: ["caution", "danger", "risk", "hazard", "stop"],
+      icon: <ShieldAlertIcon size={16} className="text-[#F87171]" />,
+      execute: (ed) => {
+        ed.chain().focus().toggleBlockquote().insertContent("[!CAUTION]\n").run();
+      },
+    },
+    {
       id: "code_block",
       title: "Code Block",
       description: "Syntax-highlighted code block",
@@ -127,7 +198,7 @@ export const SlashMenu: React.FC<SlashMenuProps> = ({ editor }) => {
       id: "quote",
       title: "Quote",
       description: "Blockquote callout for quotes or excerpts",
-      keywords: ["quote", "blockquote", "callout"],
+      keywords: ["quote", "blockquote"],
       shortcut: ">",
       icon: <QuoteIcon size={16} className="text-[#94A3B8]" />,
       execute: (ed) => {
@@ -145,6 +216,62 @@ export const SlashMenu: React.FC<SlashMenuProps> = ({ editor }) => {
       ),
       execute: (ed) => {
         ed.chain().focus().setHorizontalRule().run();
+      },
+    },
+    {
+      id: "today",
+      title: "Today's Date",
+      description: "Insert current date (e.g. October 23, 2026)",
+      keywords: ["today", "date", "day", "calendar"],
+      icon: <CalendarIcon size={16} className="text-[#38BDF8]" />,
+      execute: (ed) => {
+        const str = new Date().toLocaleDateString("en-US", {
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+        });
+        ed.chain().focus().insertContent(str).run();
+      },
+    },
+    {
+      id: "date",
+      title: "Date (DD/MM/YYYY)",
+      description: "Insert current date in DD/MM/YYYY format",
+      keywords: ["date", "calendar", "day", "dd/mm/yyyy", "short"],
+      icon: <CalendarIcon size={16} className="text-[#818CF8]" />,
+      execute: (ed) => {
+        const now = new Date();
+        const dd = String(now.getDate()).padStart(2, "0");
+        const mm = String(now.getMonth() + 1).padStart(2, "0");
+        const yyyy = now.getFullYear();
+        ed.chain().focus().insertContent(`${dd}/${mm}/${yyyy}`).run();
+      },
+    },
+    {
+      id: "time",
+      title: "Current Time",
+      description: "Insert current time (e.g. 7:15 PM)",
+      keywords: ["time", "clock", "now"],
+      icon: <ClockIcon size={16} className="text-[#34D399]" />,
+      execute: (ed) => {
+        const str = new Date().toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+        });
+        ed.chain().focus().insertContent(str).run();
+      },
+    },
+    {
+      id: "now",
+      title: "Date & Time Stamp",
+      description: "Insert full timestamp (e.g. Oct 23, 2026, 7:15 PM)",
+      keywords: ["now", "timestamp", "datetime", "date", "time"],
+      icon: <ClockIcon size={16} className="text-[#F472B6]" />,
+      execute: (ed) => {
+        const now = new Date();
+        const d = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+        const t = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+        ed.chain().focus().insertContent(`${d}, ${t}`).run();
       },
     },
   ];
