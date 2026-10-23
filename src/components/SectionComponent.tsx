@@ -12,6 +12,24 @@ import {
   UnwrapIcon,
 } from "./Icons";
 
+export type SectionColor = "default" | "blue" | "emerald" | "amber" | "purple" | "rose";
+
+export const SECTION_COLORS: {
+  id: SectionColor;
+  label: string;
+  borderLeft: string;
+  bgTint: string;
+  chevronColor: string;
+  dotBg: string;
+}[] = [
+  { id: "default", label: "Default", borderLeft: "border-l-[#333C4D]", bgTint: "bg-[#1C222B]", chevronColor: "text-[#94A3B8]", dotBg: "bg-[#475569]" },
+  { id: "blue", label: "Blue", borderLeft: "border-l-[#38BDF8]", bgTint: "bg-[#1C222B] bg-gradient-to-r from-[#38BDF8]/[0.08] to-transparent", chevronColor: "text-[#38BDF8]", dotBg: "bg-[#38BDF8]" },
+  { id: "emerald", label: "Emerald", borderLeft: "border-l-[#34D399]", bgTint: "bg-[#1C222B] bg-gradient-to-r from-[#34D399]/[0.08] to-transparent", chevronColor: "text-[#34D399]", dotBg: "bg-[#34D399]" },
+  { id: "amber", label: "Amber", borderLeft: "border-l-[#FBBF24]", bgTint: "bg-[#1C222B] bg-gradient-to-r from-[#FBBF24]/[0.08] to-transparent", chevronColor: "text-[#FBBF24]", dotBg: "bg-[#FBBF24]" },
+  { id: "purple", label: "Purple", borderLeft: "border-l-[#A78BFA]", bgTint: "bg-[#1C222B] bg-gradient-to-r from-[#A78BFA]/[0.08] to-transparent", chevronColor: "text-[#A78BFA]", dotBg: "bg-[#A78BFA]" },
+  { id: "rose", label: "Rose", borderLeft: "border-l-[#F87171]", bgTint: "bg-[#1C222B] bg-gradient-to-r from-[#F87171]/[0.08] to-transparent", chevronColor: "text-[#F87171]", dotBg: "bg-[#F87171]" },
+];
+
 export const SectionComponent: React.FC<NodeViewProps> = ({
   editor,
   node,
@@ -20,10 +38,13 @@ export const SectionComponent: React.FC<NodeViewProps> = ({
   getPos,
 }) => {
   const title = typeof node.attrs.title === "string" ? node.attrs.title : "";
+  const isCollapsed = Boolean(node.attrs.isCollapsed);
+  const currentColorId: SectionColor = (node.attrs.color as SectionColor) || "default";
+  const currentColor = SECTION_COLORS.find((c) => c.id === currentColorId) || SECTION_COLORS[0];
+
   const inputRef = useRef<HTMLInputElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [hasAutoFocused, setHasAutoFocused] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -73,9 +94,9 @@ export const SectionComponent: React.FC<NodeViewProps> = ({
     (e: React.MouseEvent<HTMLButtonElement>) => {
       e.preventDefault();
       e.stopPropagation();
-      setIsCollapsed((prev) => !prev);
+      updateAttributes({ isCollapsed: !isCollapsed });
     },
-    []
+    [isCollapsed, updateAttributes]
   );
 
   const handleHeaderDoubleClick = useCallback(
@@ -85,9 +106,9 @@ export const SectionComponent: React.FC<NodeViewProps> = ({
       }
       e.preventDefault();
       e.stopPropagation();
-      setIsCollapsed((prev) => !prev);
+      updateAttributes({ isCollapsed: !isCollapsed });
     },
-    []
+    [isCollapsed, updateAttributes]
   );
 
   const handleDelete = useCallback(
@@ -200,7 +221,7 @@ export const SectionComponent: React.FC<NodeViewProps> = ({
         e.stopPropagation();
 
         if (isCollapsed) {
-          setIsCollapsed(false);
+          updateAttributes({ isCollapsed: false });
         }
 
         if (editor && !editor.isDestroyed && typeof getPos === "function") {
@@ -225,7 +246,7 @@ export const SectionComponent: React.FC<NodeViewProps> = ({
         e.preventDefault();
         e.stopPropagation();
         if (isCollapsed) {
-          setIsCollapsed(false);
+          updateAttributes({ isCollapsed: false });
         }
         if (editor && !editor.isDestroyed && typeof getPos === "function") {
           try {
@@ -269,7 +290,7 @@ export const SectionComponent: React.FC<NodeViewProps> = ({
         e.preventDefault();
         e.stopPropagation();
         if (isCollapsed) {
-          setIsCollapsed(false);
+          updateAttributes({ isCollapsed: false });
         }
         if (editor && !editor.isDestroyed && typeof getPos === "function") {
           try {
@@ -289,17 +310,18 @@ export const SectionComponent: React.FC<NodeViewProps> = ({
 
   return (
     <NodeViewWrapper
-      className={`kenote-section-wrapper relative my-3.5 rounded-lg border border-[#262D38] bg-[#181D24]/75 overflow-visible transition-all duration-150 shadow-sm group/section ${
+      className={`kenote-section-wrapper relative my-3.5 rounded-lg border border-[#262D38] ${currentColor.borderLeft} border-l-[3.5px] bg-[#181D24]/75 overflow-visible transition-all duration-150 shadow-sm group/section ${
         isCollapsed ? "kenote-section-collapsed" : "kenote-section-expanded"
       }`}
       data-type="section"
       data-collapsed={isCollapsed ? "true" : "false"}
+      data-color={currentColorId}
     >
       {/* Section Header */}
       <div
         onDoubleClick={handleHeaderDoubleClick}
         title="Double-click to collapse or expand"
-        className={`kenote-section-header flex items-center justify-between px-3 py-2 bg-[#1C222B] text-xs select-none transition-colors cursor-pointer rounded-t-lg ${
+        className={`kenote-section-header flex items-center justify-between px-3 py-2 ${currentColor.bgTint} text-xs select-none transition-colors cursor-pointer rounded-t-lg ${
           isCollapsed ? "border-b-0 rounded-b-lg" : "border-b border-[#262D38]"
         }`}
       >
@@ -311,12 +333,12 @@ export const SectionComponent: React.FC<NodeViewProps> = ({
             onMouseDown={(e) => e.preventDefault()}
             aria-label={isCollapsed ? "Expand section" : "Collapse section"}
             title={isCollapsed ? "Expand section" : "Collapse section"}
-            className="mr-2 p-1 -ml-1 text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[#2A3241] rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-[#3B82F6] flex items-center justify-center cursor-pointer shrink-0"
+            className={`mr-2 p-1 -ml-1 ${currentColor.chevronColor} hover:bg-[#2A3241] rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-[#3B82F6] flex items-center justify-center cursor-pointer shrink-0`}
           >
             {isCollapsed ? (
-              <ChevronRightIcon size={14} className="text-[#94A3B8]" />
+              <ChevronRightIcon size={14} className={currentColor.chevronColor} />
             ) : (
-              <ChevronDownIcon size={14} className="text-[#94A3B8]" />
+              <ChevronDownIcon size={14} className={currentColor.chevronColor} />
             )}
           </button>
 
@@ -353,9 +375,27 @@ export const SectionComponent: React.FC<NodeViewProps> = ({
           {isMenuOpen && (
             <div
               contentEditable={false}
-              className="absolute right-0 top-full mt-1 w-44 bg-[#1E242E] border border-[#2B3340] rounded-lg shadow-2xl py-1 text-xs select-none z-50 animate-in fade-in zoom-in-95 duration-100"
+              className="absolute right-0 top-full mt-1 w-52 bg-[#1E242E] border border-[#2B3340] rounded-lg shadow-2xl py-1 text-xs select-none z-50 animate-in fade-in zoom-in-95 duration-100"
               onClick={(e) => e.stopPropagation()}
             >
+              {/* Accent Color Swatches */}
+              <div className="px-2.5 py-1.5 flex items-center justify-between gap-1 border-b border-[#2B3340]/70 mb-1">
+                {SECTION_COLORS.map((c) => {
+                  const isSelected = currentColorId === c.id;
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      title={c.label}
+                      onClick={() => updateAttributes({ color: c.id })}
+                      className={`w-4 h-4 rounded-full ${c.dotBg} transition-transform flex items-center justify-center ${
+                        isSelected ? "ring-2 ring-white scale-110" : "hover:scale-125 opacity-70 hover:opacity-100"
+                      }`}
+                    />
+                  );
+                })}
+              </div>
+
               <button
                 type="button"
                 onClick={handleDuplicate}
@@ -390,6 +430,38 @@ export const SectionComponent: React.FC<NodeViewProps> = ({
               >
                 <UnwrapIcon size={13} className="text-[#94A3B8]" />
                 <span>Unwrap Stack</span>
+              </button>
+
+              <div className="my-1 border-t border-[#2B3340]/70" />
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  editor.commands.collapseAllSections();
+                }}
+                className="w-full px-2.5 py-1.5 text-left text-[#D8E1E8] hover:bg-[#2A3240] hover:text-white flex items-center justify-between transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <ChevronRightIcon size={13} className="text-[#94A3B8]" />
+                  <span>Collapse All Stacks</span>
+                </div>
+                <span className="text-[10px] text-[#64748B] font-mono">Ctrl+Alt+[</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  editor.commands.expandAllSections();
+                }}
+                className="w-full px-2.5 py-1.5 text-left text-[#D8E1E8] hover:bg-[#2A3240] hover:text-white flex items-center justify-between transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <ChevronDownIcon size={13} className="text-[#94A3B8]" />
+                  <span>Expand All Stacks</span>
+                </div>
+                <span className="text-[10px] text-[#64748B] font-mono">Ctrl+Alt+]</span>
               </button>
 
               <div className="my-1 border-t border-[#2B3340]/70" />
