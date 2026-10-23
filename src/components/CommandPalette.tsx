@@ -16,6 +16,8 @@ const COMMAND_MAP: Record<string, CommandActionId> = {
   delete_active_note: "delete_note",
   delete_note: "delete_note",
   insert_section: "insert_section",
+  collapse_all_sections: "collapse_all_sections",
+  expand_all_sections: "expand_all_sections",
 };
 
 export interface ActionItem {

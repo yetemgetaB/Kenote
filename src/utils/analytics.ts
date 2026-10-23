@@ -57,6 +57,8 @@ export const COMMAND_ACTIONS = [
   "check_for_updates",
   "delete_note",
   "insert_section",
+  "collapse_all_sections",
+  "expand_all_sections",
 ] as const;
 export type CommandActionId = (typeof COMMAND_ACTIONS)[number];
 

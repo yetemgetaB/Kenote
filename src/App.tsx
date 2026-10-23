@@ -50,6 +50,8 @@ import {
   ZoomInIcon,
   ZoomOutIcon,
   SectionIcon,
+  ChevronRightIcon,
+  ChevronDownIcon,
 } from "./components/Icons";
 
 export function App() {
@@ -1037,6 +1039,26 @@ export function App() {
       icon: <SectionIcon size={16} />,
       perform: () => {
         tiptapInstance?.commands.insertSection();
+      },
+    },
+    {
+      id: "collapse_all_sections",
+      title: "Collapse All Stacks",
+      subtitle: "Collapse every stack in the active note",
+      shortcut: ["Ctrl", "Alt", "["],
+      icon: <ChevronRightIcon size={16} />,
+      perform: () => {
+        tiptapInstance?.commands.collapseAllSections();
+      },
+    },
+    {
+      id: "expand_all_sections",
+      title: "Expand All Stacks",
+      subtitle: "Expand every stack in the active note",
+      shortcut: ["Ctrl", "Alt", "]"],
+      icon: <ChevronDownIcon size={16} />,
+      perform: () => {
+        tiptapInstance?.commands.expandAllSections();
       },
     },
     {
