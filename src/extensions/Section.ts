@@ -12,11 +12,19 @@ declare module "@tiptap/core" {
       /**
        * Insert a new section at the current selection or block position
        */
-      insertSection: (attributes?: { title?: string }) => ReturnType;
+      insertSection: (attributes?: { title?: string; color?: string; isCollapsed?: boolean }) => ReturnType;
       /**
        * Set or insert a section block
        */
-      setSection: (attributes?: { title?: string }) => ReturnType;
+      setSection: (attributes?: { title?: string; color?: string; isCollapsed?: boolean }) => ReturnType;
+      /**
+       * Collapse all sections across the entire document
+       */
+      collapseAllSections: () => ReturnType;
+      /**
+       * Expand all sections across the entire document
+       */
+      expandAllSections: () => ReturnType;
       /**
        * Exit section downwards into the node after the section or create a new paragraph below
        */
@@ -62,14 +70,24 @@ function setupMarkdownItSection(md: any) {
       return false;
     }
 
-    // Extract title attribute if present
+    // Extract attributes if present
     const afterKeyword = restOfLine.slice("kenote-section".length).trim();
     let title = "";
-    if (afterKeyword.startsWith('title="')) {
-      const titleMatch = afterKeyword.match(/^title="((?:[^"\\]|\\.)*)"/);
-      if (titleMatch) {
-        title = titleMatch[1].replace(/\\"/g, '"').replace(/\\\\/g, "\\");
-      }
+    const titleMatch = afterKeyword.match(/title="((?:[^"\\]|\\.)*)"/);
+    if (titleMatch) {
+      title = titleMatch[1].replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+    }
+
+    let color = "default";
+    const colorMatch = afterKeyword.match(/color="((?:[^"\\]|\\.)*)"/);
+    if (colorMatch) {
+      color = colorMatch[1];
+    }
+
+    let isCollapsed = false;
+    const collapsedMatch = afterKeyword.match(/isCollapsed="(true|false)"/);
+    if (collapsedMatch) {
+      isCollapsed = collapsedMatch[1] === "true";
     }
 
     if (silent) {
@@ -116,6 +134,8 @@ function setupMarkdownItSection(md: any) {
     token_o.attrs = [
       ["data-type", "section"],
       ["data-title", title],
+      ["data-color", color],
+      ["data-collapsed", isCollapsed ? "true" : "false"],
     ];
     token_o.map = [startLine, nextLine];
 
@@ -176,6 +196,20 @@ export const Section = Node.create<SectionOptions>({
           "data-title": typeof attributes.title === "string" ? attributes.title : "Untitled Section",
         }),
       },
+      isCollapsed: {
+        default: false,
+        parseHTML: (element) => element.getAttribute("data-collapsed") === "true",
+        renderHTML: (attributes) => ({
+          "data-collapsed": attributes.isCollapsed ? "true" : "false",
+        }),
+      },
+      color: {
+        default: "default",
+        parseHTML: (element) => element.getAttribute("data-color") || "default",
+        renderHTML: (attributes) => ({
+          "data-color": attributes.color || "default",
+        }),
+      },
       _autoFocus: {
         default: false,
         rendered: false,
@@ -211,6 +245,8 @@ export const Section = Node.create<SectionOptions>({
         (attributes) =>
         ({ state, dispatch, tr }) => {
           const title = attributes?.title ?? "Untitled Section";
+          const color = attributes?.color ?? "default";
+          const isCollapsed = Boolean(attributes?.isCollapsed);
           const sectionType = this.type;
           const paragraphType = state.schema.nodes.paragraph;
 
@@ -220,7 +256,7 @@ export const Section = Node.create<SectionOptions>({
 
           // If text or blocks are currently selected, wrap them into a section
           if (!state.selection.empty) {
-            const wrap = wrapIn(sectionType, { title, _autoFocus: true });
+            const wrap = wrapIn(sectionType, { title, color, isCollapsed, _autoFocus: true });
             if (wrap(state, dispatch)) {
               return true;
             }
@@ -228,7 +264,7 @@ export const Section = Node.create<SectionOptions>({
 
           // Create a valid section node containing one empty paragraph
           const sectionNode = sectionType.create(
-            { title, _autoFocus: true },
+            { title, color, isCollapsed, _autoFocus: true },
             paragraphType.create()
           );
 
@@ -269,6 +305,36 @@ export const Section = Node.create<SectionOptions>({
         (attributes) =>
         ({ commands }) => {
           return commands.insertSection(attributes);
+        },
+      collapseAllSections:
+        () =>
+        ({ tr, state, dispatch }) => {
+          let modified = false;
+          state.doc.descendants((node, pos) => {
+            if (node.type === this.type && !node.attrs.isCollapsed) {
+              tr.setNodeMarkup(pos, undefined, { ...node.attrs, isCollapsed: true });
+              modified = true;
+            }
+          });
+          if (modified && dispatch) {
+            dispatch(tr);
+          }
+          return modified;
+        },
+      expandAllSections:
+        () =>
+        ({ tr, state, dispatch }) => {
+          let modified = false;
+          state.doc.descendants((node, pos) => {
+            if (node.type === this.type && node.attrs.isCollapsed) {
+              tr.setNodeMarkup(pos, undefined, { ...node.attrs, isCollapsed: false });
+              modified = true;
+            }
+          });
+          if (modified && dispatch) {
+            dispatch(tr);
+          }
+          return modified;
         },
       exitSectionDown:
         () =>
@@ -365,6 +431,8 @@ export const Section = Node.create<SectionOptions>({
     return {
       "Mod-Shift-s": () => this.editor.commands.insertSection(),
       "Mod-Shift-S": () => this.editor.commands.insertSection(),
+      "Mod-Alt-[": () => this.editor.commands.collapseAllSections(),
+      "Mod-Alt-]": () => this.editor.commands.expandAllSections(),
       Enter: () => {
         const { state } = this.editor;
         const { selection } = state;
@@ -503,8 +571,10 @@ export const Section = Node.create<SectionOptions>({
 
           const rawTitle = typeof node.attrs.title === "string" ? node.attrs.title : "";
           const escapedTitle = rawTitle.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+          const colorAttr = node.attrs.color && node.attrs.color !== "default" ? ` color="${node.attrs.color}"` : "";
+          const collapsedAttr = node.attrs.isCollapsed ? ` isCollapsed="true"` : "";
 
-          state.write(`${colons}kenote-section title="${escapedTitle}"\n\n`);
+          state.write(`${colons}kenote-section title="${escapedTitle}"${colorAttr}${collapsedAttr}\n\n`);
           state.renderContent(node);
           state.ensureNewLine();
           state.write(`${colons}`);
