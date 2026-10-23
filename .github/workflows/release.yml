@@ -60,16 +60,28 @@ jobs:
           releaseBody: |
             ## KeNote v__VERSION__
 
-            ### 🚀 Windows Startup & Background Ready
-            - **Start KeNote with Windows**: Added an optional setting in Settings → General to start KeNote automatically on Windows login.
-            - **Quiet Background Launch**: Starts quietly in the background without stealing focus or interrupting your workflow.
-            - **Instant Global Launch**: Global Launch shortcut (`Alt + Shift + K` or custom) is ready immediately after Windows startup.
-            - **Preserved Single Instance**: Opening KeNote while already running in the background instantly brings your existing window to the front.
-            - **Normal Process Termination**: Explicitly quitting KeNote terminates the process normally.
+            KeNote `v__VERSION__` is a major feature update introducing **Collapsible Stacks**, **Offline Spellcheck & Quick Suggestions**, an **Expanded Slash Command Suite**, and live **Callout Alerts**.
 
-            ### 🛠️ Improvements & Fixes
-            - **OS-Level Authoritative Sync**: Startup state is queried and updated directly with the operating system for accurate status reporting.
-            - **Custom Shortcut Compatibility**: Fully compatible with your existing customized Global Launch shortcut.
+            ### 🗂️ Collapsible Stacks (Sections)
+            - **Quick Creation**: Create collapsible blocks with `/stack [title]`, `Ctrl+Shift+S`, or the toolbar stack icon.
+            - **Wrap Selection**: Wrap any selected text directly into a stack with zero friction.
+            - **Inline Argument Pill**: Type `/stack [title]` to set stack titles seamlessly within the editor stream.
+            - **6 Accent Color Themes**: Choose from Default (Slate), Blue, Emerald, Amber, Purple, or Rose with custom left borders and header gradient tints.
+            - **Header Actions Menu (`···`)**: Duplicate, Unwrap (dissolve container while preserving contents), Copy Markdown/Plain Text, and Delete.
+            - **Bulk Commands**: "Collapse All Stacks" (`Ctrl+Alt+[`) and "Expand All Stacks" (`Ctrl+Alt+]`) via keyboard shortcuts, Stack `···` menu, and Command Palette (`Ctrl+K`).
+            - **Native Markdown Persistence**: Stored portably as `:::kenote-section title="..." color="..." isCollapsed="true"`.
+
+            ### ✍️ Offline Spellcheck & Suggestions
+            - **Offline English Lexicon**: Built-in morphological spelling checker without external network requests.
+            - **Instant Word Selection**: Right-click on any misspelled word to auto-select it and see top correction suggestions.
+            - **User Custom Dictionary**: "Add to Dictionary" learns your domain-specific terms and acronyms.
+            - **Refined Context Menu**: Distraction-free native aesthetic without sparkles or bouncy animations.
+
+            ### ⚡ Slash Commands & GitHub-Style Callouts
+            - **Numbered Lists**: Quickly insert numbered lists with `/numbered`.
+            - **Date & Time Suite**: Insert `/today` (DD/MM/YYYY), `/tomorrow`, `/yesterday`, `/time`, or `/now`.
+            - **Live Alert Callouts**: Real-time decorative rendering for `> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`, `> [!WARNING]`, and `> [!CAUTION]`.
+            - **Boundary Clamping**: Popup menus intelligently anchor upwards near viewport bottoms.
 
             ### 📦 Download & Install
             - **Windows**: Download the `.msi` or `-setup.exe` installer below.
