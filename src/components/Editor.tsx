@@ -20,6 +20,7 @@ import { api, isValidExternalUrl } from "../utils/tauriBridge";
 
 import { Section } from "../extensions/Section";
 import { InlineStackPill } from "../extensions/InlineStackPill";
+import { CalloutAlerts } from "../extensions/CalloutAlerts";
 
 const lowlight = createLowlight(common);
 
@@ -284,6 +285,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
           },
         }),
         InlineStackPill,
+        CalloutAlerts,
         Markdown.configure({
           html: true,
           transformPastedText: false,

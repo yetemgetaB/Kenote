@@ -143,6 +143,79 @@ body {
   border-radius: 0 6px 6px 0;
 }
 
+/* GitHub-style Callout Alerts in Blockquotes */
+.ProseMirror blockquote.kenote-callout {
+  font-style: normal;
+  border-radius: 6px;
+  padding: 0.65rem 0.95rem;
+  margin: 0.75rem 0;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+  color: #DDE3EA;
+}
+
+.ProseMirror blockquote.kenote-callout-note {
+  border-left: 3.5px solid #38BDF8;
+  background: rgba(56, 189, 248, 0.07);
+}
+
+.ProseMirror blockquote.kenote-callout-tip {
+  border-left: 3.5px solid #34D399;
+  background: rgba(52, 211, 153, 0.07);
+}
+
+.ProseMirror blockquote.kenote-callout-warning {
+  border-left: 3.5px solid #FBBF24;
+  background: rgba(251, 191, 36, 0.07);
+}
+
+.ProseMirror blockquote.kenote-callout-important {
+  border-left: 3.5px solid #A78BFA;
+  background: rgba(167, 139, 250, 0.07);
+}
+
+.ProseMirror blockquote.kenote-callout-caution {
+  border-left: 3.5px solid #F87171;
+  background: rgba(248, 113, 113, 0.07);
+}
+
+/* Callout badge styling */
+.ProseMirror .kenote-callout-badge {
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-right: 0.45rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 4px;
+  display: inline-block;
+  line-height: 1.25;
+}
+
+.ProseMirror .kenote-callout-badge-note {
+  color: #38BDF8;
+  background: rgba(56, 189, 248, 0.15);
+}
+
+.ProseMirror .kenote-callout-badge-tip {
+  color: #34D399;
+  background: rgba(52, 211, 153, 0.15);
+}
+
+.ProseMirror .kenote-callout-badge-warning {
+  color: #FBBF24;
+  background: rgba(251, 191, 36, 0.15);
+}
+
+.ProseMirror .kenote-callout-badge-important {
+  color: #A78BFA;
+  background: rgba(167, 139, 250, 0.15);
+}
+
+.ProseMirror .kenote-callout-badge-caution {
+  color: #F87171;
+  background: rgba(248, 113, 113, 0.15);
+}
+
 .ProseMirror code:not(pre code) {
   font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
   font-size: 0.85em;
