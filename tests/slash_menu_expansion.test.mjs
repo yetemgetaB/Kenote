@@ -85,6 +85,19 @@ describe("Slash Menu Expansion & Callout Alerts", () => {
         "Blockquote should have kenote-callout and kenote-callout-note classes"
       );
       assert.strictEqual(bq.getAttribute("data-alert"), "note");
+
+      // Verify clean badge widget exists and contains label without raw syntax symbols
+      const badge = bq.querySelector(".kenote-callout-badge-note");
+      assert.ok(badge, "Badge element should exist");
+      assert.ok(badge.textContent.includes("Note"), "Badge should contain friendly 'Note' label");
+      assert.ok(!badge.textContent.includes("[!"), "Badge should not contain raw '[!' syntax");
+      assert.ok(!badge.textContent.includes("]"), "Badge should not contain raw ']' syntax");
+
+      // Verify raw markdown tag is completely hidden and captures closing bracket
+      const rawTag = bq.querySelector(".kenote-callout-raw-tag");
+      assert.ok(rawTag, "Raw tag element should exist for markdown fidelity");
+      assert.strictEqual(rawTag.textContent, "[!NOTE]", "Raw tag must span entire '[!NOTE]' including brackets");
+
       editor.destroy();
     });
 
