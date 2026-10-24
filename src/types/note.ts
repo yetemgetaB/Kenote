@@ -48,7 +48,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   quick_switcher_shortcut: "ctrl_tab",
   global_zoom: 100,
   editor_zoom: 100,
-  global_shortcut: "Alt+Shift+K",
+  global_shortcut: "Ctrl+Space",
   telemetry_enabled: true,
 };
 

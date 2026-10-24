@@ -5,6 +5,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.6.1] - 2026-10-24
+
+### 🐛 Bug Fixes & Improvements
+
+#### ⌨️ Global Launcher Shortcut Reliability
+- **Windows Extended Key Fix (`F13`–`F24` & Custom Hotkeys)**: Deferred global hotkey registration to ensure the Windows message loop is active before registering hooks, resolving issues where custom shortcuts like `Ctrl+Alt+F13` failed to trigger.
+- **Eliminated Silent Fallback**: Removed the silent fallback that secretly reverted to `Alt+Shift+K` when a custom shortcut encountered startup timing delays, preventing split-brain mismatch between UI settings and active OS hooks.
+- **Ergonomic Default Hotkey (`Ctrl+Space`)**: Updated the default global launch shortcut from `Alt+Shift+K` to `Ctrl+Space` for a faster, Raycast-inspired workflow across all platforms.
+
+---
+
 ## [0.6.0] - 2026-10-24
 
 ### 🚀 Highlights

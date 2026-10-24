@@ -60,28 +60,17 @@ jobs:
           releaseBody: |
             ## KeNote v__VERSION__
 
-            KeNote `v__VERSION__` is a major feature update introducing **Collapsible Stacks**, **Offline Spellcheck & Quick Suggestions**, an **Expanded Slash Command Suite**, and live **Callout Alerts**.
+            KeNote `v__VERSION__` is a patch release fixing the global launcher shortcut reliability on Windows, eliminating silent fallback conflicts, and setting `Ctrl+Space` as the new default launcher hotkey.
 
-            ### 🗂️ Collapsible Stacks (Sections)
-            - **Quick Creation**: Create collapsible blocks with `/stack [title]`, `Ctrl+Shift+S`, or the toolbar stack icon.
-            - **Wrap Selection**: Wrap any selected text directly into a stack with zero friction.
-            - **Inline Argument Pill**: Type `/stack [title]` to set stack titles seamlessly within the editor stream.
-            - **6 Accent Color Themes**: Choose from Default (Slate), Blue, Emerald, Amber, Purple, or Rose with custom left borders and header gradient tints.
-            - **Header Actions Menu (`···`)**: Duplicate, Unwrap (dissolve container while preserving contents), Copy Markdown/Plain Text, and Delete.
-            - **Bulk Commands**: "Collapse All Stacks" (`Ctrl+Alt+[`) and "Expand All Stacks" (`Ctrl+Alt+]`) via keyboard shortcuts, Stack `···` menu, and Command Palette (`Ctrl+K`).
-            - **Native Markdown Persistence**: Stored portably as `:::kenote-section title="..." color="..." isCollapsed="true"`.
+            ### 🐛 Bug Fixes & Reliability
+            - **Windows Extended Key Fix (`F13`–`F24` & Custom Hotkeys)**: Deferred global hotkey registration to ensure the Windows message loop is active before registering hooks, resolving issues where custom shortcuts like `Ctrl+Alt+F13` failed to trigger.
+            - **Eliminated Silent Fallback**: Removed the silent fallback that secretly reverted to `Alt+Shift+K` when custom shortcut registration encountered startup timing delays.
+            - **Ergonomic Default Hotkey (`Ctrl+Space`)**: Updated default launcher shortcut from `Alt+Shift+K` to `Ctrl+Space` across all settings, UI previews, and backend registration.
 
-            ### ✍️ Offline Spellcheck & Suggestions
-            - **Offline English Lexicon**: Built-in morphological spelling checker without external network requests.
-            - **Instant Word Selection**: Right-click on any misspelled word to auto-select it and see top correction suggestions.
-            - **User Custom Dictionary**: "Add to Dictionary" learns your domain-specific terms and acronyms.
-            - **Refined Context Menu**: Distraction-free native aesthetic without sparkles or bouncy animations.
-
-            ### ⚡ Slash Commands & GitHub-Style Callouts
-            - **Numbered Lists**: Quickly insert numbered lists with `/numbered`.
-            - **Date & Time Suite**: Insert `/today` (DD/MM/YYYY), `/tomorrow`, `/yesterday`, `/time`, or `/now`.
-            - **Live Alert Callouts**: Real-time decorative rendering for `> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`, `> [!WARNING]`, and `> [!CAUTION]`.
-            - **Boundary Clamping**: Popup menus intelligently anchor upwards near viewport bottoms.
+            ### 🗂️ Features from v0.6.0
+            - **Collapsible Stacks (Sections)**: Create collapsible blocks with `/stack [title]`, `Ctrl+Shift+S`, or the toolbar stack icon.
+            - **Offline Spellcheck & Suggestions**: Built-in morphological spelling checker with instant right-click word selection and custom user dictionary.
+            - **Expanded Slash Commands**: Numbered lists, date & time suite (`/today`, `/now`, etc.), and live GitHub-style callouts (`[!NOTE]`, `[!WARNING]`, etc.).
 
             ### 📦 Download & Install
             - **Windows**: Download the `.msi` or `-setup.exe` installer below.

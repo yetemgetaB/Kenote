@@ -36,7 +36,7 @@ describe("Global & Editor Zoom Unit Tests", () => {
     it("DEFAULT_SETTINGS includes global_zoom, editor_zoom, and global_shortcut", () => {
       assert.equal(DEFAULT_SETTINGS.global_zoom, 100);
       assert.equal(DEFAULT_SETTINGS.editor_zoom, 100);
-      assert.equal(DEFAULT_SETTINGS.global_shortcut, "Alt+Shift+K");
+      assert.equal(DEFAULT_SETTINGS.global_shortcut, "Ctrl+Space");
     });
   });
 

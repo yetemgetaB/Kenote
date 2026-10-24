@@ -125,7 +125,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [updateErrorMessage, setUpdateErrorMessage] = useState<string | null>(null);
   const [trashActionError, setTrashActionError] = useState<string | null>(null);
   const [telemetryEnabled, setTelemetryEnabledState] = useState(settings.telemetry_enabled ?? true);
-  const [globalShortcut, setGlobalShortcut] = useState(settings.global_shortcut || "Alt+Shift+K");
+  const [globalShortcut, setGlobalShortcut] = useState(settings.global_shortcut || "Ctrl+Space");
   const [isRecordingShortcut, setIsRecordingShortcut] = useState(false);
   const [shortcutError, setShortcutError] = useState<string | null>(null);
   const [isSavingShortcut, setIsSavingShortcut] = useState(false);
@@ -158,7 +158,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setGlobalZoom(settings.global_zoom ?? DEFAULT_GLOBAL_ZOOM);
     setEditorZoom(settings.editor_zoom ?? DEFAULT_EDITOR_ZOOM);
     setTelemetryEnabledState(settings.telemetry_enabled ?? true);
-    setGlobalShortcut(settings.global_shortcut || "Alt+Shift+K");
+    setGlobalShortcut(settings.global_shortcut || "Ctrl+Space");
   }, [settings.global_zoom, settings.editor_zoom, settings.telemetry_enabled, settings.global_shortcut]);
 
   const handleSaveGlobalShortcut = async (newShortcut: string) => {

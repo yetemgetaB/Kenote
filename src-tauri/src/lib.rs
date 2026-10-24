@@ -60,7 +60,7 @@ fn default_zoom() -> Option<u32> {
 }
 
 fn default_global_shortcut() -> Option<String> {
-    Some("Alt+Shift+K".to_string())
+    Some("Ctrl+Space".to_string())
 }
 
 fn default_telemetry_enabled() -> Option<bool> {
@@ -85,7 +85,7 @@ impl Default for AppSettings {
             quick_switcher_shortcut: Some("ctrl_tab".to_string()),
             global_zoom: Some(100),
             editor_zoom: Some(100),
-            global_shortcut: Some("Alt+Shift+K".to_string()),
+            global_shortcut: Some("Ctrl+Space".to_string()),
             window_width: Some(520.0),
             window_height: Some(720.0),
             window_x: None,
@@ -617,7 +617,7 @@ fn update_global_shortcut(app: tauri::AppHandle, new_shortcut_str: String) -> Re
     let new_shortcut = trimmed.parse::<Shortcut>().map_err(|e| format!("Invalid shortcut format: {}", e))?;
     
     let mut settings = get_settings();
-    let old_shortcut_str = settings.global_shortcut.as_deref().unwrap_or("Alt+Shift+K").to_string();
+    let old_shortcut_str = settings.global_shortcut.as_deref().unwrap_or("Ctrl+Space").to_string();
 
     if old_shortcut_str == trimmed && app.global_shortcut().is_registered(new_shortcut.clone()) {
         return Ok(trimmed.to_string());
@@ -861,41 +861,51 @@ console.log("Hello from Kenote!");
                 }
             }
 
-            // Register OS-level global shortcut for window toggle
+            // Register OS-level global shortcut for window toggle.
+            //
+            // IMPORTANT: We defer registration to a separate thread that waits briefly for
+            // the Windows message loop to be fully running. This is necessary because F13-F24
+            // (extended virtual keys VK_F13-VK_F24) registered via RegisterHotKey before the
+            // event loop is pumped may silently succeed but never fire on Windows.
+            // All standard keys (letters, F1-F12, Ctrl+Space, etc.) are also safer this way.
             let shortcut_str = settings
                 .global_shortcut
                 .as_deref()
-                .unwrap_or("Alt+Shift+K");
+                .unwrap_or("Ctrl+Space")
+                .to_string();
 
             let app_handle = app.handle().clone();
-            let mut registered = false;
+            std::thread::spawn(move || {
+                // Give the Tauri window event loop time to start its message pump.
+                std::thread::sleep(std::time::Duration::from_millis(500));
 
-            if let Ok(shortcut) = shortcut_str.parse::<Shortcut>() {
-                let app_handle_clone = app_handle.clone();
-                if let Ok(()) = app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, event| {
-                    if event.state() == ShortcutState::Pressed {
-                        toggle_main_window(&app_handle_clone);
-                    }
-                }) {
-                    registered = true;
-                } else {
-                    eprintln!("Failed to register custom global shortcut {}: attempting default Alt+Shift+K fallback", shortcut_str);
-                }
-            }
-
-            // Fallback to default Alt+Shift+K if custom shortcut failed or is invalid
-            if !registered && shortcut_str != "Alt+Shift+K" {
-                if let Ok(default_shortcut) = "Alt+Shift+K".parse::<Shortcut>() {
-                    let app_handle_clone = app_handle.clone();
-                    if let Err(e) = app.global_shortcut().on_shortcut(default_shortcut, move |_app, _shortcut, event| {
-                        if event.state() == ShortcutState::Pressed {
-                            toggle_main_window(&app_handle_clone);
+                match shortcut_str.parse::<Shortcut>() {
+                    Ok(shortcut) => {
+                        let app_handle_cb = app_handle.clone();
+                        if let Err(e) = app_handle.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, event| {
+                            if event.state() == ShortcutState::Pressed {
+                                toggle_main_window(&app_handle_cb);
+                            }
+                        }) {
+                            // Registration failed. Do NOT silently fall back to a different
+                            // shortcut - that creates a split-brain state where the UI shows
+                            // one shortcut but the OS listens to another. Log it clearly.
+                            eprintln!(
+                                "[Kenote] Failed to register global shortcut '{}': {}. \
+                                No fallback registered - open Settings to choose a different shortcut.",
+                                shortcut_str, e
+                            );
                         }
-                    }) {
-                        eprintln!("Failed to register fallback shortcut Alt+Shift+K: {}", e);
+                    }
+                    Err(e) => {
+                        eprintln!(
+                            "[Kenote] Saved global shortcut '{}' is not a valid accelerator: {}. \
+                            Open Settings to reset it.",
+                            shortcut_str, e
+                        );
                     }
                 }
-            }
+            });
 
             Ok(())
         })
@@ -1042,7 +1052,7 @@ mod tests {
         let default_settings = AppSettings::default();
         assert_eq!(default_settings.global_zoom, Some(100));
         assert_eq!(default_settings.editor_zoom, Some(100));
-        assert_eq!(default_settings.global_shortcut, Some("Alt+Shift+K".to_string()));
+        assert_eq!(default_settings.global_shortcut, Some("Ctrl+Space".to_string()));
 
         // Test custom values serialization & deserialization
         let custom = AppSettings {
@@ -1070,7 +1080,7 @@ mod tests {
         let from_legacy: AppSettings = serde_json::from_str(legacy_json).expect("Should deserialize legacy JSON");
         assert_eq!(from_legacy.global_zoom, Some(100));
         assert_eq!(from_legacy.editor_zoom, Some(100));
-        assert_eq!(from_legacy.global_shortcut, Some("Alt+Shift+K".to_string()));
+        assert_eq!(from_legacy.global_shortcut, Some("Ctrl+Space".to_string()));
     }
 
     #[test]

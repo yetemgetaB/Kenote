@@ -12,7 +12,7 @@ export interface ParsedShortcutResult {
   error?: string;
 }
 
-export const DEFAULT_GLOBAL_SHORTCUT = "Alt+Shift+K";
+export const DEFAULT_GLOBAL_SHORTCUT = "Ctrl+Space";
 
 export const INTERNAL_SHORTCUTS: Record<string, string> = {
   "Ctrl+K": "Command Palette",
@@ -248,11 +248,11 @@ export function isValidGlobalShortcut(shortcut?: string | null): boolean {
 }
 
 /**
- * Formats a shortcut string (e.g., "Alt+Shift+K") into a clean display representation ("Alt + Shift + K").
+ * Formats a shortcut string (e.g., "Ctrl+Space") into a clean display representation ("Ctrl + Space").
  */
 export function formatShortcutDisplay(shortcut?: string | null): string {
   if (!shortcut || typeof shortcut !== "string") {
-    return "Alt + Shift + K";
+    return "Ctrl + Space";
   }
   return shortcut.replace(/\+/g, " + ");
 }

@@ -13,15 +13,15 @@ import { DEFAULT_SETTINGS } from "../src/types/note.ts";
 
 describe("Global Launch Shortcut Unit Tests", () => {
   describe("1. Default Shortcut & Configuration", () => {
-    it("has default shortcut set to Alt+Shift+K", () => {
-      assert.equal(DEFAULT_GLOBAL_SHORTCUT, "Alt+Shift+K");
-      assert.equal(DEFAULT_SETTINGS.global_shortcut, "Alt+Shift+K");
+    it("has default shortcut set to Ctrl+Space", () => {
+      assert.equal(DEFAULT_GLOBAL_SHORTCUT, "Ctrl+Space");
+      assert.equal(DEFAULT_SETTINGS.global_shortcut, "Ctrl+Space");
     });
 
     it("formats default shortcut cleanly for display", () => {
-      assert.equal(formatShortcutDisplay(DEFAULT_GLOBAL_SHORTCUT), "Alt + Shift + K");
-      assert.equal(formatShortcutDisplay(null), "Alt + Shift + K");
-      assert.equal(formatShortcutDisplay(undefined), "Alt + Shift + K");
+      assert.equal(formatShortcutDisplay(DEFAULT_GLOBAL_SHORTCUT), "Ctrl + Space");
+      assert.equal(formatShortcutDisplay(null), "Ctrl + Space");
+      assert.equal(formatShortcutDisplay(undefined), "Ctrl + Space");
     });
 
     it("splits shortcut string into individual key tokens", () => {
@@ -216,7 +216,7 @@ describe("Global Launch Shortcut Unit Tests", () => {
     });
 
     it("preserves previous shortcut when registration fails", async () => {
-      let registeredShortcut = "Alt+Shift+K";
+      let registeredShortcut = "Ctrl+Space";
 
       async function mockUpdateShortcut(newShortcut, shouldFail = false) {
         if (!isValidGlobalShortcut(newShortcut)) {
