@@ -21,6 +21,10 @@ import { Section } from "../extensions/Section";
 import { InlineStackPill } from "../extensions/InlineStackPill";
 import { CalloutAlerts } from "../extensions/CalloutAlerts";
 import { SmartCodeBlock } from "../extensions/SmartCodeBlock";
+import Table from "@tiptap/extension-table";
+import TableRow from "@tiptap/extension-table-row";
+import TableCell from "@tiptap/extension-table-cell";
+import TableHeader from "@tiptap/extension-table-header";
 
 const lowlight = createLowlight(common);
 
@@ -286,6 +290,15 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
         }),
         InlineStackPill,
         CalloutAlerts,
+        Table.configure({
+          resizable: true,
+          HTMLAttributes: {
+            class: "kenote-table",
+          },
+        }),
+        TableRow,
+        TableHeader,
+        TableCell,
         Markdown.configure({
           html: true,
           transformPastedText: false,

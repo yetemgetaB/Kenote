@@ -8,6 +8,7 @@ import {
   ListIcon,
   CheckIcon,
   SectionIcon,
+  TableIcon,
 } from "./Icons";
 import { toggleSmartBold, toggleSmartItalic, toggleSmartUnderline } from "./Editor";
 
@@ -299,6 +300,23 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
           }`}
         >
           <SectionIcon size={14} />
+        </button>
+
+        {/* Table Button */}
+        <button
+          onClick={() => {
+            if (editor.isActive("table")) {
+              editor.chain().focus().addRowAfter().run();
+            } else {
+              editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+            }
+          }}
+          title={editor.isActive("table") ? "Add Row in Table" : "Insert Table (/table)"}
+          className={`p-1.5 rounded hover:text-white hover:bg-[#262E3B] transition-colors focus:outline-none ${
+            editor.isActive("table") ? "text-[var(--accent-color,#0399F7)] bg-[var(--accent-muted,rgba(3,153,247,0.15))]" : ""
+          }`}
+        >
+          <TableIcon size={14} />
         </button>
 
         {/* Lists Menu */}

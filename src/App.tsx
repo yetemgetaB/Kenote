@@ -52,6 +52,7 @@ import {
   SectionIcon,
   ChevronRightIcon,
   ChevronDownIcon,
+  TableIcon,
 } from "./components/Icons";
 
 export function App() {
@@ -1068,6 +1069,15 @@ export function App() {
       icon: <ChevronDownIcon size={16} />,
       perform: () => {
         tiptapInstance?.commands.expandAllSections();
+      },
+    },
+    {
+      id: "insert_table",
+      title: "Insert Table",
+      subtitle: "Add a 3x3 table with header row (/table)",
+      icon: <TableIcon size={16} />,
+      perform: () => {
+        tiptapInstance?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
       },
     },
     {

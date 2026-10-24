@@ -9,6 +9,7 @@ import {
   UnderlineIcon,
   ClearFormattingIcon,
   SectionIcon,
+  TableIcon,
 } from "./Icons";
 import {
   toggleSmartBold,
@@ -100,6 +101,7 @@ export const EditorContextMenu: React.FC<EditorContextMenuProps> = ({
     typeof navigator !== "undefined" &&
     /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
   const modKey = isMac ? "⌘" : "Ctrl+";
+  const isInTable = editor.isActive("table");
 
   const { selection } = editor.state;
   const hasSelection = !selection.empty;
@@ -402,6 +404,105 @@ export const EditorContextMenu: React.FC<EditorContextMenuProps> = ({
         </div>
         <span className="text-[10px] text-[#64748B] font-mono">{modKey}Shift+S</span>
       </button>
+
+      {/* Table Options */}
+      {isInTable ? (
+        <>
+          <div className="h-px bg-[#262D38] my-1" />
+          <div className="px-2.5 py-1 text-[10px] font-semibold text-[#64748B] uppercase tracking-wider">
+            Table Controls
+          </div>
+          <button
+            role="menuitem"
+            tabIndex={0}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              onClose();
+              editor.chain().focus().addColumnAfter().run();
+            }}
+            className="w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between hover:bg-[#262E3B] hover:text-white cursor-pointer transition-colors focus:bg-[#262E3B] focus:text-white focus:outline-none"
+          >
+            <span>Add Column After</span>
+          </button>
+          <button
+            role="menuitem"
+            tabIndex={0}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              onClose();
+              editor.chain().focus().addRowAfter().run();
+            }}
+            className="w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between hover:bg-[#262E3B] hover:text-white cursor-pointer transition-colors focus:bg-[#262E3B] focus:text-white focus:outline-none"
+          >
+            <span>Add Row After</span>
+          </button>
+          <button
+            role="menuitem"
+            tabIndex={0}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              onClose();
+              editor.chain().focus().deleteColumn().run();
+            }}
+            className="w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between hover:bg-[#262E3B] hover:text-white cursor-pointer transition-colors focus:bg-[#262E3B] focus:text-white focus:outline-none text-[#F87171]"
+          >
+            <span>Delete Column</span>
+          </button>
+          <button
+            role="menuitem"
+            tabIndex={0}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              onClose();
+              editor.chain().focus().deleteRow().run();
+            }}
+            className="w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between hover:bg-[#262E3B] hover:text-white cursor-pointer transition-colors focus:bg-[#262E3B] focus:text-white focus:outline-none text-[#F87171]"
+          >
+            <span>Delete Row</span>
+          </button>
+          <button
+            role="menuitem"
+            tabIndex={0}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              onClose();
+              editor.chain().focus().toggleHeaderRow().run();
+            }}
+            className="w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between hover:bg-[#262E3B] hover:text-white cursor-pointer transition-colors focus:bg-[#262E3B] focus:text-white focus:outline-none"
+          >
+            <span>Toggle Header Row</span>
+          </button>
+          <button
+            role="menuitem"
+            tabIndex={0}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              onClose();
+              editor.chain().focus().deleteTable().run();
+            }}
+            className="w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between hover:bg-red-500/10 hover:text-red-400 cursor-pointer transition-colors focus:bg-red-500/10 focus:text-red-400 focus:outline-none text-red-400"
+          >
+            <span>Delete Table</span>
+          </button>
+        </>
+      ) : (
+        <button
+          role="menuitem"
+          tabIndex={0}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            onClose();
+            editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+          }}
+          className="w-full px-2.5 py-1.5 text-left rounded-md flex items-center justify-between hover:bg-[#262E3B] hover:text-white cursor-pointer transition-colors focus:bg-[#262E3B] focus:text-white focus:outline-none"
+        >
+          <div className="flex items-center space-x-2">
+            <TableIcon size={14} className="opacity-70" />
+            <span>Insert Table</span>
+          </div>
+          <span className="text-[10px] text-[#64748B] font-mono">/table</span>
+        </button>
+      )}
     </div>
   );
 };

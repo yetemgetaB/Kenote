@@ -324,6 +324,78 @@ body {
   font-weight: bold;
 }
 
+/* Table Styles */
+.ProseMirror .tableWrapper {
+  overflow-x: auto;
+  margin: 1.25rem 0;
+  max-width: 100%;
+}
+
+.ProseMirror table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  margin: 1.25rem 0;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid #2B3340;
+  background-color: #161A22;
+}
+
+.ProseMirror table td,
+.ProseMirror table th {
+  min-width: 100px;
+  border: 1px solid #2B3340;
+  padding: 8px 12px;
+  vertical-align: top;
+  box-sizing: border-box;
+  position: relative;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.ProseMirror table td > *,
+.ProseMirror table th > * {
+  margin-bottom: 0;
+}
+
+.ProseMirror table th {
+  font-weight: 600;
+  text-align: left;
+  background-color: #1E2530;
+  color: #E2E8F0;
+}
+
+.ProseMirror table td {
+  color: #CBD5E1;
+}
+
+.ProseMirror table .selectedCell:after {
+  z-index: 2;
+  position: absolute;
+  content: "";
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(3, 153, 247, 0.15);
+  pointer-events: none;
+}
+
+.ProseMirror table .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: -2px;
+  width: 4px;
+  background-color: var(--accent-color, #0399F7);
+  pointer-events: none;
+}
+
+.ProseMirror.resize-cursor {
+  cursor: col-resize;
+}
+
 .ProseMirror ul[data-type="taskList"] {
   list-style: none;
   padding: 0;
