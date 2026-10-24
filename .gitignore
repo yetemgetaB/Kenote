@@ -33,3 +33,5 @@ extracted_icon.png
 *.key.pub
 graphify-out/
 
+brag-output*/
+.agents/
