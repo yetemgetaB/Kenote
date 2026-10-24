@@ -267,6 +267,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
           },
         }).configure({
           lowlight,
+          defaultLanguage: "javascript",
         }),
         CustomTaskList,
         TaskItem.configure({
@@ -441,13 +442,16 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
         }
         prevNoteIdRef.current = noteId;
         isSwitchingNoteRef.current = true;
-        editor.commands.setContent(preserveBlankLines(initialContent || ""), false);
-        const fullText = editor.getText();
-        const charCount = editor.state.doc.textContent.length;
-        const { wordCount, firstLineTitle } = computeDocumentStats(fullText, charCount);
-        onChange(charCount, wordCount, firstLineTitle);
-        restoreCursor(noteId, editor);
-        isSwitchingNoteRef.current = false;
+        queueMicrotask(() => {
+          if (!editor || editor.isDestroyed) return;
+          editor.commands.setContent(preserveBlankLines(initialContent || ""), false);
+          const fullText = editor.getText();
+          const charCount = editor.state.doc.textContent.length;
+          const { wordCount, firstLineTitle } = computeDocumentStats(fullText, charCount);
+          onChange(charCount, wordCount, firstLineTitle);
+          restoreCursor(noteId, editor);
+          isSwitchingNoteRef.current = false;
+        });
       }
     }, [noteId, initialContent, editor, onChange]);
 

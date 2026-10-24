@@ -253,75 +253,104 @@ body {
 }
 
 /* Code syntax highlighting (lowlight / highlight.js dark theme) */
+.ProseMirror .hljs-keyword,
 .ProseMirror pre code .hljs-keyword,
+.ProseMirror .hljs-selector-tag,
 .ProseMirror pre code .hljs-selector-tag,
+.ProseMirror .hljs-subst,
 .ProseMirror pre code .hljs-subst {
-  color: #C678DD;
-  font-weight: 600;
+  color: #C678DD !important;
+  font-weight: 600 !important;
 }
 
+.ProseMirror .hljs-string,
 .ProseMirror pre code .hljs-string,
+.ProseMirror .hljs-doctag,
 .ProseMirror pre code .hljs-doctag {
-  color: #98C379;
+  color: #98C379 !important;
 }
 
+.ProseMirror .hljs-title,
 .ProseMirror pre code .hljs-title,
+.ProseMirror .hljs-title.function_,
 .ProseMirror pre code .hljs-title.function_,
+.ProseMirror .hljs-section,
 .ProseMirror pre code .hljs-section {
-  color: #61AFEF;
-  font-weight: 600;
+  color: #61AFEF !important;
+  font-weight: 600 !important;
 }
 
+.ProseMirror .hljs-title.class_,
 .ProseMirror pre code .hljs-title.class_,
+.ProseMirror .hljs-type,
 .ProseMirror pre code .hljs-type,
+.ProseMirror .hljs-built_in,
 .ProseMirror pre code .hljs-built_in {
-  color: #E5C07B;
+  color: #E5C07B !important;
 }
 
+.ProseMirror .hljs-number,
 .ProseMirror pre code .hljs-number,
+.ProseMirror .hljs-literal,
 .ProseMirror pre code .hljs-literal {
-  color: #D19A66;
+  color: #D19A66 !important;
 }
 
+.ProseMirror .hljs-variable,
 .ProseMirror pre code .hljs-variable,
+.ProseMirror .hljs-template-variable,
 .ProseMirror pre code .hljs-template-variable,
+.ProseMirror .hljs-attr,
 .ProseMirror pre code .hljs-attr,
+.ProseMirror .hljs-attribute,
 .ProseMirror pre code .hljs-attribute {
-  color: #E06C75;
+  color: #E06C75 !important;
 }
 
+.ProseMirror .hljs-comment,
 .ProseMirror pre code .hljs-comment,
+.ProseMirror .hljs-quote,
 .ProseMirror pre code .hljs-quote {
-  color: #636D83;
-  font-style: italic;
+  color: #636D83 !important;
+  font-style: italic !important;
 }
 
+.ProseMirror .hljs-symbol,
 .ProseMirror pre code .hljs-symbol,
+.ProseMirror .hljs-bullet,
 .ProseMirror pre code .hljs-bullet,
+.ProseMirror .hljs-link,
 .ProseMirror pre code .hljs-link {
-  color: #56B6C2;
+  color: #56B6C2 !important;
 }
 
+.ProseMirror .hljs-meta,
 .ProseMirror pre code .hljs-meta {
-  color: #E5C07B;
+  color: #E5C07B !important;
 }
 
+.ProseMirror .hljs-tag,
 .ProseMirror pre code .hljs-tag,
+.ProseMirror .hljs-name,
 .ProseMirror pre code .hljs-name {
-  color: #E06C75;
+  color: #E06C75 !important;
 }
 
+.ProseMirror .hljs-punctuation,
 .ProseMirror pre code .hljs-punctuation,
+.ProseMirror .hljs-operator,
 .ProseMirror pre code .hljs-operator {
-  color: #ABB2BF;
+  color: #ABB2BF !important;
 }
 
+.ProseMirror .hljs-emphasis,
 .ProseMirror pre code .hljs-emphasis {
-  font-style: italic;
+  font-style: italic !important;
 }
 
+.ProseMirror .hljs-strong,
 .ProseMirror pre code .hljs-strong {
-  font-weight: bold;
+  font-weight: bold !important;
 }
 
 /* Table Styles */

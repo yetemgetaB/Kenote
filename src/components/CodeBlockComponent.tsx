@@ -7,18 +7,19 @@ export const CodeBlockComponent: React.FC<NodeViewProps> = ({
     attrs: { language: defaultLanguage },
   },
   updateAttributes,
-  extension,
+  editor,
+  getPos,
 }) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
-    // Get text content of code block
-    const text = (extension as any)?.editor?.state?.doc?.textBetween(
-      (extension as any)?.getPos?.() || 0,
-      ((extension as any)?.getPos?.() || 0) + 1000,
-      "\n"
-    );
-    navigator.clipboard.writeText(text || "");
+    let text = "";
+    if (typeof getPos === "function") {
+      const pos = getPos();
+      const node = editor?.state?.doc?.nodeAt(pos);
+      text = node?.textContent || "";
+    }
+    navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -30,18 +31,17 @@ export const CodeBlockComponent: React.FC<NodeViewProps> = ({
         <div className="flex items-center space-x-2">
           <select
             contentEditable={false}
-            defaultValue={defaultLanguage || "auto"}
+            value={defaultLanguage || "javascript"}
             onChange={(e) => updateAttributes({ language: e.target.value })}
             className="bg-transparent text-gray-300 hover:text-white focus:outline-none cursor-pointer text-xs"
           >
-            <option value="auto" className="bg-[#1B2028] text-gray-200">Auto</option>
             <option value="javascript" className="bg-[#1B2028] text-gray-200">JavaScript</option>
             <option value="typescript" className="bg-[#1B2028] text-gray-200">TypeScript</option>
+            <option value="python" className="bg-[#1B2028] text-gray-200">Python</option>
             <option value="html" className="bg-[#1B2028] text-gray-200">HTML</option>
             <option value="css" className="bg-[#1B2028] text-gray-200">CSS</option>
             <option value="json" className="bg-[#1B2028] text-gray-200">JSON</option>
             <option value="rust" className="bg-[#1B2028] text-gray-200">Rust</option>
-            <option value="python" className="bg-[#1B2028] text-gray-200">Python</option>
             <option value="bash" className="bg-[#1B2028] text-gray-200">Bash</option>
             <option value="sql" className="bg-[#1B2028] text-gray-200">SQL</option>
             <option value="markdown" className="bg-[#1B2028] text-gray-200">Markdown</option>

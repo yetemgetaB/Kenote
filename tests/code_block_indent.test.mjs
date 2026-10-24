@@ -36,6 +36,18 @@ function createTestEditor(initialContent = "<p>Hello</p>") {
   });
 }
 
+function dispatchKey(editor, key) {
+  const event = new KeyboardEvent("keydown", { key });
+  for (const plugin of editor.state.plugins) {
+    if (plugin.props && plugin.props.handleKeyDown) {
+      if (plugin.props.handleKeyDown(editor.view, event)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 describe("Smart Code Block Indentation & Formatting Tests", () => {
   describe("1. Constants & Configuration", () => {
     it("configures 4 spaces as default indentation", () => {
@@ -164,6 +176,17 @@ describe("Smart Code Block Indentation & Formatting Tests", () => {
       assert.equal(text, "const obj = {\n    \n};");
       editor.destroy();
     });
+    it("exits the code block when pressing Enter on a blank line at the end", () => {
+      const editor = createTestEditor("<pre><code>x = 10\n</code></pre>");
+      // Position cursor on the second line (which is empty)
+      editor.commands.setTextSelection(8);
+
+      const handled = dispatchKey(editor, "Enter");
+      assert.equal(handled, true);
+      // Editor should now have exited the code block into a paragraph
+      assert.equal(editor.isActive("codeBlock"), false);
+      editor.destroy();
+    });
   });
 
   describe("5. Smart Backspace Indent Deletion", () => {
@@ -185,6 +208,56 @@ describe("Smart Code Block Indentation & Formatting Tests", () => {
       editor.commands.keyboardShortcut("Backspace");
       // Does not delete 4 characters of indent since cursor is after normal text
       assert.notEqual(editor.getText(), "");
+      editor.destroy();
+    });
+  });
+
+  describe("6. Arrow Key Navigation across Code Block Boundaries", () => {
+    it("steps out to previous block or inserts paragraph on ArrowUp on first line", () => {
+      const editor = createTestEditor("<p>Above</p><pre><code>let y = 20</code></pre>");
+      // Position cursor on first line of code block
+      editor.commands.setTextSelection(10);
+      assert.equal(editor.isActive("codeBlock"), true);
+
+      const handled = dispatchKey(editor, "ArrowUp");
+      assert.equal(handled, true);
+      assert.equal(editor.isActive("codeBlock"), false);
+      editor.destroy();
+    });
+
+    it("steps out to next block or inserts paragraph on ArrowDown on last line", () => {
+      const editor = createTestEditor("<pre><code>let y = 20</code></pre><p>Below</p>");
+      // Position cursor on last line of code block
+      editor.commands.setTextSelection(10);
+      assert.equal(editor.isActive("codeBlock"), true);
+
+      const handled = dispatchKey(editor, "ArrowDown");
+      assert.equal(handled, true);
+      assert.equal(editor.isActive("codeBlock"), false);
+      editor.destroy();
+    });
+
+    it("steps out before code block on ArrowLeft at start", () => {
+      const editor = createTestEditor("<p>Intro</p><pre><code>console.log()</code></pre>");
+      // Place cursor at pos 1 of code block content (offset 0)
+      editor.commands.setTextSelection(8);
+      assert.equal(editor.isActive("codeBlock"), true);
+
+      const handled = dispatchKey(editor, "ArrowLeft");
+      assert.equal(handled, true);
+      assert.equal(editor.isActive("codeBlock"), false);
+      editor.destroy();
+    });
+
+    it("steps out after code block on ArrowRight at end", () => {
+      const editor = createTestEditor("<pre><code>console.log()</code></pre><p>Outro</p>");
+      // Place cursor at end of code block
+      editor.commands.setTextSelection(14);
+      assert.equal(editor.isActive("codeBlock"), true);
+
+      const handled = dispatchKey(editor, "ArrowRight");
+      assert.equal(handled, true);
+      assert.equal(editor.isActive("codeBlock"), false);
       editor.destroy();
     });
   });
