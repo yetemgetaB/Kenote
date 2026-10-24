@@ -507,6 +507,15 @@ export function App() {
         }
       } catch (err) {
         console.error("Initialization error:", err);
+      } finally {
+        // Reveal window smoothly after initial DOM and note content have painted
+        if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+          window.requestAnimationFrame(() => {
+            api.showWindow();
+          });
+        } else {
+          api.showWindow();
+        }
       }
     }
     init();

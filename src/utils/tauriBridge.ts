@@ -300,6 +300,14 @@ export const api = {
     }
   },
 
+  async showWindow(): Promise<void> {
+    try {
+      await invokeTauri("show_window");
+    } catch (e) {
+      console.log("Show window", e);
+    }
+  },
+
   async minimizeWindow(): Promise<void> {
     try {
       await invokeTauri("minimize_window");

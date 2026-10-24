@@ -531,6 +531,14 @@ fn close_window(window: WebviewWindow) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn show_window(window: WebviewWindow) -> Result<(), String> {
+    window.show().map_err(|e| e.to_string())?;
+    window.unminimize().map_err(|e| e.to_string())?;
+    window.set_focus().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 fn reveal_in_explorer(filename: Option<String>) -> Result<(), String> {
     let settings = get_settings();
     let notes_dir = get_resolved_notes_dir(settings.custom_notes_dir.as_deref());
@@ -741,7 +749,8 @@ pub fn run() {
             update_global_shortcut,
             enable_autostart,
             disable_autostart,
-            is_autostart_enabled
+            is_autostart_enabled,
+            show_window
         ])
         .setup(|app| {
             let is_autostart = is_autostart_launch(std::env::args());
@@ -794,13 +803,23 @@ pub fn run() {
                     let _ = win.set_always_on_top(true);
                 }
 
-                // Show window and bring to focus on normal user launch; stay background-ready if autostarted
+                // Window visibility & smooth launch:
+                // Window starts hidden (visible: false in tauri.conf.json) so position and size
+                // restoration happen off-screen without any jump or flicker.
                 if is_autostart {
                     let _ = win.hide();
                 } else {
-                    let _ = win.show();
-                    let _ = win.unminimize();
-                    let _ = win.set_focus();
+                    // Reveal smoothly via frontend after first paint (show_window command).
+                    // As a failsafe, reveal after 1200ms if frontend has not already done so.
+                    let win_safety = win.clone();
+                    std::thread::spawn(move || {
+                        std::thread::sleep(std::time::Duration::from_millis(1200));
+                        if !win_safety.is_visible().unwrap_or(false) {
+                            let _ = win_safety.show();
+                            let _ = win_safety.unminimize();
+                            let _ = win_safety.set_focus();
+                        }
+                    });
                 }
 
                 let win_clone = win.clone();
