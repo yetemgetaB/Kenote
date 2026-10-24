@@ -252,6 +252,78 @@ body {
   border: 1px solid #333C4D;
 }
 
+/* Code syntax highlighting (lowlight / highlight.js dark theme) */
+.ProseMirror pre code .hljs-keyword,
+.ProseMirror pre code .hljs-selector-tag,
+.ProseMirror pre code .hljs-subst {
+  color: #C678DD;
+  font-weight: 600;
+}
+
+.ProseMirror pre code .hljs-string,
+.ProseMirror pre code .hljs-doctag {
+  color: #98C379;
+}
+
+.ProseMirror pre code .hljs-title,
+.ProseMirror pre code .hljs-title.function_,
+.ProseMirror pre code .hljs-section {
+  color: #61AFEF;
+  font-weight: 600;
+}
+
+.ProseMirror pre code .hljs-title.class_,
+.ProseMirror pre code .hljs-type,
+.ProseMirror pre code .hljs-built_in {
+  color: #E5C07B;
+}
+
+.ProseMirror pre code .hljs-number,
+.ProseMirror pre code .hljs-literal {
+  color: #D19A66;
+}
+
+.ProseMirror pre code .hljs-variable,
+.ProseMirror pre code .hljs-template-variable,
+.ProseMirror pre code .hljs-attr,
+.ProseMirror pre code .hljs-attribute {
+  color: #E06C75;
+}
+
+.ProseMirror pre code .hljs-comment,
+.ProseMirror pre code .hljs-quote {
+  color: #636D83;
+  font-style: italic;
+}
+
+.ProseMirror pre code .hljs-symbol,
+.ProseMirror pre code .hljs-bullet,
+.ProseMirror pre code .hljs-link {
+  color: #56B6C2;
+}
+
+.ProseMirror pre code .hljs-meta {
+  color: #E5C07B;
+}
+
+.ProseMirror pre code .hljs-tag,
+.ProseMirror pre code .hljs-name {
+  color: #E06C75;
+}
+
+.ProseMirror pre code .hljs-punctuation,
+.ProseMirror pre code .hljs-operator {
+  color: #ABB2BF;
+}
+
+.ProseMirror pre code .hljs-emphasis {
+  font-style: italic;
+}
+
+.ProseMirror pre code .hljs-strong {
+  font-weight: bold;
+}
+
 .ProseMirror ul[data-type="taskList"] {
   list-style: none;
   padding: 0;

@@ -5,6 +5,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.6.2] - 2026-10-24
+
+### ✨ New Features & Polish
+
+#### 💻 Smart Code Blocks & Syntax Coloring
+- **Vibrant Syntax Highlighting**: Added Tokyo Night / Atom One Dark color palette for code blocks supporting dozens of programming languages (keywords, strings, functions, classes, comments, numbers, types).
+- **Smart 4-Space Indentation Rules**:
+  - `Tab`: Indents cursor or multi-line selections by 4 spaces.
+  - `Shift+Tab`: Dedents cursor line or selected lines by up to 4 spaces without destroying text.
+  - `Enter` Auto-Indentation: Preserves base indentation on new lines automatically.
+  - **Block Opener Indentation**: Automatically increases indentation by +4 spaces when pressing `Enter` after block openers (`:`, `{`, `[`, `(`) for Python `if`/`def`/`class`, JavaScript, TypeScript, Rust, and C/C++.
+  - **Bracket Expansion**: Pressing `Enter` between `{}` cleanly expands into a 3-line block with an indented center line and correctly positioned cursor.
+  - **Smart Backspace**: Deletes full 4-space indent units when deleting at indentation boundaries.
+
+#### ⚡ Smooth Startup & Zero Flash
+- **Eliminated White Screen Delay**: Resolved startup white screen flash by configuring window background color and synchronizing Tauri window presentation with DOM readiness.
+- **Seamless Window Positioning**: Saved position is applied before showing the window, completely removing launch position jump and reposition jitter.
+
+#### 🏷️ Callout Alert Badge Fix
+- **Clean Alert Badges**: Resolved rendering glitch where raw bracket symbols (`[!NOTE]`) were visible and clipped in note callouts.
+
+---
+
 ## [0.6.1] - 2026-10-24
 
 ### 🐛 Bug Fixes & Improvements
