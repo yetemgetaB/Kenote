@@ -13,11 +13,13 @@ import { Markdown } from "tiptap-markdown";
 import { common, createLowlight } from "lowlight";
 import { CodeBlockComponent } from "./CodeBlockComponent";
 import { SectionComponent } from "./SectionComponent";
+import { ImageComponent } from "./ImageComponent";
 import { EditorContextMenu } from "./EditorContextMenu";
 import { SlashMenu } from "./SlashMenu";
 import { api, isValidExternalUrl } from "../utils/tauriBridge";
 
 import { Section } from "../extensions/Section";
+import { ImageAttachment } from "../extensions/ImageAttachment";
 import { InlineStackPill } from "../extensions/InlineStackPill";
 import { CalloutAlerts } from "../extensions/CalloutAlerts";
 import { SmartCodeBlock } from "../extensions/SmartCodeBlock";
@@ -171,6 +173,8 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
     ref
   ) => {
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+    const [isDraggingFile, setIsDraggingFile] = useState(false);
+    const dragCounterRef = useRef(0);
     const cursorSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const restoreRafRef = useRef<number | null>(null);
     const isSwitchingNoteRef = useRef<boolean>(false);
@@ -287,6 +291,11 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
         Section.extend({
           addNodeView() {
             return ReactNodeViewRenderer(SectionComponent);
+          },
+        }),
+        ImageAttachment.extend({
+          addNodeView() {
+            return ReactNodeViewRenderer(ImageComponent);
           },
         }),
         InlineStackPill,
@@ -494,6 +503,22 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
       <div
         ref={scrollContainerRef}
         className="flex-1 w-full overflow-y-auto custom-scrollbar relative"
+        onDragEnter={(e) => {
+          if (e.dataTransfer?.types?.includes("Files")) {
+            dragCounterRef.current += 1;
+            setIsDraggingFile(true);
+          }
+        }}
+        onDragLeave={() => {
+          dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+          if (dragCounterRef.current === 0) {
+            setIsDraggingFile(false);
+          }
+        }}
+        onDrop={() => {
+          dragCounterRef.current = 0;
+          setIsDraggingFile(false);
+        }}
         onContextMenu={(e) => {
           e.preventDefault();
           setContextMenu({
@@ -503,6 +528,14 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
           });
         }}
       >
+        {isDraggingFile && (
+          <div className="absolute inset-3 border-2 border-dashed border-[var(--accent-color,#38BDF8)] rounded-xl pointer-events-none bg-[#38BDF8]/5 z-30 flex items-center justify-center animate-in fade-in duration-100 backdrop-blur-[1px]">
+            <div className="bg-[#1E242E] border border-[#2B3545] px-4 py-2.5 rounded-xl shadow-2xl flex items-center space-x-2.5 text-sm text-gray-200">
+              <span className="w-2.5 h-2.5 rounded-full bg-[var(--accent-color,#38BDF8)] animate-ping" />
+              <span className="font-medium">Drop image here to attach</span>
+            </div>
+          </div>
+        )}
         <EditorContent editor={editor} style={{ zoom: `${editorZoom / 100}` }} />
         <EditorContextMenu
           isOpen={!!contextMenu?.isOpen}
