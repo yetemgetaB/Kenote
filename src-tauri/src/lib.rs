@@ -1,3 +1,5 @@
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::Engine as _;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -94,8 +96,8 @@ impl Default for AppSettings {
             discovery_source: None,
             telemetry_enabled: Some(true),
         }
-    }
 }
+    }
 
 fn get_app_data_dir() -> PathBuf {
     if let Some(mut dir) = dirs::data_dir() {
@@ -131,6 +133,13 @@ fn get_trash_dir(custom_dir: Option<&str>) -> PathBuf {
     let trash_dir = notes_dir.join(".trash");
     let _ = fs::create_dir_all(&trash_dir);
     trash_dir
+}
+
+fn get_assets_dir(custom_dir: Option<&str>) -> PathBuf {
+    let notes_dir = get_resolved_notes_dir(custom_dir);
+    let assets_dir = notes_dir.join("assets");
+    let _ = fs::create_dir_all(&assets_dir);
+    assets_dir
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
@@ -513,6 +522,134 @@ fn empty_trash() -> Result<(), String> {
 }
 
 #[tauri::command]
+fn save_image_attachment(
+    filename: Option<String>,
+    base64_data: String,
+) -> Result<String, String> {
+    let settings = get_settings();
+    let assets_dir = get_assets_dir(settings.custom_notes_dir.as_deref());
+
+    // 1. Separate potential data URI prefix e.g. "data:image/png;base64,"
+    let (mime_ext, clean_base64) = if let Some(idx) = base64_data.find(";base64,") {
+        let prefix = &base64_data[..idx];
+        let data = &base64_data[idx + 8..];
+        let ext = if prefix.contains("image/png") {
+            "png"
+        } else if prefix.contains("image/jpeg") || prefix.contains("image/jpg") {
+            "jpg"
+        } else if prefix.contains("image/webp") {
+            "webp"
+        } else if prefix.contains("image/gif") {
+            "gif"
+        } else if prefix.contains("image/svg") {
+            "svg"
+        } else if prefix.contains("image/bmp") {
+            "bmp"
+        } else if prefix.contains("image/x-icon") || prefix.contains("image/vnd.microsoft.icon") {
+            "ico"
+        } else {
+            "png"
+        };
+        (Some(ext), data.trim())
+    } else {
+        (None, base64_data.trim())
+    };
+
+    // 2. Decode base64 bytes
+    let image_bytes = BASE64_STANDARD
+        .decode(clean_base64)
+        .map_err(|e| format!("Invalid base64 image data: {}", e))?;
+
+    // 3. Determine extension
+    let requested_name = filename.as_deref().unwrap_or("").trim();
+    let sanitized_basename = Path::new(requested_name)
+        .file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    let ext = if let Some(dot_idx) = sanitized_basename.rfind('.') {
+        let e = sanitized_basename[dot_idx + 1..].to_lowercase();
+        match e.as_str() {
+            "png" | "jpg" | "jpeg" | "webp" | "gif" | "svg" | "bmp" | "ico" => e,
+            _ => mime_ext.unwrap_or("png").to_string(),
+        }
+    } else {
+        mime_ext.unwrap_or("png").to_string()
+    };
+
+    // 4. Generate timestamp and random suffix for collision-free uniqueness
+    let now = chrono::Local::now();
+    let timestamp = now.format("%Y%m%d-%H%M%S").to_string();
+    let rand_suffix: u32 = {
+        let duration = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or_default();
+        (duration.subsec_nanos() % 0xFFFF) as u32
+    };
+
+    let target_filename = if !sanitized_basename.is_empty() && !sanitized_basename.starts_with('.') {
+        let stem = if let Some(dot_idx) = sanitized_basename.rfind('.') {
+            &sanitized_basename[..dot_idx]
+        } else {
+            &sanitized_basename
+        };
+        let clean_stem: String = stem
+            .chars()
+            .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '-' })
+            .take(30)
+            .collect();
+        format!("{}-{}-{:04x}.{}", clean_stem, timestamp, rand_suffix, ext)
+    } else {
+        format!("image-{}-{:04x}.{}", timestamp, rand_suffix, ext)
+    };
+
+    let target_path = assets_dir.join(&target_filename);
+    fs::write(&target_path, image_bytes).map_err(|e| format!("Failed to write image file: {}", e))?;
+
+    Ok(format!("assets/{}", target_filename))
+}
+
+#[tauri::command]
+fn read_image_attachment(
+    relative_path: String,
+) -> Result<String, String> {
+    let settings = get_settings();
+    let notes_dir = get_resolved_notes_dir(settings.custom_notes_dir.as_deref());
+
+    // Security check: reject directory traversal attempts
+    let trimmed = relative_path.trim().replace('\\', "/");
+    if trimmed.contains("..") || trimmed.starts_with('/') {
+        return Err("Invalid image path: directory traversal prohibited".to_string());
+    }
+
+    let full_path = notes_dir.join(&trimmed);
+    if !full_path.exists() || !full_path.is_file() {
+        return Err(format!("Image attachment not found: {}", trimmed));
+    }
+
+    let bytes = fs::read(&full_path).map_err(|e| format!("Failed to read image: {}", e))?;
+    let ext = full_path
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("png")
+        .to_lowercase();
+
+    let mime = match ext.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "webp" => "image/webp",
+        "gif" => "image/gif",
+        "svg" => "image/svg+xml",
+        "bmp" => "image/bmp",
+        "ico" => "image/x-icon",
+        _ => "application/octet-stream",
+    };
+
+    let encoded = BASE64_STANDARD.encode(&bytes);
+    Ok(format!("data:{};base64,{}", mime, encoded))
+}
+
+#[tauri::command]
 fn set_window_always_on_top(window: WebviewWindow, always_on_top: bool) -> Result<(), String> {
     window.set_always_on_top(always_on_top).map_err(|e| e.to_string())?;
     Ok(())
@@ -741,6 +878,8 @@ pub fn run() {
             restore_note,
             permanently_delete_note,
             empty_trash,
+            save_image_attachment,
+            read_image_attachment,
             set_window_always_on_top,
             minimize_window,
             close_window,
@@ -1122,6 +1261,36 @@ mod tests {
         assert!(!is_autostart_launch(vec!["kenote.exe"]));
         assert!(!is_autostart_launch(vec!["kenote.exe", "--normal"]));
         assert!(!is_autostart_launch(Vec::<String>::new()));
+    }
+
+    #[test]
+    fn test_image_attachment_handling() {
+        let sample_data = BASE64_STANDARD.encode(b"fake png image bytes");
+        let sample_data_uri = format!("data:image/png;base64,{}", sample_data);
+
+        let saved_rel = save_image_attachment(Some("diagram.png".to_string()), sample_data_uri).expect("Should save image");
+        assert!(saved_rel.starts_with("assets/"));
+        assert!(saved_rel.ends_with(".png"));
+        assert!(saved_rel.contains("diagram-"));
+
+        let read_result = read_image_attachment(saved_rel.clone());
+        assert!(read_result.is_ok());
+        let data_url = read_result.unwrap();
+        assert!(data_url.starts_with("data:image/png;base64,"));
+
+        // Clean up written test asset
+        let settings = get_settings();
+        let notes_dir = get_resolved_notes_dir(settings.custom_notes_dir.as_deref());
+        let full_path = notes_dir.join(&saved_rel);
+        let _ = fs::remove_file(full_path);
+    }
+
+    #[test]
+    fn test_read_image_attachment_traversal_protection() {
+        assert!(read_image_attachment("../secret.txt".to_string()).is_err());
+        assert!(read_image_attachment("..\\secret.txt".to_string()).is_err());
+        assert!(read_image_attachment("/etc/passwd".to_string()).is_err());
+        assert!(read_image_attachment("assets/../../etc/passwd".to_string()).is_err());
     }
 }
 
