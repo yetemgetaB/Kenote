@@ -664,3 +664,79 @@ body {
     display: inline;
   }
 }
+
+/* Clean Print & PDF Stylesheet */
+@media print {
+  header,
+  nav,
+  .titlebar,
+  .bottom-toolbar,
+  .save-status-slot,
+  .fixed,
+  button,
+  input,
+  [data-tauri-drag-region] {
+    display: none !important;
+  }
+
+  html,
+  body,
+  #root,
+  .custom-scrollbar {
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+
+  .prose {
+    color: #111827 !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    font-size: 11pt !important;
+    line-height: 1.5 !important;
+  }
+
+  .prose h1, .prose h2, .prose h3 {
+    color: #0f172a !important;
+    page-break-after: avoid;
+  }
+
+  .prose pre, .prose code {
+    background: #f8fafc !important;
+    color: #1e293b !important;
+    border: 1px solid #e2e8f0 !important;
+    page-break-inside: avoid;
+  }
+
+  .kenote-table, table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+    page-break-inside: avoid;
+  }
+
+  .kenote-table th, .kenote-table td, table th, table td {
+    border: 1px solid #cbd5e1 !important;
+    color: #0f172a !important;
+    background: #ffffff !important;
+    padding: 6px 10px !important;
+  }
+
+  .kenote-table th, table th {
+    background: #f1f5f9 !important;
+    font-weight: 600 !important;
+  }
+
+  blockquote {
+    border-left: 3px solid #0284c7 !important;
+    color: #334155 !important;
+    background: #f8fafc !important;
+  }
+
+  img {
+    max-width: 100% !important;
+    page-break-inside: avoid;
+  }
+}

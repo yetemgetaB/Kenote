@@ -464,6 +464,55 @@ export const api = {
     });
   },
 
+  async saveFile(
+    defaultFilename: string,
+    content: string | Uint8Array,
+    filters?: Array<{ name: string; extensions: string[] }>
+  ): Promise<string | null> {
+    if (isTauri()) {
+      try {
+        const { save } = await import("@tauri-apps/plugin-dialog");
+        const selected = await save({
+          defaultPath: defaultFilename,
+          filters,
+        });
+        if (selected && typeof selected === "string") {
+          const { writeTextFile, writeFile } = await import("@tauri-apps/plugin-fs");
+          if (typeof content === "string") {
+            await writeTextFile(selected, content);
+          } else {
+            await writeFile(selected, content);
+          }
+          return selected;
+        }
+        return null;
+      } catch (err) {
+        console.error("Failed to save file via Tauri dialog:", err);
+        throw err;
+      }
+    }
+
+    // Browser fallback: trigger file download via anchor
+    try {
+      const blob =
+        typeof content === "string"
+          ? new Blob([content], { type: "text/plain;charset=utf-8" })
+          : new Blob([content as any]);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = defaultFilename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      return defaultFilename;
+    } catch (err) {
+      console.error("Failed to trigger browser download:", err);
+      return null;
+    }
+  },
+
   async openExternal(url: string): Promise<boolean> {
     if (!isValidExternalUrl(url)) {
       console.warn("Blocked attempt to open invalid or unsafe external URL:", url);
