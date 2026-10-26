@@ -5,6 +5,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.6.5] - 2026-10-26
+
+### ✨ New Features & Polish
+
+#### 📤 Document Export Suite (PDF, HTML, Markdown, Rich Text)
+- **PDF Document Export (`.pdf`)**: Print or save note directly to PDF with clean document layout and typography (`@media print` stylesheet with UI chrome hidden, proper page breaks, and high-contrast text).
+- **Standalone HTML Page (`.html`)**: Export to a self-contained `.html` document with embedded dark/light mode responsive styles, system typography, and styled code blocks/tables.
+- **Markdown & Plain Text (`.md`, `.txt`)**: Export active note via native save file dialog (`api.saveFile`) with proper file extension filters.
+- **Copy Formatted Rich Text (`Ctrl + C` / Menu)**: Copy styled HTML content directly to clipboard with plain text fallback, ready to paste into Slack, Gmail, or Google Docs.
+- **Export All Notes (Vault Backup)**: One-click directory backup of the entire notes collection into Markdown files in a chosen folder.
+- **Raycast-Styled Export HUD (`ExportModal`)**: Fast modal accessible via `Ctrl + Shift + E`, titlebar icon button, or Command Palette, with keyboard navigation (`↑`/`↓`) and hotkey shortcuts (`P`, `C`, `H`, `M`, `T`, `B`).
+
+---
+
 ## [0.6.4] - 2026-10-26
 
 ### ✨ New Features & Polish
