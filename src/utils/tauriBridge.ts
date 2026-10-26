@@ -32,6 +32,23 @@ async function invokeTauri<T>(cmd: string, args?: Record<string, unknown>): Prom
 const STORAGE_KEY_NOTES = "kenote_notes_mock";
 const STORAGE_KEY_SETTINGS = "kenote_settings_mock";
 const STORAGE_KEY_AUTOSTART = "kenote_autostart_mock";
+const STORAGE_KEY_ASSETS = "kenote_assets_mock";
+const mockAssetsMap = new Map<string, string>();
+
+export async function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+      } else {
+        reject(new Error("Failed to read blob as base64 string"));
+      }
+    };
+    reader.onerror = () => reject(reader.error || new Error("FileReader error"));
+    reader.readAsDataURL(blob);
+  });
+}
 
 const defaultMockNotes: NoteMetadata[] = [
   {
@@ -339,6 +356,112 @@ export const api = {
     } catch (e) {
       console.log("Save window state", e);
     }
+  },
+
+  async saveImageAttachment(fileOrBlob: Blob | File, preferredName?: string): Promise<string> {
+    const base64Data = await blobToBase64(fileOrBlob);
+    const filename = preferredName || (fileOrBlob instanceof File ? fileOrBlob.name : undefined);
+
+    if (isTauri()) {
+      return await invokeTauri<string>("save_image_attachment", {
+        filename,
+        base64Data,
+      });
+    }
+
+    // Browser mock fallback
+    const now = Date.now();
+    const cleanName = (filename || "image").replace(/[^a-zA-Z0-9.-]/g, "_");
+    const mockPath = `assets/${now}-${cleanName}`;
+    mockAssetsMap.set(mockPath, base64Data);
+    try {
+      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY_ASSETS) || "{}");
+      stored[mockPath] = base64Data;
+      localStorage.setItem(STORAGE_KEY_ASSETS, JSON.stringify(stored));
+    } catch {}
+    return mockPath;
+  },
+
+  async resolveAssetUrl(src: string): Promise<string> {
+    if (!src) return "";
+    if (
+      src.startsWith("http://") ||
+      src.startsWith("https://") ||
+      src.startsWith("data:") ||
+      src.startsWith("blob:")
+    ) {
+      return src;
+    }
+
+    if (isTauri()) {
+      try {
+        return await invokeTauri<string>("read_image_attachment", { relativePath: src });
+      } catch (err) {
+        console.warn("Failed to read image attachment via Tauri:", src, err);
+        return src;
+      }
+    }
+
+    // Mock fallback
+    if (mockAssetsMap.has(src)) {
+      return mockAssetsMap.get(src)!;
+    }
+    try {
+      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY_ASSETS) || "{}");
+      if (stored[src]) return stored[src];
+    } catch {}
+    return src;
+  },
+
+  async selectImageFile(): Promise<File | null> {
+    if (isTauri()) {
+      try {
+        const { open } = await import("@tauri-apps/plugin-dialog");
+        const selected = await open({
+          directory: false,
+          multiple: false,
+          filters: [
+            {
+              name: "Image",
+              extensions: ["png", "jpg", "jpeg", "webp", "gif", "svg", "bmp", "ico"],
+            },
+          ],
+        });
+        if (selected && typeof selected === "string") {
+          const { readFile } = await import("@tauri-apps/plugin-fs");
+          const bytes = await readFile(selected);
+          const filename = selected.split(/[\\/]/).pop() || "image.png";
+          const ext = filename.split(".").pop()?.toLowerCase() || "png";
+          const mime =
+            ext === "jpg" || ext === "jpeg"
+              ? "image/jpeg"
+              : ext === "webp"
+              ? "image/webp"
+              : ext === "gif"
+              ? "image/gif"
+              : ext === "svg"
+              ? "image/svg+xml"
+              : "image/png";
+          return new File([bytes], filename, { type: mime });
+        }
+        return null;
+      } catch (e) {
+        console.error("Failed to pick image via Tauri dialog:", e);
+        return null;
+      }
+    }
+
+    // Browser fallback
+    return new Promise((resolve) => {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "image/*";
+      input.onchange = () => {
+        const file = input.files?.[0] || null;
+        resolve(file);
+      };
+      input.click();
+    });
   },
 
   async openExternal(url: string): Promise<boolean> {
