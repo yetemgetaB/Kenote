@@ -5,6 +5,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.6.4] - 2026-10-26
+
+### ✨ New Features & Polish
+
+#### 🖼️ Image Attachments, Clipboard Pasting & Drag-and-Drop
+- **Instant Clipboard Image Pasting (`Ctrl + V`)**: Copy screenshots or web images directly into notes; KeNote automatically writes them to your note's local `assets/` directory and embeds them seamlessly.
+- **Drag-and-Drop Files (DND)**: Drop images directly from Windows Explorer, Finder, or desktop into the editor at your cursor position with an active visual drop target indicator.
+- **Slash Command & Toolbar Access**: Type `/image` or click the new image icon in the bottom toolbar to pick and attach images via native file dialog.
+- **100% Portable Markdown**: Persisted as clean relative paths (`![caption](assets/image-...png)`), fully compatible with Obsidian, VS Code, Typora, and GitHub.
+- **Interactive Image Card**:
+  - **Zoom Lightbox Preview**: Click any image or hit the search icon to view full-resolution in a modal.
+  - **Copy Image**: 1-click clipboard copy of raw image bytes for sharing in external apps.
+  - **Editable Captions**: Inline alt-text / caption pill synced directly with markdown.
+  - **Error & Loading States**: Clean skeleton loader and broken link fallback with 1-click deletion.
+- **Security & Integrity**: Hardened Rust backend with strict directory traversal prevention and extension validation.
+
+---
+
+## [0.6.3] - 2026-10-25
+
+### ✨ New Features & Polish
+- **Markdown Tables**: Added 3x3 table insertion via `/table` slash command, bottom toolbar, and contextual row/column controls.
+- **Editor Navigation Fixes**: Enhanced code block arrow navigation, enter behavior, and flushSync cleanup.
+
+---
+
 ## [0.6.2] - 2026-10-24
 
 ### ✨ New Features & Polish
