@@ -9,7 +9,9 @@ import {
   CheckIcon,
   SectionIcon,
   TableIcon,
+  ImageIcon,
 } from "./Icons";
+import { api } from "../utils/tauriBridge";
 import { toggleSmartBold, toggleSmartItalic, toggleSmartUnderline } from "./Editor";
 
 interface BottomToolbarProps {
@@ -317,6 +319,39 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
           }`}
         >
           <TableIcon size={14} />
+        </button>
+
+        {/* Image Attachment Button */}
+        <button
+          onClick={() => {
+            api
+              .selectImageFile()
+              .then((file) => {
+                if (!file) return;
+                return api.saveImageAttachment(file).then((relPath) => {
+                  editor
+                    .chain()
+                    .focus()
+                    .insertContent({
+                      type: "image",
+                      attrs: {
+                        src: relPath,
+                        alt: file.name.replace(/\.[^/.]+$/, ""),
+                      },
+                    })
+                    .run();
+                });
+              })
+              .catch((err) => {
+                console.error("Failed to insert image:", err);
+              });
+          }}
+          title="Insert Image Attachment (/image)"
+          className={`p-1.5 rounded hover:text-white hover:bg-[#262E3B] transition-colors focus:outline-none ${
+            editor.isActive("image") ? "text-[var(--accent-color,#0399F7)] bg-[var(--accent-muted,rgba(3,153,247,0.15))]" : ""
+          }`}
+        >
+          <ImageIcon size={14} />
         </button>
 
         {/* Lists Menu */}

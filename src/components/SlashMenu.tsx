@@ -13,7 +13,9 @@ import {
   InfoCircleIcon,
   ShieldAlertIcon,
   TableIcon,
+  ImageIcon,
 } from "./Icons";
+import { api } from "../utils/tauriBridge";
 
 export interface SlashMenuItem {
   id: string;
@@ -204,6 +206,36 @@ export const SlashMenu: React.FC<SlashMenuProps> = ({ editor }) => {
       icon: <TableIcon size={16} className="text-[#38BDF8]" />,
       execute: (ed) => {
         ed.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+      },
+    },
+    {
+      id: "image",
+      title: "Image Attachment",
+      description: "Insert an image file from your computer",
+      keywords: ["image", "picture", "photo", "img", "attachment", "upload", "file"],
+      shortcut: "/image",
+      icon: <ImageIcon size={16} className="text-[#38BDF8]" />,
+      execute: (ed) => {
+        api
+          .selectImageFile()
+          .then((file) => {
+            if (!file) return;
+            return api.saveImageAttachment(file).then((relPath) => {
+              ed.chain()
+                .focus()
+                .insertContent({
+                  type: "image",
+                  attrs: {
+                    src: relPath,
+                    alt: file.name.replace(/\.[^/.]+$/, ""),
+                  },
+                })
+                .run();
+            });
+          })
+          .catch((err) => {
+            console.error("Failed to insert image:", err);
+          });
       },
     },
     {
