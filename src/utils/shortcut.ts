@@ -22,6 +22,7 @@ export const INTERNAL_SHORTCUTS: Record<string, string> = {
   "Ctrl+Tab": "Quick Switcher",
   "Ctrl+,": "Settings",
   "Ctrl+Shift+S": "Insert Section",
+  "Ctrl+Shift+E": "Export Note",
 };
 
 /**

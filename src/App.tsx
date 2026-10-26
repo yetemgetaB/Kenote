@@ -9,8 +9,10 @@ import { CommandPalette, ActionItem } from "./components/CommandPalette";
 import { SettingsView } from "./components/SettingsView";
 import { WelcomeModal } from "./components/WelcomeModal";
 import { UpdateModal } from "./components/UpdateModal";
+import { ExportModal } from "./components/ExportModal";
 import { NoteMetadata, AppSettings, DEFAULT_SETTINGS } from "./types/note";
 import { api, isValidExternalUrl } from "./utils/tauriBridge";
+import { copyRichText, exportToPdf } from "./utils/exportNote";
 import { applyAccentColor } from "./utils/theme";
 import {
   incrementGlobalZoom,
@@ -53,6 +55,8 @@ import {
   ChevronRightIcon,
   ChevronDownIcon,
   TableIcon,
+  ExportIcon,
+  FileTextIcon,
 } from "./components/Icons";
 
 export function App() {
@@ -79,6 +83,7 @@ export function App() {
   const [isNoteSwitcherOpen, setIsNoteSwitcherOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [availableUpdate, setAvailableUpdate] = useState<UpdateInfo | null>(null);
@@ -942,12 +947,17 @@ export function App() {
         return;
       }
 
-      // 2. Escape cancels quick switcher overlay or closes Settings
+      // 2. Escape cancels quick switcher overlay or closes Settings or Export
       if (e.key === "Escape") {
         if (isQuickSwitcherOpenRef.current) {
           e.preventDefault();
           isQuickSwitcherOpenRef.current = false;
           setIsQuickSwitcherOpen(false);
+          return;
+        }
+        if (isExportModalOpen) {
+          e.preventDefault();
+          setIsExportModalOpen(false);
           return;
         }
         if (isSettingsOpen) {
@@ -967,21 +977,30 @@ export function App() {
       } else if (isCmdOrCtrl && (e.key === "0" || e.code === "Numpad0")) {
         e.preventDefault();
         handleGlobalZoomReset();
+      } else if (isCmdOrCtrl && e.shiftKey && e.key.toLowerCase() === "e") {
+        e.preventDefault();
+        setIsExportModalOpen((prev) => !prev);
+        setIsCommandPaletteOpen(false);
+        setIsNoteSwitcherOpen(false);
+        setIsSettingsOpen(false);
       } else if (isCmdOrCtrl && e.key.toLowerCase() === "n") {
         // Other Standard Shortcuts
         e.preventDefault();
         setIsSettingsOpen(false);
+        setIsExportModalOpen(false);
         handleNewNote();
       } else if (isCmdOrCtrl && e.key.toLowerCase() === "o") {
         e.preventDefault();
         setIsNoteSwitcherOpen((prev) => !prev);
         setIsCommandPaletteOpen(false);
         setIsSettingsOpen(false);
+        setIsExportModalOpen(false);
       } else if (isCmdOrCtrl && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setIsCommandPaletteOpen((prev) => !prev);
         setIsNoteSwitcherOpen(false);
         setIsSettingsOpen(false);
+        setIsExportModalOpen(false);
       } else if (isCmdOrCtrl && e.key.toLowerCase() === "s" && !e.shiftKey) {
         e.preventDefault();
         flushPendingSave();
@@ -993,6 +1012,7 @@ export function App() {
         setIsSettingsOpen((prev) => !prev);
         setIsCommandPaletteOpen(false);
         setIsNoteSwitcherOpen(false);
+        setIsExportModalOpen(false);
       }
     };
 
@@ -1023,7 +1043,7 @@ export function App() {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, [handleNewNote, handleSelectNote, flushPendingSave, handleToggleAlwaysOnTop, getOrderedNotes, isSettingsOpen]);
+  }, [handleNewNote, handleSelectNote, flushPendingSave, handleToggleAlwaysOnTop, getOrderedNotes, isSettingsOpen, isExportModalOpen]);
 
   // Actions for Command Palette
   const actions: ActionItem[] = [
@@ -1116,6 +1136,36 @@ export function App() {
       },
     },
     {
+      id: "copy_rich_text",
+      title: "Copy Formatted Rich Text",
+      icon: <CopyIcon size={16} />,
+      perform: async () => {
+        if (tiptapInstance) {
+          const success = await copyRichText(tiptapInstance);
+          showToast(
+            success
+              ? "Formatted text copied to clipboard!"
+              : "Failed to copy rich text"
+          );
+        }
+      },
+    },
+    {
+      id: "export_note",
+      title: "Export Note... (PDF, HTML, Markdown)",
+      shortcut: ["Ctrl", "Shift", "E"],
+      icon: <ExportIcon size={16} />,
+      perform: () => setIsExportModalOpen(true),
+    },
+    {
+      id: "export_pdf",
+      title: "Export Note as PDF",
+      icon: <FileTextIcon size={16} />,
+      perform: () => {
+        setTimeout(() => exportToPdf(), 100);
+      },
+    },
+    {
       id: "open_folder",
       title: "Open Notes Folder in Explorer",
       icon: <FolderIcon size={16} />,
@@ -1191,6 +1241,7 @@ export function App() {
         onOpenNoteSwitcher={() => setIsNoteSwitcherOpen(true)}
         onNewNote={handleNewNote}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenExport={() => setIsExportModalOpen(true)}
         onCloseSettings={() => setIsSettingsOpen(false)}
         onMinimize={() => api.minimizeWindow()}
         onClose={() => api.closeWindow()}
@@ -1310,6 +1361,16 @@ export function App() {
         isOpen={isUpdateModalOpen}
         update={availableUpdate}
         onClose={() => setIsUpdateModalOpen(false)}
+      />
+
+      {/* Export Document Modal */}
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        activeNote={activeNote}
+        editor={tiptapInstance}
+        allNotes={notes}
+        onShowToast={showToast}
       />
 
     </div>
