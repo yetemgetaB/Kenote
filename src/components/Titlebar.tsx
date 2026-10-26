@@ -7,6 +7,7 @@ import {
   MinimizeIcon,
   CloseIcon,
   SettingsIcon,
+  ExportIcon,
 } from "./Icons";
 import { ArrowLeft } from "lucide-react";
 
@@ -19,6 +20,7 @@ interface TitlebarProps {
   onOpenNoteSwitcher: () => void;
   onNewNote: () => void;
   onOpenSettings: () => void;
+  onOpenExport?: () => void;
   onCloseSettings?: () => void;
   onMinimize: () => void;
   onClose: () => void;
@@ -33,6 +35,7 @@ export const Titlebar: React.FC<TitlebarProps> = ({
   onOpenNoteSwitcher,
   onNewNote,
   onOpenSettings,
+  onOpenExport,
   onCloseSettings,
   onMinimize,
   onClose,
@@ -98,6 +101,15 @@ export const Titlebar: React.FC<TitlebarProps> = ({
 
       {/* Right side window controls */}
       <div className="flex items-center space-x-1">
+        {!isSettingsOpen && onOpenExport && (
+          <button
+            onClick={onOpenExport}
+            title="Export Note (Ctrl+Shift+E)"
+            className="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-[#2A313D] transition-colors focus:outline-none"
+          >
+            <ExportIcon size={14} />
+          </button>
+        )}
         {!isSettingsOpen && (
           <button
             onClick={onOpenSettings}
