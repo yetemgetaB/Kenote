@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
-## [0.6.5] - 2026-10-26
+## [0.6.4] - 2026-10-26
 
 ### ✨ New Features & Polish
 
@@ -16,12 +16,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Copy Formatted Rich Text (`Ctrl + C` / Menu)**: Copy styled HTML content directly to clipboard with plain text fallback, ready to paste into Slack, Gmail, or Google Docs.
 - **Export All Notes (Vault Backup)**: One-click directory backup of the entire notes collection into Markdown files in a chosen folder.
 - **Raycast-Styled Export HUD (`ExportModal`)**: Fast modal accessible via `Ctrl + Shift + E`, titlebar icon button, or Command Palette, with keyboard navigation (`↑`/`↓`) and hotkey shortcuts (`P`, `C`, `H`, `M`, `T`, `B`).
-
----
-
-## [0.6.4] - 2026-10-26
-
-### ✨ New Features & Polish
 
 #### 🖼️ Image Attachments, Clipboard Pasting & Drag-and-Drop
 - **Instant Clipboard Image Pasting (`Ctrl + V`)**: Copy screenshots or web images directly into notes; KeNote automatically writes them to your note's local `assets/` directory and embeds them seamlessly.
