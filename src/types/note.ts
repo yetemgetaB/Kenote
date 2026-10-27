@@ -7,6 +7,7 @@ export interface NoteMetadata {
   created_at: number;
   character_count: number;
   is_pinned: boolean;
+  tags?: string[];
 }
 
 export interface AppSettings {

@@ -18,6 +18,8 @@ pub struct NoteMetadata {
     pub created_at: u64,
     pub character_count: usize,
     pub is_pinned: bool,
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -243,6 +245,75 @@ fn extract_title_from_content(content: &str) -> String {
     }
 }
 
+fn extract_tags_from_content(content: &str) -> Vec<String> {
+    let mut tags: Vec<String> = Vec::new();
+    let mut in_code_block = false;
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("```") {
+            in_code_block = !in_code_block;
+            continue;
+        }
+        if in_code_block {
+            continue;
+        }
+
+        // Strip leading markdown heading tokens, e.g. "### Heading" -> "Heading"
+        let mut line_to_scan = line;
+        let trimmed_start = line.trim_start();
+        if trimmed_start.starts_with('#') {
+            let heading_prefix_len = trimmed_start.chars().take_while(|&c| c == '#').count();
+            if trimmed_start[heading_prefix_len..].starts_with(' ') {
+                let offset = line.len() - trimmed_start.len() + heading_prefix_len;
+                line_to_scan = &line[offset..];
+            }
+        }
+
+        // Split by backtick to ignore inline code segments
+        for (idx, segment) in line_to_scan.split('`').enumerate() {
+            if idx % 2 == 1 {
+                // Inside inline code
+                continue;
+            }
+
+            let chars: Vec<char> = segment.chars().collect();
+            let len = chars.len();
+            let mut i = 0;
+            while i < len {
+                if chars[i] == '#' {
+                    let preceded_by_boundary = i == 0 || chars[i - 1].is_whitespace() || chars[i - 1] == '(' || chars[i - 1] == '[' || chars[i - 1] == '{';
+                    if preceded_by_boundary && i + 1 < len {
+                        let next_char = chars[i + 1];
+                        if next_char.is_alphabetic() || next_char == '_' {
+                            let start = i + 1;
+                            let mut end = start;
+                            while end < len {
+                                let c = chars[end];
+                                if c.is_alphanumeric() || c == '_' || c == '-' || c == '/' {
+                                    end += 1;
+                                } else {
+                                    break;
+                                }
+                            }
+                            let tag_str: String = chars[start..end].iter().collect();
+                            let lower = tag_str.to_lowercase();
+                            if !tags.contains(&lower) {
+                                tags.push(lower);
+                            }
+                            i = end;
+                            continue;
+                        }
+                    }
+                }
+                i += 1;
+            }
+        }
+    }
+
+    tags
+}
+
 fn get_file_timestamps(path: &Path) -> (u64, u64) {
     if let Ok(metadata) = fs::metadata(path) {
         let modified = metadata
@@ -287,6 +358,7 @@ fn list_notes() -> Result<Vec<NoteMetadata>, String> {
                     let (updated_at, created_at) = get_file_timestamps(&path);
                     let character_count = content.chars().count();
 
+                    let tags = extract_tags_from_content(&content);
                     notes.push(NoteMetadata {
                         id,
                         filename,
@@ -296,6 +368,7 @@ fn list_notes() -> Result<Vec<NoteMetadata>, String> {
                         created_at,
                         character_count,
                         is_pinned,
+                        tags,
                     });
                 }
             }
@@ -328,6 +401,7 @@ fn read_note(filename: String) -> Result<NoteMetadata, String> {
     let id = filename.trim_end_matches(".md").to_string();
     let is_pinned = is_note_pinned(&filename, &metadata_index);
 
+    let tags = extract_tags_from_content(&content);
     Ok(NoteMetadata {
         id,
         filename,
@@ -337,6 +411,7 @@ fn read_note(filename: String) -> Result<NoteMetadata, String> {
         created_at,
         character_count,
         is_pinned,
+        tags,
     })
 }
 
@@ -379,6 +454,7 @@ fn save_note(mut filename: String, content: String, is_pinned: bool) -> Result<N
     let character_count = content.chars().count();
     let id = filename.trim_end_matches(".md").to_string();
 
+    let tags = extract_tags_from_content(&content);
     Ok(NoteMetadata {
         id,
         filename,
@@ -388,6 +464,7 @@ fn save_note(mut filename: String, content: String, is_pinned: bool) -> Result<N
         created_at,
         character_count,
         is_pinned,
+        tags,
     })
 }
 
@@ -429,6 +506,7 @@ fn list_trashed_notes() -> Result<Vec<NoteMetadata>, String> {
                     let (updated_at, created_at) = get_file_timestamps(&path);
                     let character_count = content.chars().count();
 
+                    let tags = extract_tags_from_content(&content);
                     notes.push(NoteMetadata {
                         id,
                         filename,
@@ -438,6 +516,7 @@ fn list_trashed_notes() -> Result<Vec<NoteMetadata>, String> {
                         created_at,
                         character_count,
                         is_pinned,
+                        tags,
                     });
                 }
             }
@@ -470,6 +549,7 @@ fn restore_note(filename: String) -> Result<NoteMetadata, String> {
     let id = filename.trim_end_matches(".md").to_string();
     let is_pinned = is_note_pinned(&filename, &metadata_index);
 
+    let tags = extract_tags_from_content(&content);
     Ok(NoteMetadata {
         id,
         filename,
@@ -479,6 +559,7 @@ fn restore_note(filename: String) -> Result<NoteMetadata, String> {
         created_at,
         character_count,
         is_pinned,
+        tags,
     })
 }
 
@@ -1291,6 +1372,38 @@ mod tests {
         assert!(read_image_attachment("..\\secret.txt".to_string()).is_err());
         assert!(read_image_attachment("/etc/passwd".to_string()).is_err());
         assert!(read_image_attachment("assets/../../etc/passwd".to_string()).is_err());
+    }
+
+    #[test]
+    fn test_extract_tags_from_content() {
+        let content = r#"# Meeting Notes #work
+Here are the action items:
+- Review budget #finance/q1
+- Call client #client-acme
+- Ignore `inline #notatag` and #123 (issue number)
+- Check https://example.com/#anchor
+- Also (#parenthesized) and [#bracketed]
+- Duplicate #WORK and #work should be deduplicated
+
+```rust
+// In code block:
+#notataginblock
+```
+
+Final thought #ideas."#;
+
+        let tags = extract_tags_from_content(content);
+        assert_eq!(
+            tags,
+            vec![
+                "work",
+                "finance/q1",
+                "client-acme",
+                "parenthesized",
+                "bracketed",
+                "ideas"
+            ]
+        );
     }
 }
 
