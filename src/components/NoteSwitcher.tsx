@@ -1,12 +1,14 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { NoteMetadata } from "../types/note";
 import { PinIcon, TrashIcon, RestoreIcon } from "./Icons";
 import { api } from "../utils/tauriBridge";
+import { getAllUniqueTags, filterNotesByTag, extractTagsFromMarkdown } from "../utils/tags";
 
 interface NoteSwitcherProps {
   isOpen: boolean;
   notes: NoteMetadata[];
   activeNoteId: string | null;
+  initialTag?: string | null;
   onSelectNote: (note: NoteMetadata) => void;
   onTogglePin: (note: NoteMetadata, e: React.MouseEvent) => void;
   onDeleteNote: (note: NoteMetadata, e: React.MouseEvent) => void;
@@ -18,6 +20,7 @@ export const NoteSwitcher: React.FC<NoteSwitcherProps> = ({
   isOpen,
   notes,
   activeNoteId,
+  initialTag = null,
   onSelectNote,
   onTogglePin,
   onDeleteNote,
@@ -27,6 +30,7 @@ export const NoteSwitcher: React.FC<NoteSwitcherProps> = ({
   const [tab, setTab] = useState<"active" | "trash">("active");
   const [trashedNotes, setTrashedNotes] = useState<NoteMetadata[]>([]);
   const [search, setSearch] = useState("");
+  const [selectedTag, setSelectedTag] = useState<string | null>(initialTag);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -46,10 +50,11 @@ export const NoteSwitcher: React.FC<NoteSwitcherProps> = ({
       setSearch("");
       setSelectedIndex(0);
       setTab("active");
+      setSelectedTag(initialTag || null);
       loadTrashedNotes();
       setTimeout(() => inputRef.current?.focus(), 50);
     }
-  }, [isOpen]);
+  }, [isOpen, initialTag]);
 
   useEffect(() => {
     if (isOpen && tab === "trash") {
@@ -60,18 +65,37 @@ export const NoteSwitcher: React.FC<NoteSwitcherProps> = ({
   // Current active list based on tab
   const currentList = tab === "active" ? notes : trashedNotes;
 
-  // Filter notes
-  const filteredNotes = currentList.filter((n) => {
-    const q = search.toLowerCase();
-    return (
-      n.title.toLowerCase().includes(q) ||
-      n.content.toLowerCase().includes(q)
-    );
-  });
+  // Extract all unique tags in current list with counts
+  const availableTags = useMemo(() => getAllUniqueTags(currentList), [currentList]);
+
+  // Filter notes by selected tag first, then search query
+  const filteredNotes = useMemo(() => {
+    const baseList = selectedTag ? filterNotesByTag(currentList, selectedTag) : currentList;
+    const q = search.trim().toLowerCase();
+    if (!q) return baseList;
+
+    const isTagQuery = q.startsWith("#");
+    const tagQuery = isTagQuery ? q.slice(1) : q;
+
+    return baseList.filter((n) => {
+      const noteTags = n.tags && n.tags.length > 0 ? n.tags : extractTagsFromMarkdown(n.content || "");
+      const matchesTags = noteTags.some((t) => t.toLowerCase().includes(tagQuery));
+
+      if (isTagQuery) {
+        return matchesTags;
+      }
+
+      return (
+        n.title.toLowerCase().includes(q) ||
+        n.content.toLowerCase().includes(q) ||
+        matchesTags
+      );
+    });
+  }, [currentList, selectedTag, search]);
 
   useEffect(() => {
     setSelectedIndex(0);
-  }, [search, tab]);
+  }, [search, tab, selectedTag]);
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -153,17 +177,17 @@ export const NoteSwitcher: React.FC<NoteSwitcherProps> = ({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-[440px] bg-[#1E242E] border border-[#2F3746] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[480px] animate-in zoom-in-95 duration-150"
+        className="w-full max-w-[460px] bg-[#1E242E] border border-[#2F3746] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[520px] animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search Bar */}
-        <div className="p-3 border-b border-[#2A3240] flex items-center">
+        <div className="p-3 border-b border-[#2A3240] flex items-center bg-[#1B212A]">
           <input
             ref={inputRef}
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder={tab === "active" ? "Search for notes..." : "Search trash..."}
+            placeholder={tab === "active" ? "Search notes or #tag..." : "Search trash..."}
             className="w-full bg-transparent text-sm text-gray-200 placeholder-gray-500 focus:outline-none px-2 py-1"
           />
         </div>
@@ -172,7 +196,10 @@ export const NoteSwitcher: React.FC<NoteSwitcherProps> = ({
         <div className="px-3 py-1.5 border-b border-[#262E3B] flex items-center justify-between text-xs text-gray-400 font-medium bg-[#171C24]">
           <div className="flex items-center space-x-1">
             <button
-              onClick={() => setTab("active")}
+              onClick={() => {
+                setTab("active");
+                setSelectedTag(null);
+              }}
               className={`px-2.5 py-1 rounded-lg transition-colors focus:outline-none ${
                 tab === "active"
                   ? "bg-[#283242] text-white font-semibold"
@@ -182,7 +209,10 @@ export const NoteSwitcher: React.FC<NoteSwitcherProps> = ({
               Notes ({notes.length})
             </button>
             <button
-              onClick={() => setTab("trash")}
+              onClick={() => {
+                setTab("trash");
+                setSelectedTag(null);
+              }}
               className={`px-2.5 py-1 rounded-lg transition-colors focus:outline-none flex items-center space-x-1 ${
                 tab === "trash"
                   ? "bg-[#283242] text-white font-semibold"
@@ -204,6 +234,41 @@ export const NoteSwitcher: React.FC<NoteSwitcherProps> = ({
           )}
         </div>
 
+        {/* Tag Filter Pills Bar */}
+        {availableTags.length > 0 && (
+          <div className="px-3 py-1.5 border-b border-[#262E3B] flex items-center space-x-1.5 overflow-x-auto custom-scrollbar bg-[#151A22]">
+            <button
+              onClick={() => setSelectedTag(null)}
+              className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors shrink-0 ${
+                selectedTag === null
+                  ? "bg-[var(--accent-color,#0399F7)] text-white font-semibold shadow-sm"
+                  : "bg-[#202733] text-gray-400 hover:text-white hover:bg-[#283242]"
+              }`}
+            >
+              All ({currentList.length})
+            </button>
+            {availableTags.map(({ tag, count }) => {
+              const isSelected = selectedTag === tag;
+              return (
+                <button
+                  key={tag}
+                  onClick={() => setSelectedTag(isSelected ? null : tag)}
+                  className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors shrink-0 flex items-center space-x-1 ${
+                    isSelected
+                      ? "bg-[var(--accent-color,#0399F7)] text-white font-semibold shadow-sm"
+                      : "bg-[#202733] text-gray-400 hover:text-white hover:bg-[#283242]"
+                  }`}
+                >
+                  <span>#{tag}</span>
+                  <span className={`text-[10px] ${isSelected ? "text-white/80" : "text-gray-500"}`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* Notes List */}
         <div
           ref={listRef}
@@ -211,12 +276,19 @@ export const NoteSwitcher: React.FC<NoteSwitcherProps> = ({
         >
           {filteredNotes.length === 0 ? (
             <div className="py-12 text-center text-xs text-gray-500">
-              {tab === "active" ? "No notes found" : "Trash is empty"}
+              {selectedTag
+                ? `No notes found tagged #${selectedTag}`
+                : tab === "active"
+                ? "No notes found"
+                : "Trash is empty"}
             </div>
           ) : (
             filteredNotes.map((note, index) => {
               const isSelected = index === selectedIndex;
               const isCurrent = note.id === activeNoteId && tab === "active";
+              const noteTags = note.tags && note.tags.length > 0
+                ? note.tags
+                : extractTagsFromMarkdown(note.content || "");
 
               return (
                 <div
@@ -245,7 +317,39 @@ export const NoteSwitcher: React.FC<NoteSwitcherProps> = ({
                         {note.title || "Untitled"}
                       </span>
                     </div>
-                    <div className="text-[11px] text-gray-400 mt-0.5 flex items-center space-x-1.5">
+
+                    {/* Tag Badges */}
+                    {noteTags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {noteTags.slice(0, 4).map((tag) => {
+                          const isTagActive = selectedTag === tag;
+                          return (
+                            <span
+                              key={tag}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedTag(isTagActive ? null : tag);
+                              }}
+                              className={`px-1.5 py-0.2 rounded text-[10px] font-medium transition-colors ${
+                                isTagActive
+                                  ? "bg-[var(--accent-color,#0399F7)] text-white"
+                                  : "bg-[#232B37] text-sky-400 border border-[#303B4C] hover:border-sky-400/60"
+                              }`}
+                              title={`Filter by #${tag}`}
+                            >
+                              #{tag}
+                            </span>
+                          );
+                        })}
+                        {noteTags.length > 4 && (
+                          <span className="text-[10px] text-gray-500 self-center">
+                            +{noteTags.length - 4}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="text-[11px] text-gray-400 mt-1 flex items-center space-x-1.5">
                       {isCurrent ? (
                         <>
                           <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--accent-color,#0399F7)]"></span>

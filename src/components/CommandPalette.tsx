@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { NoteMetadata } from "../types/note";
 import { PinIcon, NoteSwitcherIcon } from "./Icons";
 import { trackCommandUsed, CommandActionId } from "../utils/analytics";
+import { extractTagsFromMarkdown } from "../utils/tags";
 
 const COMMAND_MAP: Record<string, CommandActionId> = {
   new_note: "new_note",
@@ -48,13 +49,23 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Filter notes that match search query
+  // Filter notes that match search query (title, content, or tags)
   const filteredNotes = search.trim()
-    ? notes.filter(
-        (note) =>
-          note.title.toLowerCase().includes(search.toLowerCase()) ||
-          note.content.toLowerCase().includes(search.toLowerCase())
-      )
+    ? notes.filter((note) => {
+        const q = search.toLowerCase();
+        const tagQuery = q.startsWith("#") ? q.slice(1) : q;
+        const noteTags =
+          note.tags && note.tags.length > 0
+            ? note.tags
+            : extractTagsFromMarkdown(note.content || "");
+        const matchesTags = noteTags.some((t) => t.toLowerCase().includes(tagQuery));
+
+        return (
+          note.title.toLowerCase().includes(q) ||
+          note.content.toLowerCase().includes(q) ||
+          matchesTags
+        );
+      })
     : [];
 
   // Filter actions that match search query
@@ -195,6 +206,30 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                                 {note.content.replace(/^[#\s*-_]+/, "").slice(0, 80)}
                               </span>
                             )}
+                            {(() => {
+                              const noteTags =
+                                note.tags && note.tags.length > 0
+                                  ? note.tags
+                                  : extractTagsFromMarkdown(note.content || "");
+                              if (noteTags.length === 0) return null;
+                              return (
+                                <div className="flex flex-wrap gap-1 mt-0.5">
+                                  {noteTags.slice(0, 3).map((tag) => (
+                                    <span
+                                      key={tag}
+                                      className="px-1 py-0.2 rounded text-[9px] font-medium bg-[#232B37] text-sky-400 border border-[#303B4C]"
+                                    >
+                                      #{tag}
+                                    </span>
+                                  ))}
+                                  {noteTags.length > 3 && (
+                                    <span className="text-[9px] text-gray-500">
+                                      +{noteTags.length - 3}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </div>
                         </div>
                         <span className="text-[10px] text-gray-500 font-mono shrink-0 ml-2">

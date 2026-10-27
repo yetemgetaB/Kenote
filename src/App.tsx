@@ -81,6 +81,7 @@ export function App() {
 
   // Modals state
   const [isNoteSwitcherOpen, setIsNoteSwitcherOpen] = useState(false);
+  const [noteSwitcherInitialTag, setNoteSwitcherInitialTag] = useState<string | null>(null);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -664,6 +665,25 @@ export function App() {
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, []);
+
+  // Listen for editor inline tag clicks to open Note Switcher pre-filtered to that tag
+  useEffect(() => {
+    const handleOpenTag = (e: Event) => {
+      const customEvent = e as CustomEvent<{ tag: string }>;
+      if (customEvent.detail?.tag) {
+        setNoteSwitcherInitialTag(customEvent.detail.tag);
+        setIsNoteSwitcherOpen(true);
+        setIsCommandPaletteOpen(false);
+        setIsSettingsOpen(false);
+        setIsExportModalOpen(false);
+      }
+    };
+
+    window.addEventListener("kenote:open-tag", handleOpenTag);
+    return () => {
+      window.removeEventListener("kenote:open-tag", handleOpenTag);
     };
   }, []);
 
@@ -1311,11 +1331,15 @@ export function App() {
         isOpen={isNoteSwitcherOpen}
         notes={notes}
         activeNoteId={activeNote?.id || null}
+        initialTag={noteSwitcherInitialTag}
         onSelectNote={handleSelectNote}
         onTogglePin={handleTogglePinNote}
         onDeleteNote={handleDeleteNote}
         onRestoreNote={handleRestoreNote}
-        onClose={() => setIsNoteSwitcherOpen(false)}
+        onClose={() => {
+          setIsNoteSwitcherOpen(false);
+          setNoteSwitcherInitialTag(null);
+        }}
       />
 
       {/* Undo Toast Notification */}

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { NoteMetadata } from "../types/note";
 import { PinIcon } from "./Icons";
+import { extractTagsFromMarkdown } from "../utils/tags";
 
 interface QuickSwitcherOverlayProps {
   isOpen: boolean;
@@ -104,6 +105,26 @@ export const QuickSwitcherOverlay: React.FC<QuickSwitcherOverlayProps> = ({
                       </h4>
                     </div>
                   </div>
+
+                  {(() => {
+                    const noteTags =
+                      note.tags && note.tags.length > 0
+                        ? note.tags
+                        : extractTagsFromMarkdown(note.content || "");
+                    if (noteTags.length === 0) return null;
+                    return (
+                      <div className="flex flex-wrap gap-1 mb-1.5">
+                        {noteTags.slice(0, 2).map((tag) => (
+                          <span
+                            key={tag}
+                            className="px-1.5 py-0.2 rounded text-[9px] font-medium bg-[#1F2735] text-sky-400 border border-[#2F3C50]"
+                          >
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
+                    );
+                  })()}
 
                   {/* Snippet Preview */}
                   <p className="text-[11px] text-gray-400 line-clamp-4 leading-relaxed font-sans break-words">
