@@ -23,6 +23,7 @@ import { ImageAttachment } from "../extensions/ImageAttachment";
 import { InlineStackPill } from "../extensions/InlineStackPill";
 import { CalloutAlerts } from "../extensions/CalloutAlerts";
 import { SmartCodeBlock } from "../extensions/SmartCodeBlock";
+import { TagHighlight } from "../extensions/TagHighlight";
 import Table from "@tiptap/extension-table";
 import TableRow from "@tiptap/extension-table-row";
 import TableCell from "@tiptap/extension-table-cell";
@@ -300,6 +301,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
         }),
         InlineStackPill,
         CalloutAlerts,
+        TagHighlight,
         Table.configure({
           resizable: true,
           HTMLAttributes: {

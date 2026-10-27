@@ -665,6 +665,31 @@ body {
   }
 }
 
+/* Inline Note Tags (#tag) */
+.ProseMirror .kenote-tag-pill {
+  display: inline-flex;
+  align-items: center;
+  background-color: rgba(3, 153, 247, 0.12);
+  color: var(--accent-color, #0399F7);
+  font-family: inherit;
+  font-size: 0.9em;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(3, 153, 247, 0.25);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: text;
+  line-height: 1.4;
+  vertical-align: baseline;
+}
+
+.ProseMirror .kenote-tag-pill:hover {
+  background-color: rgba(3, 153, 247, 0.24);
+  border-color: rgba(3, 153, 247, 0.45);
+  box-shadow: 0 1px 4px rgba(3, 153, 247, 0.2);
+}
+
 /* Clean Print & PDF Stylesheet */
 @media print {
   header,
