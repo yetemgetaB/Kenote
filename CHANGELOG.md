@@ -9,6 +9,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### ✨ New Features & Polish
 
+#### 🏷️ Note Tags & Categorization (`#tag`)
+- **Zero-Syntax-Pollution Inline Tags**: Write tags anywhere in your notes (e.g. `#work`, `#ideas`, `#project-2026`, `#dev/react`); they stay pure Markdown in raw files while rendering with interactive accent badge styling in the editor.
+- **Fast Rust & Frontend Parsing**: Automatic tag extraction in the Rust backend (`NoteMetadata.tags`) and client state with smart exclusions for headings (`# Title`), URLs, issue numbers, and code blocks.
+- **Note Switcher Filter Pills**: Dynamic horizontal filter pill bar (`All`, `#work (5)`, `#ideas (3)`) in the Note Switcher with live note counts.
+- **1-Click Tag Filtering**: Click any inline tag pill in the editor or note card badge in search lists to instantly filter notes by that tag.
+- **Command Palette & Quick Switcher Badges**: Search notes by `#tag` and view active tag badges across all switcher overlays.
+
 #### 📤 Document Export Suite (PDF, HTML, Markdown, Rich Text)
 - **PDF Document Export (`.pdf`)**: Print or save note directly to PDF with clean document layout and typography (`@media print` stylesheet with UI chrome hidden, proper page breaks, and high-contrast text).
 - **Standalone HTML Page (`.html`)**: Export to a self-contained `.html` document with embedded dark/light mode responsive styles, system typography, and styled code blocks/tables.
