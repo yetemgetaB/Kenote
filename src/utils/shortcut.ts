@@ -23,6 +23,8 @@ export const INTERNAL_SHORTCUTS: Record<string, string> = {
   "Ctrl+,": "Settings",
   "Ctrl+Shift+S": "Insert Section",
   "Ctrl+Shift+E": "Export Note",
+  "Ctrl+F": "Find in Note",
+  "Ctrl+H": "Find and Replace",
 };
 
 /**

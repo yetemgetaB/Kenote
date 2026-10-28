@@ -10,6 +10,8 @@ import { SettingsView } from "./components/SettingsView";
 import { WelcomeModal } from "./components/WelcomeModal";
 import { UpdateModal } from "./components/UpdateModal";
 import { ExportModal } from "./components/ExportModal";
+import { FindReplaceBar } from "./components/FindReplaceBar";
+import { Search as SearchIcon, Replace as ReplaceIcon } from "lucide-react";
 import { NoteMetadata, AppSettings, DEFAULT_SETTINGS } from "./types/note";
 import { api, isValidExternalUrl } from "./utils/tauriBridge";
 import { copyRichText, exportToPdf } from "./utils/exportNote";
@@ -85,6 +87,8 @@ export function App() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isFindOpen, setIsFindOpen] = useState(false);
+  const [isReplaceMode, setIsReplaceMode] = useState(false);
   const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [availableUpdate, setAvailableUpdate] = useState<UpdateInfo | null>(null);
@@ -967,12 +971,17 @@ export function App() {
         return;
       }
 
-      // 2. Escape cancels quick switcher overlay or closes Settings or Export
+      // 2. Escape cancels quick switcher overlay or closes Settings or Export or Find
       if (e.key === "Escape") {
         if (isQuickSwitcherOpenRef.current) {
           e.preventDefault();
           isQuickSwitcherOpenRef.current = false;
           setIsQuickSwitcherOpen(false);
+          return;
+        }
+        if (isFindOpen) {
+          e.preventDefault();
+          setIsFindOpen(false);
           return;
         }
         if (isExportModalOpen) {
@@ -1003,11 +1012,29 @@ export function App() {
         setIsCommandPaletteOpen(false);
         setIsNoteSwitcherOpen(false);
         setIsSettingsOpen(false);
+        setIsFindOpen(false);
+      } else if (isCmdOrCtrl && e.key.toLowerCase() === "f" && !e.shiftKey) {
+        e.preventDefault();
+        setIsFindOpen(true);
+        setIsReplaceMode(false);
+        setIsCommandPaletteOpen(false);
+        setIsNoteSwitcherOpen(false);
+        setIsSettingsOpen(false);
+        setIsExportModalOpen(false);
+      } else if (isCmdOrCtrl && e.key.toLowerCase() === "h" && !e.shiftKey) {
+        e.preventDefault();
+        setIsFindOpen(true);
+        setIsReplaceMode(true);
+        setIsCommandPaletteOpen(false);
+        setIsNoteSwitcherOpen(false);
+        setIsSettingsOpen(false);
+        setIsExportModalOpen(false);
       } else if (isCmdOrCtrl && e.key.toLowerCase() === "n") {
         // Other Standard Shortcuts
         e.preventDefault();
         setIsSettingsOpen(false);
         setIsExportModalOpen(false);
+        setIsFindOpen(false);
         handleNewNote();
       } else if (isCmdOrCtrl && e.key.toLowerCase() === "o") {
         e.preventDefault();
@@ -1015,12 +1042,14 @@ export function App() {
         setIsCommandPaletteOpen(false);
         setIsSettingsOpen(false);
         setIsExportModalOpen(false);
+        setIsFindOpen(false);
       } else if (isCmdOrCtrl && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setIsCommandPaletteOpen((prev) => !prev);
         setIsNoteSwitcherOpen(false);
         setIsSettingsOpen(false);
         setIsExportModalOpen(false);
+        setIsFindOpen(false);
       } else if (isCmdOrCtrl && e.key.toLowerCase() === "s" && !e.shiftKey) {
         e.preventDefault();
         flushPendingSave();
@@ -1033,6 +1062,7 @@ export function App() {
         setIsCommandPaletteOpen(false);
         setIsNoteSwitcherOpen(false);
         setIsExportModalOpen(false);
+        setIsFindOpen(false);
       }
     };
 
@@ -1063,7 +1093,7 @@ export function App() {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, [handleNewNote, handleSelectNote, flushPendingSave, handleToggleAlwaysOnTop, getOrderedNotes, isSettingsOpen, isExportModalOpen]);
+  }, [handleNewNote, handleSelectNote, flushPendingSave, handleToggleAlwaysOnTop, getOrderedNotes, isSettingsOpen, isExportModalOpen, isFindOpen]);
 
   // Actions for Command Palette
   const actions: ActionItem[] = [
@@ -1186,6 +1216,26 @@ export function App() {
       },
     },
     {
+      id: "find_in_note",
+      title: "Find in Note...",
+      shortcut: ["Ctrl", "F"],
+      icon: <SearchIcon size={16} />,
+      perform: () => {
+        setIsFindOpen(true);
+        setIsReplaceMode(false);
+      },
+    },
+    {
+      id: "find_replace_in_note",
+      title: "Find and Replace in Note...",
+      shortcut: ["Ctrl", "H"],
+      icon: <ReplaceIcon size={16} />,
+      perform: () => {
+        setIsFindOpen(true);
+        setIsReplaceMode(true);
+      },
+    },
+    {
       id: "open_folder",
       title: "Open Notes Folder in Explorer",
       icon: <FolderIcon size={16} />,
@@ -1291,6 +1341,15 @@ export function App() {
               fontFamily={settings.font_family}
               editorZoom={settings.editor_zoom ?? DEFAULT_EDITOR_ZOOM}
               onEditorReady={handleEditorReady}
+            />
+
+            {/* In-Note Find & Replace Floating HUD */}
+            <FindReplaceBar
+              isOpen={isFindOpen}
+              isReplaceMode={isReplaceMode}
+              editor={tiptapInstance}
+              onClose={() => setIsFindOpen(false)}
+              onToggleReplaceMode={() => setIsReplaceMode((prev) => !prev)}
             />
           </main>
 
