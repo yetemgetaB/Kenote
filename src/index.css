@@ -690,6 +690,22 @@ body {
   box-shadow: 0 1px 4px rgba(3, 153, 247, 0.2);
 }
 
+/* Find & Replace Highlights */
+.ProseMirror .kenote-search-match {
+  background-color: rgba(234, 179, 8, 0.28);
+  color: #FEF08A;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
+.ProseMirror .kenote-search-match-active {
+  background-color: rgba(249, 115, 22, 0.65);
+  color: #FFFFFF;
+  border-radius: 3px;
+  padding: 0 1px;
+  box-shadow: 0 0 0 1.5px rgba(249, 115, 22, 0.9), 0 0 8px rgba(249, 115, 22, 0.5);
+}
+
 /* Clean Print & PDF Stylesheet */
 @media print {
   header,

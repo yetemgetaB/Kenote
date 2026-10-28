@@ -24,6 +24,7 @@ import { InlineStackPill } from "../extensions/InlineStackPill";
 import { CalloutAlerts } from "../extensions/CalloutAlerts";
 import { SmartCodeBlock } from "../extensions/SmartCodeBlock";
 import { TagHighlight } from "../extensions/TagHighlight";
+import { SearchAndReplace } from "../extensions/SearchAndReplace";
 import Table from "@tiptap/extension-table";
 import TableRow from "@tiptap/extension-table-row";
 import TableCell from "@tiptap/extension-table-cell";
@@ -302,6 +303,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
         InlineStackPill,
         CalloutAlerts,
         TagHighlight,
+        SearchAndReplace,
         Table.configure({
           resizable: true,
           HTMLAttributes: {
