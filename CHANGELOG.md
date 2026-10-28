@@ -9,6 +9,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### ✨ New Features & Polish
 
+#### 🔍 In-Note Find & Replace (`Ctrl + F` / `Ctrl + H`)
+- **Raycast-Styled Floating HUD (`FindReplaceBar`)**: Compact top-right floating bar with live match counter (`1 of 5`), previous/next navigation buttons, and expand/collapse Replace row.
+- **ProseMirror Search Engine**: Live match ranges and decorations highlighting all matches in amber and active match in vibrant orange with viewport auto-scroll.
+- **Match Options**: Case sensitive (`Aa`) and whole-word (`\b`) toggle buttons for precision searching.
+- **Instant Replacement**: 1-click single replace (`Ctrl + Shift + Enter`) and reverse-order Replace All preserving document positions.
+- **Keyboard Shortcuts & Command Palette**: <kbd>Ctrl</kbd> + <kbd>F</kbd> for Find, <kbd>Ctrl</kbd> + <kbd>H</kbd> for Replace, <kbd>Enter</kbd> / <kbd>Shift + Enter</kbd> for navigation, and Command Palette integration.
+
 #### 🏷️ Note Tags & Categorization (`#tag`)
 - **Zero-Syntax-Pollution Inline Tags**: Write tags anywhere in your notes (e.g. `#work`, `#ideas`, `#project-2026`, `#dev/react`); they stay pure Markdown in raw files while rendering with interactive accent badge styling in the editor.
 - **Fast Rust & Frontend Parsing**: Automatic tag extraction in the Rust backend (`NoteMetadata.tags`) and client state with smart exclusions for headings (`# Title`), URLs, issue numbers, and code blocks.
