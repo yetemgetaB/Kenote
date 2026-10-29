@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
-## [0.6.4] - 2026-10-26
+## [0.6.5] - 2026-10-29
 
 ### ✨ New Features & Polish
 
@@ -22,6 +22,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Note Switcher Filter Pills**: Dynamic horizontal filter pill bar (`All`, `#work (5)`, `#ideas (3)`) in the Note Switcher with live note counts.
 - **1-Click Tag Filtering**: Click any inline tag pill in the editor or note card badge in search lists to instantly filter notes by that tag.
 - **Command Palette & Quick Switcher Badges**: Search notes by `#tag` and view active tag badges across all switcher overlays.
+
+---
+
+## [0.6.4] - 2026-10-26
+
+### ✨ New Features & Polish
 
 #### 📤 Document Export Suite (PDF, HTML, Markdown, Rich Text)
 - **PDF Document Export (`.pdf`)**: Print or save note directly to PDF with clean document layout and typography (`@media print` stylesheet with UI chrome hidden, proper page breaks, and high-contrast text).
