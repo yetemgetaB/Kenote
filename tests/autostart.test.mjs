@@ -23,6 +23,16 @@ describe("Autostart Unit Tests", () => {
     assert.equal(isEnabled, false);
   });
 
+  it("defaults isAutostartLaunch to false in mock environment", async () => {
+    const isLaunch = await api.isAutostartLaunch();
+    assert.equal(isLaunch, false);
+  });
+
+  it("reflects isAutostartLaunch when flag is set in mock environment", async () => {
+    globalThis.localStorage.setItem("kenote_autostart_launch_mock", "true");
+    assert.equal(await api.isAutostartLaunch(), true);
+  });
+
   it("enables and disables autostart via bridge API", async () => {
     const enabledState = await api.setAutostartEnabled(true);
     assert.equal(enabledState, true);
