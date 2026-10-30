@@ -12,6 +12,12 @@
         padding: 0;
       }
     </style>
+    <script>
+      // Prevent generic Edge / browser right-click context menu throughout the app
+      window.addEventListener("contextmenu", function (e) {
+        e.preventDefault();
+      });
+    </script>
   </head>
   <body class="bg-[#16191E] text-[#E2E8F0] antialiased select-none overflow-hidden h-full w-full m-0 p-0">
     <div id="root" class="h-full w-full"></div>

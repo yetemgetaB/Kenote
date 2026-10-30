@@ -43,6 +43,7 @@ export const Titlebar: React.FC<TitlebarProps> = ({
   return (
     <header
       data-tauri-drag-region
+      onContextMenu={(e) => e.preventDefault()}
       className="h-10 w-full flex items-center justify-between px-3 bg-[#1B2028]/95 border-b border-[#2A313C] select-none z-30 transition-colors"
     >
       {/* Left side actions */}
