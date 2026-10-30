@@ -519,13 +519,17 @@ export function App() {
       } catch (err) {
         console.error("Initialization error:", err);
       } finally {
-        // Reveal window smoothly after initial DOM and note content have painted
-        if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
-          window.requestAnimationFrame(() => {
+        // Reveal window smoothly after initial DOM and note content have painted,
+        // unless launched quietly in background via autostart/silent/hidden.
+        const isAutostart = await api.isAutostartLaunch().catch(() => false);
+        if (!isAutostart) {
+          if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+            window.requestAnimationFrame(() => {
+              api.showWindow();
+            });
+          } else {
             api.showWindow();
-          });
-        } else {
-          api.showWindow();
+          }
         }
       }
     }

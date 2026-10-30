@@ -32,6 +32,7 @@ async function invokeTauri<T>(cmd: string, args?: Record<string, unknown>): Prom
 const STORAGE_KEY_NOTES = "kenote_notes_mock";
 const STORAGE_KEY_SETTINGS = "kenote_settings_mock";
 const STORAGE_KEY_AUTOSTART = "kenote_autostart_mock";
+const STORAGE_KEY_AUTOSTART_LAUNCH = "kenote_autostart_launch_mock";
 const STORAGE_KEY_ASSETS = "kenote_assets_mock";
 const mockAssetsMap = new Map<string, string>();
 
@@ -119,6 +120,18 @@ export const api = {
       return await invokeTauri<boolean>("is_autostart_enabled");
     }
     return localStorage.getItem(STORAGE_KEY_AUTOSTART) === "true";
+  },
+
+  async isAutostartLaunch(): Promise<boolean> {
+    if (isTauri()) {
+      try {
+        return await invokeTauri<boolean>("get_is_autostart_launch");
+      } catch (e) {
+        console.error("Failed to check isAutostartLaunch:", e);
+        return false;
+      }
+    }
+    return localStorage.getItem(STORAGE_KEY_AUTOSTART_LAUNCH) === "true";
   },
 
   async setAutostartEnabled(enabled: boolean): Promise<boolean> {
