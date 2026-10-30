@@ -3,10 +3,15 @@ use base64::Engine as _;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::SystemTime;
 use tauri::{LogicalPosition, LogicalSize, Manager, WebviewWindow, WindowEvent};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
+
+pub struct AppLaunchState {
+    pub autostart_silenced: AtomicBool,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NoteMetadata {
@@ -749,11 +754,21 @@ fn close_window(window: WebviewWindow) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn show_window(window: WebviewWindow) -> Result<(), String> {
+fn show_window(window: WebviewWindow, state: tauri::State<AppLaunchState>) -> Result<(), String> {
+    // If the application was launched via autostart/silent/hidden,
+    // suppress initial window reveal so it starts quietly in the background.
+    if state.autostart_silenced.swap(false, Ordering::SeqCst) {
+        return Ok(());
+    }
     window.show().map_err(|e| e.to_string())?;
     window.unminimize().map_err(|e| e.to_string())?;
     window.set_focus().map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[tauri::command]
+fn get_is_autostart_launch(state: tauri::State<AppLaunchState>) -> bool {
+    state.autostart_silenced.load(Ordering::SeqCst) || is_autostart_launch(std::env::args())
 }
 
 #[tauri::command]
@@ -911,6 +926,9 @@ where
 }
 
 pub fn toggle_main_window(app: &tauri::AppHandle) {
+    if let Some(state) = app.try_state::<AppLaunchState>() {
+        state.autostart_silenced.store(false, Ordering::SeqCst);
+    }
     if let Some(win) = app.get_webview_window("main") {
         let is_visible = win.is_visible().unwrap_or(false);
         let is_minimized = win.is_minimized().unwrap_or(false);
@@ -928,8 +946,16 @@ pub fn toggle_main_window(app: &tauri::AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let is_autostart = is_autostart_launch(std::env::args());
+
     tauri::Builder::default()
+        .manage(AppLaunchState {
+            autostart_silenced: AtomicBool::new(is_autostart),
+        })
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(state) = app.try_state::<AppLaunchState>() {
+                state.autostart_silenced.store(false, Ordering::SeqCst);
+            }
             if let Some(win) = app.get_webview_window("main") {
                 let _ = win.show();
                 let _ = win.unminimize();
@@ -970,6 +996,7 @@ pub fn run() {
             enable_autostart,
             disable_autostart,
             is_autostart_enabled,
+            get_is_autostart_launch,
             show_window
         ])
         .setup(|app| {
@@ -1331,6 +1358,16 @@ mod tests {
         assert!("Ctrl+Alt+F13".parse::<Shortcut>().is_ok());
         assert!("".parse::<Shortcut>().is_err());
         assert!("InvalidKeyCombinationName".parse::<Shortcut>().is_err());
+    }
+
+    #[test]
+    fn test_app_launch_state_autostart_silencing() {
+        let state = AppLaunchState {
+            autostart_silenced: AtomicBool::new(true),
+        };
+        assert!(state.autostart_silenced.load(Ordering::SeqCst));
+        assert!(state.autostart_silenced.swap(false, Ordering::SeqCst));
+        assert!(!state.autostart_silenced.swap(false, Ordering::SeqCst));
     }
 
     #[test]
