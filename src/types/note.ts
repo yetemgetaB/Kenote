@@ -8,11 +8,14 @@ export interface NoteMetadata {
   character_count: number;
   is_pinned: boolean;
   tags?: string[];
+  is_external?: boolean;
+  file_path?: string;
 }
 
 export interface AppSettings {
   accent_color: string;
   custom_notes_dir: string | null;
+  external_notes?: string[];
   font_size: string;
   font_family: string;
   line_height: string;

@@ -25,12 +25,18 @@ pub struct NoteMetadata {
     pub is_pinned: bool,
     #[serde(default)]
     pub tags: Vec<String>,
+    #[serde(default)]
+    pub is_external: Option<bool>,
+    #[serde(default)]
+    pub file_path: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppSettings {
     pub accent_color: String,
     pub custom_notes_dir: Option<String>,
+    #[serde(default)]
+    pub external_notes: Option<Vec<String>>,
     pub font_size: String,
     pub font_family: String,
     pub line_height: String,
@@ -81,6 +87,7 @@ impl Default for AppSettings {
         Self {
             accent_color: "#0399F7".to_string(),
             custom_notes_dir: None,
+            external_notes: None,
             font_size: "15px".to_string(),
             font_family: "system-ui".to_string(),
             line_height: "1.6".to_string(),
@@ -374,6 +381,38 @@ fn list_notes() -> Result<Vec<NoteMetadata>, String> {
                         character_count,
                         is_pinned,
                         tags,
+                        is_external: None,
+                        file_path: None,
+                    });
+                }
+            }
+        }
+    }
+
+    // Also read external notes tracked in settings
+    if let Some(ref ext_paths) = settings.external_notes {
+        for ext_path_str in ext_paths {
+            let path = PathBuf::from(ext_path_str);
+            if path.is_file() {
+                if let Ok(content) = fs::read_to_string(&path) {
+                    let title = extract_title_from_content(&content);
+                    let (updated_at, created_at) = get_file_timestamps(&path);
+                    let character_count = content.chars().count();
+                    let tags = extract_tags_from_content(&content);
+                    let is_pinned = is_note_pinned(ext_path_str, &metadata_index);
+
+                    notes.push(NoteMetadata {
+                        id: ext_path_str.clone(),
+                        filename: ext_path_str.clone(),
+                        title,
+                        content,
+                        updated_at,
+                        created_at,
+                        character_count,
+                        is_pinned,
+                        tags,
+                        is_external: Some(true),
+                        file_path: Some(ext_path_str.clone()),
                     });
                 }
             }
@@ -392,7 +431,12 @@ fn list_notes() -> Result<Vec<NoteMetadata>, String> {
 fn read_note(filename: String) -> Result<NoteMetadata, String> {
     let settings = get_settings();
     let notes_dir = get_resolved_notes_dir(settings.custom_notes_dir.as_deref());
-    let path = notes_dir.join(&filename);
+    let is_external = Path::new(&filename).is_absolute();
+    let path = if is_external {
+        PathBuf::from(&filename)
+    } else {
+        notes_dir.join(&filename)
+    };
 
     if !path.exists() {
         return Err("Note not found".to_string());
@@ -403,13 +447,17 @@ fn read_note(filename: String) -> Result<NoteMetadata, String> {
     let title = extract_title_from_content(&content);
     let (updated_at, created_at) = get_file_timestamps(&path);
     let character_count = content.chars().count();
-    let id = filename.trim_end_matches(".md").to_string();
+    let id = if is_external {
+        filename.clone()
+    } else {
+        filename.trim_end_matches(".md").to_string()
+    };
     let is_pinned = is_note_pinned(&filename, &metadata_index);
 
     let tags = extract_tags_from_content(&content);
     Ok(NoteMetadata {
         id,
-        filename,
+        filename: filename.clone(),
         title,
         content,
         updated_at,
@@ -417,6 +465,8 @@ fn read_note(filename: String) -> Result<NoteMetadata, String> {
         character_count,
         is_pinned,
         tags,
+        is_external: if is_external { Some(true) } else { None },
+        file_path: if is_external { Some(filename) } else { None },
     })
 }
 
@@ -424,7 +474,12 @@ fn read_note(filename: String) -> Result<NoteMetadata, String> {
 fn set_note_pinned(filename: String, is_pinned: bool) -> Result<(), String> {
     let settings = get_settings();
     let notes_dir = get_resolved_notes_dir(settings.custom_notes_dir.as_deref());
-    let path = notes_dir.join(&filename);
+    let is_external = Path::new(&filename).is_absolute();
+    let path = if is_external {
+        PathBuf::from(&filename)
+    } else {
+        notes_dir.join(&filename)
+    };
 
     if !path.exists() {
         return Err("Note not found".to_string());
@@ -441,12 +496,19 @@ fn save_note(mut filename: String, content: String, is_pinned: bool) -> Result<N
     let settings = get_settings();
     let notes_dir = get_resolved_notes_dir(settings.custom_notes_dir.as_deref());
 
+    let is_external = !filename.is_empty() && Path::new(&filename).is_absolute();
+
     if filename.is_empty() {
         let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S_%3f").to_string();
         filename = format!("note_{}.md", timestamp);
     }
 
-    let path = notes_dir.join(&filename);
+    let path = if is_external {
+        PathBuf::from(&filename)
+    } else {
+        notes_dir.join(&filename)
+    };
+
     fs::write(&path, &content).map_err(|e| e.to_string())?;
 
     // Update metadata index for pin status without renaming the file
@@ -457,12 +519,16 @@ fn save_note(mut filename: String, content: String, is_pinned: bool) -> Result<N
     let title = extract_title_from_content(&content);
     let (updated_at, created_at) = get_file_timestamps(&path);
     let character_count = content.chars().count();
-    let id = filename.trim_end_matches(".md").to_string();
+    let id = if is_external {
+        filename.clone()
+    } else {
+        filename.trim_end_matches(".md").to_string()
+    };
 
     let tags = extract_tags_from_content(&content);
     Ok(NoteMetadata {
         id,
-        filename,
+        filename: filename.clone(),
         title,
         content,
         updated_at,
@@ -470,11 +536,68 @@ fn save_note(mut filename: String, content: String, is_pinned: bool) -> Result<N
         character_count,
         is_pinned,
         tags,
+        is_external: if is_external { Some(true) } else { None },
+        file_path: if is_external { Some(filename) } else { None },
     })
 }
 
 #[tauri::command]
+fn open_external_note(path: String) -> Result<NoteMetadata, String> {
+    let path_buf = PathBuf::from(&path);
+    if !path_buf.exists() || !path_buf.is_file() {
+        return Err("File does not exist or is not a valid file".to_string());
+    }
+
+    let content = fs::read_to_string(&path_buf).map_err(|e| format!("Failed to read file: {}", e))?;
+    let title = extract_title_from_content(&content);
+    let (updated_at, created_at) = get_file_timestamps(&path_buf);
+    let character_count = content.chars().count();
+    let tags = extract_tags_from_content(&content);
+
+    let mut settings = get_settings();
+    let mut external_notes = settings.external_notes.unwrap_or_default();
+    if !external_notes.contains(&path) {
+        external_notes.insert(0, path.clone());
+        settings.external_notes = Some(external_notes);
+        let _ = save_settings(settings);
+    }
+
+    let settings_ref = get_settings();
+    let notes_dir = get_resolved_notes_dir(settings_ref.custom_notes_dir.as_deref());
+    let metadata_index = load_metadata_index(&notes_dir);
+    let is_pinned = is_note_pinned(&path, &metadata_index);
+
+    Ok(NoteMetadata {
+        id: path.clone(),
+        filename: path.clone(),
+        title,
+        content,
+        updated_at,
+        created_at,
+        character_count,
+        is_pinned,
+        tags,
+        is_external: Some(true),
+        file_path: Some(path),
+    })
+}
+
+#[tauri::command]
+fn untrack_external_note(path: String) -> Result<(), String> {
+    let mut settings = get_settings();
+    if let Some(mut external_notes) = settings.external_notes {
+        external_notes.retain(|p| p != &path);
+        settings.external_notes = Some(external_notes);
+        save_settings(settings)?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
 fn delete_note(filename: String) -> Result<(), String> {
+    if Path::new(&filename).is_absolute() {
+        return untrack_external_note(filename);
+    }
     let settings = get_settings();
     let notes_dir = get_resolved_notes_dir(settings.custom_notes_dir.as_deref());
     let trash_dir = get_trash_dir(settings.custom_notes_dir.as_deref());
@@ -522,6 +645,8 @@ fn list_trashed_notes() -> Result<Vec<NoteMetadata>, String> {
                         character_count,
                         is_pinned,
                         tags,
+                        is_external: None,
+                        file_path: None,
                     });
                 }
             }
@@ -565,6 +690,8 @@ fn restore_note(filename: String) -> Result<NoteMetadata, String> {
         character_count,
         is_pinned,
         tags,
+        is_external: None,
+        file_path: None,
     })
 }
 
@@ -979,6 +1106,8 @@ pub fn run() {
             list_notes,
             read_note,
             save_note,
+            open_external_note,
+            untrack_external_note,
             set_note_pinned,
             delete_note,
             list_trashed_notes,
