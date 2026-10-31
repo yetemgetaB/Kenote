@@ -472,9 +472,31 @@ export function App() {
         const dir = await api.getNotesDirectory();
         setNotesDir(dir);
 
-        const loadedNotes = await api.listNotes();
+        let loadedNotes = await api.listNotes();
         notesRef.current = loadedNotes;
         setNotes(loadedNotes);
+
+        // Check if application was launched with an external file (e.g. via "Open With" or CLI argument)
+        const launchFile = await api.getLaunchFile().catch(() => null);
+        if (launchFile) {
+          try {
+            const externalNote = await api.openExternalNote(launchFile);
+            const filtered = loadedNotes.filter((n) => n.id !== externalNote.id && n.filename !== externalNote.filename);
+            const updated = [externalNote, ...filtered];
+            loadedNotes = updated;
+            notesRef.current = updated;
+            setNotes(updated);
+            activeNoteRef.current = externalNote;
+            setActiveNote(externalNote);
+            setActiveTitle(externalNote.title);
+            setCharCount(externalNote.character_count);
+            recentNoteIdsRef.current = [externalNote.id, ...filtered.map((n) => n.id)];
+            setRecentNoteIds(recentNoteIdsRef.current);
+            return;
+          } catch (e) {
+            console.error("Failed to open launch file:", e);
+          }
+        }
 
         const startupMode = loadedSettings.startup_behavior || "last";
 
@@ -810,6 +832,20 @@ export function App() {
       console.error("Failed to untrack external note:", err);
     }
   };
+
+  // Listen for single-instance external file opens (e.g. right-click "Open With" while app is running)
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    api.onOpenExternalFile((filePath) => {
+      handleOpenExternalFile(filePath);
+    }).then((cleanup) => {
+      unlisten = cleanup;
+    });
+
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, []);
 
   // Restore Note from Trash
   const handleRestoreNote = (restoredNote: NoteMetadata) => {

@@ -77,4 +77,18 @@ describe("In-Place Editing & External Notes Tests", () => {
     const trashed = await api.listTrashedNotes();
     assert.ok(!trashed.some((n) => n.id === fakePath), "External note should never be placed in trash");
   });
+
+  it("handles launch file retrieval gracefully when not in desktop", async () => {
+    const launchFile = await api.getLaunchFile();
+    assert.equal(launchFile, null);
+  });
+
+  it("handles external file open event listener registration gracefully", async () => {
+    let received = null;
+    const cleanup = await api.onOpenExternalFile((file) => {
+      received = file;
+    });
+    assert.equal(typeof cleanup, "function");
+    cleanup();
+  });
 });

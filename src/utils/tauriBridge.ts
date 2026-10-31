@@ -310,6 +310,36 @@ export const api = {
     return null;
   },
 
+  async getLaunchFile(): Promise<string | null> {
+    if (isTauri()) {
+      try {
+        return await invokeTauri<string | null>("get_launch_file");
+      } catch (e) {
+        console.error("Failed to get launch file:", e);
+        return null;
+      }
+    }
+    return null;
+  },
+
+  async onOpenExternalFile(callback: (filePath: string) => void): Promise<() => void> {
+    if (isTauri()) {
+      try {
+        const { listen } = await import("@tauri-apps/api/event");
+        const unlisten = await listen<string>("open-external-file", (event) => {
+          if (event.payload) {
+            callback(event.payload);
+          }
+        });
+        return unlisten;
+      } catch (e) {
+        console.error("Failed to listen for open-external-file event:", e);
+        return () => {};
+      }
+    }
+    return () => {};
+  },
+
   async setNotePinned(filename: string, is_pinned: boolean): Promise<void> {
     if (isTauri()) {
       await invokeTauri("set_note_pinned", { filename, isPinned: is_pinned });
