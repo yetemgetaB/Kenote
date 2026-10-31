@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { NoteMetadata } from "../types/note";
-import { PinIcon, TrashIcon, RestoreIcon } from "./Icons";
+import { PinIcon, TrashIcon, RestoreIcon, FolderIcon, CloseIcon } from "./Icons";
 import { api } from "../utils/tauriBridge";
 import { getAllUniqueTags, filterNotesByTag, extractTagsFromMarkdown } from "../utils/tags";
 
@@ -13,6 +13,8 @@ interface NoteSwitcherProps {
   onTogglePin: (note: NoteMetadata, e: React.MouseEvent) => void;
   onDeleteNote: (note: NoteMetadata, e: React.MouseEvent) => void;
   onRestoreNote?: (note: NoteMetadata) => void;
+  onOpenFile?: () => void;
+  onUntrackNote?: (note: NoteMetadata, e: React.MouseEvent) => void;
   onClose: () => void;
 }
 
@@ -25,6 +27,8 @@ export const NoteSwitcher: React.FC<NoteSwitcherProps> = ({
   onTogglePin,
   onDeleteNote,
   onRestoreNote,
+  onOpenFile,
+  onUntrackNote,
   onClose,
 }) => {
   const [tab, setTab] = useState<"active" | "trash">("active");
@@ -224,6 +228,17 @@ export const NoteSwitcher: React.FC<NoteSwitcherProps> = ({
             </button>
           </div>
 
+          {tab === "active" && onOpenFile && (
+            <button
+              onClick={onOpenFile}
+              title="Open external markdown or text file (Ctrl+Shift+O)"
+              className="px-2.5 py-1 rounded-lg transition-colors focus:outline-none flex items-center space-x-1.5 text-gray-300 hover:text-white bg-[#222B38] hover:bg-[#2C3747] border border-[#2F3A4B] text-[11px] font-medium shadow-xs"
+            >
+              <FolderIcon size={12} />
+              <span>Open File...</span>
+            </button>
+          )}
+
           {tab === "trash" && trashedNotes.length > 0 && (
             <button
               onClick={handleEmptyTrash}
@@ -316,6 +331,14 @@ export const NoteSwitcher: React.FC<NoteSwitcherProps> = ({
                       <span className="text-sm font-semibold truncate block">
                         {note.title || "Untitled"}
                       </span>
+                      {note.is_external && (
+                        <span
+                          className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30 shrink-0"
+                          title={note.file_path || note.filename}
+                        >
+                          External
+                        </span>
+                      )}
                     </div>
 
                     {/* Tag Badges */}
@@ -349,17 +372,25 @@ export const NoteSwitcher: React.FC<NoteSwitcherProps> = ({
                       </div>
                     )}
 
-                    <div className="text-[11px] text-gray-400 mt-1 flex items-center space-x-1.5">
+                    <div className="text-[11px] text-gray-400 mt-1 flex items-center space-x-1.5 truncate">
                       {isCurrent ? (
                         <>
-                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--accent-color,#0399F7)]"></span>
-                          <span className="text-[var(--accent-color,#0399F7)] font-medium">Current</span>
+                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--accent-color,#0399F7)] shrink-0"></span>
+                          <span className="text-[var(--accent-color,#0399F7)] font-medium shrink-0">Current</span>
                         </>
                       ) : (
-                        <span>{formatTimestamp(note.updated_at)}</span>
+                        <span className="shrink-0">{formatTimestamp(note.updated_at)}</span>
                       )}
-                      <span>•</span>
-                      <span>{note.character_count} characters</span>
+                      <span className="shrink-0">•</span>
+                      <span className="shrink-0">{note.character_count} characters</span>
+                      {note.file_path && (
+                        <>
+                          <span className="shrink-0">•</span>
+                          <span className="truncate text-gray-500 text-[10px]" title={note.file_path}>
+                            {note.file_path}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -376,13 +407,30 @@ export const NoteSwitcher: React.FC<NoteSwitcherProps> = ({
                         >
                           <PinIcon size={13} filled={note.is_pinned} />
                         </button>
-                        <button
-                          onClick={(e) => onDeleteNote(note, e)}
-                          title="Move to Trash"
-                          className="p-1.5 rounded text-gray-400 hover:text-red-400 hover:bg-red-500/20 transition-colors focus:outline-none"
-                        >
-                          <TrashIcon size={13} />
-                        </button>
+                        {note.is_external ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onUntrackNote) {
+                                onUntrackNote(note, e);
+                              } else {
+                                onDeleteNote(note, e);
+                              }
+                            }}
+                            title="Remove from Kenote (keeps file safe on disk)"
+                            className="p-1.5 rounded text-gray-400 hover:text-amber-400 hover:bg-amber-500/20 transition-colors focus:outline-none"
+                          >
+                            <CloseIcon size={13} />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={(e) => onDeleteNote(note, e)}
+                            title="Move to Trash"
+                            className="p-1.5 rounded text-gray-400 hover:text-red-400 hover:bg-red-500/20 transition-colors focus:outline-none"
+                          >
+                            <TrashIcon size={13} />
+                          </button>
+                        )}
                       </>
                     ) : (
                       <>
