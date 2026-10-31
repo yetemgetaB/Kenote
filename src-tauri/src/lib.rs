@@ -5,12 +5,13 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::SystemTime;
-use tauri::{LogicalPosition, LogicalSize, Manager, WebviewWindow, WindowEvent};
+use tauri::{Emitter, LogicalPosition, LogicalSize, Manager, WebviewWindow, WindowEvent};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 pub struct AppLaunchState {
     pub autostart_silenced: AtomicBool,
+    pub launch_file: std::sync::Mutex<Option<String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -899,6 +900,15 @@ fn get_is_autostart_launch(state: tauri::State<AppLaunchState>) -> bool {
 }
 
 #[tauri::command]
+fn get_launch_file(state: tauri::State<AppLaunchState>) -> Option<String> {
+    if let Ok(mut lock) = state.launch_file.lock() {
+        lock.take()
+    } else {
+        None
+    }
+}
+
+#[tauri::command]
 fn reveal_in_explorer(filename: Option<String>) -> Result<(), String> {
     let settings = get_settings();
     let notes_dir = get_resolved_notes_dir(settings.custom_notes_dir.as_deref());
@@ -1052,6 +1062,23 @@ where
     })
 }
 
+pub fn find_launch_file_in_args<I, S>(args: I) -> Option<String>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    for arg in args.into_iter().skip(1) {
+        let a = arg.as_ref();
+        if !a.starts_with('-') && !a.starts_with('/') {
+            let path = PathBuf::from(a);
+            if path.is_file() {
+                return Some(a.to_string());
+            }
+        }
+    }
+    None
+}
+
 pub fn toggle_main_window(app: &tauri::AppHandle) {
     if let Some(state) = app.try_state::<AppLaunchState>() {
         state.autostart_silenced.store(false, Ordering::SeqCst);
@@ -1073,13 +1100,17 @@ pub fn toggle_main_window(app: &tauri::AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let is_autostart = is_autostart_launch(std::env::args());
+    let args: Vec<String> = std::env::args().collect();
+    let is_autostart = is_autostart_launch(&args);
+    let initial_launch_file = find_launch_file_in_args(&args);
+    let should_silence = is_autostart && initial_launch_file.is_none();
 
     tauri::Builder::default()
         .manage(AppLaunchState {
-            autostart_silenced: AtomicBool::new(is_autostart),
+            autostart_silenced: AtomicBool::new(should_silence),
+            launch_file: std::sync::Mutex::new(initial_launch_file),
         })
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             if let Some(state) = app.try_state::<AppLaunchState>() {
                 state.autostart_silenced.store(false, Ordering::SeqCst);
             }
@@ -1087,6 +1118,9 @@ pub fn run() {
                 let _ = win.show();
                 let _ = win.unminimize();
                 let _ = win.set_focus();
+            }
+            if let Some(file_path) = find_launch_file_in_args(&args) {
+                let _ = app.emit("open-external-file", file_path);
             }
         }))
         .plugin(tauri_plugin_autostart::init(
@@ -1126,6 +1160,7 @@ pub fn run() {
             disable_autostart,
             is_autostart_enabled,
             get_is_autostart_launch,
+            get_launch_file,
             show_window
         ])
         .setup(|app| {
