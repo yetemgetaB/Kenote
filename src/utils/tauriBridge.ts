@@ -217,7 +217,7 @@ export const api = {
     const title = extractTitle(content);
     const character_count = content.length;
 
-    let targetNote = list.find((n) => n.filename === filename);
+    let targetNote = list.find((n) => n.filename === filename || n.id === filename);
     if (targetNote) {
       targetNote.content = content;
       targetNote.title = title;
@@ -225,8 +225,9 @@ export const api = {
       targetNote.character_count = character_count;
       targetNote.is_pinned = is_pinned;
     } else {
-      const id = `note_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-      const newFilename = `${id}.md`;
+      const isAbsolute = filename.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(filename);
+      const id = isAbsolute ? filename : `note_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const newFilename = isAbsolute ? filename : `${id}.md`;
       targetNote = {
         id,
         filename: newFilename,
@@ -236,6 +237,8 @@ export const api = {
         created_at: now,
         character_count,
         is_pinned,
+        is_external: isAbsolute ? true : undefined,
+        file_path: isAbsolute ? filename : undefined,
       };
       list.unshift(targetNote);
     }
@@ -243,6 +246,68 @@ export const api = {
     list.sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0) || b.updated_at - a.updated_at);
     localStorage.setItem(STORAGE_KEY_NOTES, JSON.stringify(list));
     return targetNote;
+  },
+
+  async openExternalNote(path: string): Promise<NoteMetadata> {
+    if (isTauri()) {
+      return await invokeTauri<NoteMetadata>("open_external_note", { path });
+    }
+    // Mock browser fallback
+    const list = await this.listNotes();
+    let note = list.find((n) => n.id === path || n.filename === path);
+    if (!note) {
+      note = {
+        id: path,
+        filename: path,
+        title: path.split(/[/\\]/).pop()?.replace(/\.(md|markdown|txt)$/i, "") || "External Note",
+        content: `# External Note\n\nOpened from: ${path}`,
+        updated_at: Math.floor(Date.now() / 1000),
+        created_at: Math.floor(Date.now() / 1000),
+        character_count: 50,
+        is_pinned: false,
+        is_external: true,
+        file_path: path,
+      };
+      list.unshift(note);
+      localStorage.setItem(STORAGE_KEY_NOTES, JSON.stringify(list));
+    }
+    return note;
+  },
+
+  async untrackExternalNote(path: string): Promise<void> {
+    if (isTauri()) {
+      await invokeTauri("untrack_external_note", { path });
+      return;
+    }
+    let list = await this.listNotes();
+    list = list.filter((n) => n.id !== path && n.filename !== path && n.file_path !== path);
+    localStorage.setItem(STORAGE_KEY_NOTES, JSON.stringify(list));
+  },
+
+  async selectMarkdownOrTextFile(): Promise<string | null> {
+    if (isTauri()) {
+      try {
+        const { open } = await import("@tauri-apps/plugin-dialog");
+        const selected = await open({
+          directory: false,
+          multiple: false,
+          filters: [
+            {
+              name: "Markdown & Text",
+              extensions: ["md", "markdown", "txt"],
+            },
+          ],
+        });
+        if (selected && typeof selected === "string") {
+          return selected;
+        }
+        return null;
+      } catch (e) {
+        console.error("Failed to pick markdown file via dialog:", e);
+        return null;
+      }
+    }
+    return null;
   },
 
   async setNotePinned(filename: string, is_pinned: boolean): Promise<void> {
@@ -265,11 +330,11 @@ export const api = {
       return;
     }
     let list = await this.listNotes();
-    const trashed = list.find((n) => n.filename === filename);
-    list = list.filter((n) => n.filename !== filename);
+    const trashed = list.find((n) => n.filename === filename || n.id === filename);
+    list = list.filter((n) => n.filename !== filename && n.id !== filename);
     localStorage.setItem(STORAGE_KEY_NOTES, JSON.stringify(list));
 
-    if (trashed) {
+    if (trashed && !trashed.is_external) {
       const trashKey = "kenote_trash_mock";
       const trashList = JSON.parse(localStorage.getItem(trashKey) || "[]");
       trashList.unshift(trashed);
