@@ -698,6 +698,10 @@ export function App() {
   // Delete Note (move to trash)
   const handleDeleteNote = async (note: NoteMetadata, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    if (note.is_external) {
+      await handleUntrackExternalNote(note);
+      return;
+    }
     try {
       if (pendingSaveRef.current?.filename === note.filename) {
         pendingSaveRef.current = null;
@@ -741,6 +745,69 @@ export function App() {
       }, 5000);
     } catch (err) {
       console.error("Failed to delete note:", err);
+    }
+  };
+
+  // Open external file from disk
+  const handleOpenExternalFile = async (explicitPath?: string) => {
+    try {
+      const filePath = explicitPath || (await api.selectMarkdownOrTextFile());
+      if (!filePath) return;
+
+      const loadedNote = await api.openExternalNote(filePath);
+
+      // Add or update in notes list
+      setNotes((prevNotes) => {
+        const filtered = prevNotes.filter((n) => n.id !== loadedNote.id && n.filename !== loadedNote.filename);
+        const updated = [loadedNote, ...filtered];
+        notesRef.current = updated;
+        return updated;
+      });
+
+      // Select as active note
+      handleSelectNote(loadedNote);
+      setIsNoteSwitcherOpen(false);
+      setIsCommandPaletteOpen(false);
+      showToast(`Opened external file: ${loadedNote.title || "File"}`);
+    } catch (err) {
+      console.error("Failed to open external file:", err);
+      showToast("Failed to open external file");
+    }
+  };
+
+  // Untrack external note (removes from list, keeps file safe on disk)
+  const handleUntrackExternalNote = async (note: NoteMetadata, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      const targetPath = note.file_path || note.filename;
+      await api.untrackExternalNote(targetPath);
+
+      const remaining = notesRef.current.filter((n) => n.id !== note.id && n.filename !== note.filename);
+      notesRef.current = remaining;
+      recentNoteIdsRef.current = recentNoteIdsRef.current.filter((id) => id !== note.id);
+      setNotes(remaining);
+      setRecentNoteIds(recentNoteIdsRef.current);
+
+      try {
+        const key = "kenote_cursor_positions";
+        const currentMap = JSON.parse(localStorage.getItem(key) || "{}");
+        delete currentMap[note.id];
+        localStorage.setItem(key, JSON.stringify(currentMap));
+      } catch {}
+
+      if (activeNoteRef.current?.filename === note.filename || activeNoteRef.current?.id === note.id) {
+        if (remaining.length > 0) {
+          const nextMruId = recentNoteIdsRef.current[0];
+          const nextNote = remaining.find((n) => n.id === nextMruId) || remaining[0];
+          handleSelectNote(nextNote);
+        } else {
+          handleNewNote();
+        }
+      }
+
+      showToast(`Closed external file: ${note.title || "Untitled"}`);
+    } catch (err) {
+      console.error("Failed to untrack external note:", err);
     }
   };
 
@@ -1040,6 +1107,9 @@ export function App() {
         setIsExportModalOpen(false);
         setIsFindOpen(false);
         handleNewNote();
+      } else if (isCmdOrCtrl && e.shiftKey && e.key.toLowerCase() === "o") {
+        e.preventDefault();
+        handleOpenExternalFile();
       } else if (isCmdOrCtrl && e.key.toLowerCase() === "o") {
         e.preventDefault();
         setIsNoteSwitcherOpen((prev) => !prev);
@@ -1160,6 +1230,14 @@ export function App() {
       shortcut: ["Ctrl", "O"],
       icon: <NoteSwitcherIcon size={16} />,
       perform: () => setIsNoteSwitcherOpen(true),
+    },
+    {
+      id: "open_file",
+      title: "Open File from Computer...",
+      subtitle: "Open external Markdown or text file to edit in-place",
+      shortcut: ["Ctrl", "Shift", "O"],
+      icon: <FolderIcon size={16} />,
+      perform: () => handleOpenExternalFile(),
     },
     {
       id: "toggle_pin",
@@ -1399,6 +1477,8 @@ export function App() {
         onTogglePin={handleTogglePinNote}
         onDeleteNote={handleDeleteNote}
         onRestoreNote={handleRestoreNote}
+        onOpenFile={() => handleOpenExternalFile()}
+        onUntrackNote={handleUntrackExternalNote}
         onClose={() => {
           setIsNoteSwitcherOpen(false);
           setNoteSwitcherInitialTag(null);
