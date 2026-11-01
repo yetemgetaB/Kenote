@@ -5,6 +5,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.6.6] - 2026-11-01
+
+### ✨ New Features & Polish
+
+#### 📂 In-Place External Note Editing & Note Switcher Integration
+- **Direct In-Place Editing**: Open any Markdown (`.md`, `.markdown`) or text (`.txt`) file located anywhere on your computer (git repositories, project folders, desktop); KeNote edits and autosaves directly back to that file at its exact disk location.
+- **Search Notes "Open File..." Action**: Dedicated **Open File...** button in the Note Switcher header (`Ctrl + O`), accompanied by a global <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>O</kbd> shortcut and Command Palette action.
+- **External Note Tracking & Badging**: External files are tracked in settings and appear in note switchers with a distinct amber `External` badge and file path preview. External files can be pinned to top just like internal notes.
+- **Safe Untracking Protection**: Removing an external note from KeNote cleanly untracks and closes it without ever moving or deleting the user's file on disk.
+
+#### 🖥️ OS-Level "Open With" & Launch File Associations
+- **Windows File Associations**: Registered `bundle.fileAssociations` in `tauri.conf.json` for `.md`, `.markdown`, and `.txt` files with `role: "Editor"`, adding KeNote to the Windows "Open with..." context menu.
+- **Cold Start File Launching**: Double-clicking an associated file or opening from terminal automatically captures the file path on startup and reveals it in the editor.
+- **Warm Start Single-Instance Handoff**: If KeNote is already running, selecting "Open with KeNote" focuses the window and immediately loads the external file without spawning duplicate instances.
+
+---
+
 ## [0.6.5] - 2026-10-29
 
 ### ✨ New Features & Polish
