@@ -40,6 +40,9 @@
 - 🖱️ **Refined Native Context Menu**: Clean right-click menu with spelling suggestions, word actions (lookup, synonyms), text formatting, and quick clipboard actions.
 - 🌐 **Global Launch Shortcut**: Summon or hide KeNote from anywhere across your OS with customizable global hotkeys (`Alt + Shift + K` by default) with an interactive keycap shortcut recorder.
 - 🗂️ **Note Switcher & Fast Search**: Browse, filter, pin, and manage all your notes instantly with `Ctrl + O`.
+- 📂 **In-Place External File Editing**: Open and edit any Markdown or text file on your drive directly with `Ctrl + Shift + O` or via Windows "Open with KeNote", auto-saving directly in place.
+- 🔍 **In-Note Find & Replace**: Fast search and replace (`Ctrl + F` / `Ctrl + H`) with floating Raycast HUD, match highlights, and whole-word / case toggles.
+- 🏷️ **Tags & Categorization**: Organize notes with inline `#tag` labels and filter instantly with interactive tag pills in the note switcher.
 - 📌 **Always-On-Top Pinning**: Keep your notes floating over active apps, code editors, and browsers with a single click or `Ctrl + P`.
 - 💾 **100% Local-First Storage**: Your notes belong to you — stored directly as standard `.md` markdown files on your drive with automatic debounce saving, custom folder selection, and live disk sync.
 - ⚡ **Command Actions Palette**: Quick-access all commands, actions, and settings with `Ctrl + K`.
