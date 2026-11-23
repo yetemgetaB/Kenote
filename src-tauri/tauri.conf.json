@@ -34,6 +34,27 @@
     "active": true,
     "targets": "all",
     "createUpdaterArtifacts": true,
+    "category": "Productivity",
+    "shortDescription": "Minimal Raycast-like Note Taking App",
+    "longDescription": "Kenote is a fast, minimal, local-first markdown note taking app.",
+    "linux": {
+      "deb": {
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libappindicator3-1",
+          "librsvg2-2"
+        ],
+        "section": "editors"
+      },
+      "rpm": {
+        "depends": [
+          "webkit2gtk4.1",
+          "openssl",
+          "libappindicator-gtk3",
+          "librsvg2"
+        ]
+      }
+    },
     "fileAssociations": [
       {
         "ext": [
