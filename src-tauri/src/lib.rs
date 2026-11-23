@@ -1528,10 +1528,35 @@ mod tests {
     fn test_app_launch_state_autostart_silencing() {
         let state = AppLaunchState {
             autostart_silenced: AtomicBool::new(true),
+            launch_file: std::sync::Mutex::new(None),
         };
         assert!(state.autostart_silenced.load(Ordering::SeqCst));
         assert!(state.autostart_silenced.swap(false, Ordering::SeqCst));
         assert!(!state.autostart_silenced.swap(false, Ordering::SeqCst));
+        assert!(state.launch_file.lock().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_find_launch_file_in_args() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "kenote_test_launch_{}",
+            chrono::Local::now().timestamp_nanos_opt().unwrap_or(0)
+        ));
+        let _ = fs::create_dir_all(&temp_dir);
+        let note_file = temp_dir.join("external_note.md");
+        fs::write(&note_file, "# Hello").expect("Should create temp file");
+        let note_str = note_file.to_string_lossy().to_string();
+
+        // Ignores executable name (argv[0]), flags, and nonexistent files
+        assert_eq!(find_launch_file_in_args(vec!["kenote.exe"]), None);
+        assert_eq!(find_launch_file_in_args(vec!["kenote.exe", "--autostart"]), None);
+        assert_eq!(find_launch_file_in_args(vec!["kenote.exe", "--autostart", &note_str]), Some(note_str.clone()));
+        assert_eq!(
+            find_launch_file_in_args(vec!["kenote.exe", &temp_dir.join("missing.md").to_string_lossy().to_string()]),
+            None
+        );
+
+        let _ = fs::remove_dir_all(&temp_dir);
     }
 
     #[test]
