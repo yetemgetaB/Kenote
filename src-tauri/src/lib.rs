@@ -157,6 +157,44 @@ fn get_assets_dir(custom_dir: Option<&str>) -> PathBuf {
     assets_dir
 }
 
+/// Validates that an internal note filename is a safe single-segment relative filename
+/// without directory separators, drive prefixes, or parent-directory traversal.
+fn validate_internal_note_filename(filename: &str) -> Result<String, String> {
+    let trimmed = filename.trim();
+    if trimmed.is_empty() {
+        return Err("Invalid note filename: filename cannot be empty".to_string());
+    }
+    let normalized = trimmed.replace('\\', "/");
+    if normalized.starts_with('/') || normalized.contains('/') || normalized.contains("..") {
+        return Err("Invalid note filename: directory traversal prohibited".to_string());
+    }
+    let path = Path::new(trimmed);
+    if path.is_absolute()
+        || path.components().any(|c| {
+            matches!(
+                c,
+                std::path::Component::Prefix(_)
+                    | std::path::Component::RootDir
+                    | std::path::Component::ParentDir
+                    | std::path::Component::CurDir
+            )
+        })
+    {
+        return Err("Invalid note filename: invalid path component".to_string());
+    }
+    Ok(trimmed.to_string())
+}
+
+/// Resolves either an external absolute note path or a validated internal note filename inside `notes_dir`.
+fn resolve_note_path(notes_dir: &Path, filename: &str) -> Result<(PathBuf, bool), String> {
+    if Path::new(filename).is_absolute() {
+        Ok((PathBuf::from(filename), true))
+    } else {
+        let safe_name = validate_internal_note_filename(filename)?;
+        Ok((notes_dir.join(safe_name), false))
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
 pub struct NotesMetadataIndex {
     #[serde(default)]
@@ -432,12 +470,7 @@ fn list_notes() -> Result<Vec<NoteMetadata>, String> {
 fn read_note(filename: String) -> Result<NoteMetadata, String> {
     let settings = get_settings();
     let notes_dir = get_resolved_notes_dir(settings.custom_notes_dir.as_deref());
-    let is_external = Path::new(&filename).is_absolute();
-    let path = if is_external {
-        PathBuf::from(&filename)
-    } else {
-        notes_dir.join(&filename)
-    };
+    let (path, is_external) = resolve_note_path(&notes_dir, &filename)?;
 
     if !path.exists() {
         return Err("Note not found".to_string());
@@ -475,12 +508,7 @@ fn read_note(filename: String) -> Result<NoteMetadata, String> {
 fn set_note_pinned(filename: String, is_pinned: bool) -> Result<(), String> {
     let settings = get_settings();
     let notes_dir = get_resolved_notes_dir(settings.custom_notes_dir.as_deref());
-    let is_external = Path::new(&filename).is_absolute();
-    let path = if is_external {
-        PathBuf::from(&filename)
-    } else {
-        notes_dir.join(&filename)
-    };
+    let (path, _) = resolve_note_path(&notes_dir, &filename)?;
 
     if !path.exists() {
         return Err("Note not found".to_string());
@@ -497,17 +525,12 @@ fn save_note(mut filename: String, content: String, is_pinned: bool) -> Result<N
     let settings = get_settings();
     let notes_dir = get_resolved_notes_dir(settings.custom_notes_dir.as_deref());
 
-    let is_external = !filename.is_empty() && Path::new(&filename).is_absolute();
-
-    if filename.is_empty() {
+    let (path, is_external) = if filename.is_empty() {
         let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S_%3f").to_string();
         filename = format!("note_{}.md", timestamp);
-    }
-
-    let path = if is_external {
-        PathBuf::from(&filename)
+        (notes_dir.join(&filename), false)
     } else {
-        notes_dir.join(&filename)
+        resolve_note_path(&notes_dir, &filename)?
     };
 
     fs::write(&path, &content).map_err(|e| e.to_string())?;
@@ -599,13 +622,14 @@ fn delete_note(filename: String) -> Result<(), String> {
     if Path::new(&filename).is_absolute() {
         return untrack_external_note(filename);
     }
+    let safe_filename = validate_internal_note_filename(&filename)?;
     let settings = get_settings();
     let notes_dir = get_resolved_notes_dir(settings.custom_notes_dir.as_deref());
     let trash_dir = get_trash_dir(settings.custom_notes_dir.as_deref());
-    let src_path = notes_dir.join(&filename);
+    let src_path = notes_dir.join(&safe_filename);
 
     if src_path.exists() {
-        let dest_path = trash_dir.join(&filename);
+        let dest_path = trash_dir.join(&safe_filename);
         if dest_path.exists() {
             let _ = fs::remove_file(&dest_path);
         }
@@ -660,11 +684,12 @@ fn list_trashed_notes() -> Result<Vec<NoteMetadata>, String> {
 
 #[tauri::command]
 fn restore_note(filename: String) -> Result<NoteMetadata, String> {
+    let safe_filename = validate_internal_note_filename(&filename)?;
     let settings = get_settings();
     let notes_dir = get_resolved_notes_dir(settings.custom_notes_dir.as_deref());
     let trash_dir = get_trash_dir(settings.custom_notes_dir.as_deref());
-    let src_path = trash_dir.join(&filename);
-    let dest_path = notes_dir.join(&filename);
+    let src_path = trash_dir.join(&safe_filename);
+    let dest_path = notes_dir.join(&safe_filename);
 
     if !src_path.exists() {
         return Err("Trashed note not found".to_string());
@@ -677,13 +702,13 @@ fn restore_note(filename: String) -> Result<NoteMetadata, String> {
     let title = extract_title_from_content(&content);
     let (updated_at, created_at) = get_file_timestamps(&dest_path);
     let character_count = content.chars().count();
-    let id = filename.trim_end_matches(".md").to_string();
-    let is_pinned = is_note_pinned(&filename, &metadata_index);
+    let id = safe_filename.trim_end_matches(".md").to_string();
+    let is_pinned = is_note_pinned(&safe_filename, &metadata_index);
 
     let tags = extract_tags_from_content(&content);
     Ok(NoteMetadata {
         id,
-        filename,
+        filename: safe_filename,
         title,
         content,
         updated_at,
@@ -698,17 +723,18 @@ fn restore_note(filename: String) -> Result<NoteMetadata, String> {
 
 #[tauri::command]
 fn permanently_delete_note(filename: String) -> Result<(), String> {
+    let safe_filename = validate_internal_note_filename(&filename)?;
     let settings = get_settings();
     let notes_dir = get_resolved_notes_dir(settings.custom_notes_dir.as_deref());
     let trash_dir = get_trash_dir(settings.custom_notes_dir.as_deref());
-    let path = trash_dir.join(&filename);
+    let path = trash_dir.join(&safe_filename);
     if path.exists() {
         fs::remove_file(path).map_err(|e| e.to_string())?;
     }
 
     // Clean up metadata entry if it was present
     let mut metadata_index = load_metadata_index(&notes_dir);
-    if metadata_index.pinned.remove(&filename).is_some() {
+    if metadata_index.pinned.remove(&safe_filename).is_some() {
         let _ = save_metadata_index(&notes_dir, &metadata_index);
     }
     Ok(())
@@ -914,7 +940,7 @@ fn reveal_in_explorer(filename: Option<String>) -> Result<(), String> {
     let notes_dir = get_resolved_notes_dir(settings.custom_notes_dir.as_deref());
     let _ = fs::create_dir_all(&notes_dir);
     let target = if let Some(name) = filename {
-        notes_dir.join(name)
+        resolve_note_path(&notes_dir, &name)?.0
     } else {
         notes_dir
     };
@@ -1630,6 +1656,48 @@ Final thought #ideas."#;
                 "ideas"
             ]
         );
+    }
+
+    #[test]
+    fn test_validate_internal_note_filename_rejects_traversal() {
+        assert_eq!(
+            validate_internal_note_filename("note_123.md").as_deref(),
+            Ok("note_123.md")
+        );
+        assert_eq!(
+            validate_internal_note_filename("welcome.md").as_deref(),
+            Ok("welcome.md")
+        );
+
+        assert!(validate_internal_note_filename("").is_err());
+        assert!(validate_internal_note_filename("   ").is_err());
+        assert!(validate_internal_note_filename(".").is_err());
+        assert!(validate_internal_note_filename("..").is_err());
+        assert!(validate_internal_note_filename("../secret.md").is_err());
+        assert!(validate_internal_note_filename("..\\secret.md").is_err());
+        assert!(validate_internal_note_filename("sub/note.md").is_err());
+        assert!(validate_internal_note_filename("sub\\note.md").is_err());
+        assert!(validate_internal_note_filename("/etc/passwd").is_err());
+        assert!(validate_internal_note_filename("C:note.md").is_err());
+    }
+
+    #[test]
+    fn test_resolve_note_path() {
+        let notes_dir = PathBuf::from("/tmp/kenote_notes");
+        let (internal_path, is_ext) =
+            resolve_note_path(&notes_dir, "note_alpha.md").expect("Should resolve internal note");
+        assert!(!is_ext);
+        assert_eq!(internal_path, notes_dir.join("note_alpha.md"));
+
+        assert!(resolve_note_path(&notes_dir, "../escape.md").is_err());
+        assert!(resolve_note_path(&notes_dir, "nested/note.md").is_err());
+
+        let abs_example = std::env::temp_dir().join("external_sample.md");
+        let abs_str = abs_example.to_string_lossy().to_string();
+        let (ext_path, is_ext_flag) =
+            resolve_note_path(&notes_dir, &abs_str).expect("Should resolve external absolute path");
+        assert!(is_ext_flag);
+        assert_eq!(ext_path, abs_example);
     }
 }
 
