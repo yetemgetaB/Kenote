@@ -14,6 +14,7 @@ import { FindReplaceBar } from "./components/FindReplaceBar";
 import { Search as SearchIcon, Replace as ReplaceIcon } from "lucide-react";
 import { NoteMetadata, AppSettings, DEFAULT_SETTINGS } from "./types/note";
 import { api, isValidExternalUrl } from "./utils/tauriBridge";
+import { hasExternalUpdate } from "./utils/documentStats";
 import { copyRichText, exportToPdf } from "./utils/exportNote";
 import { applyAccentColor } from "./utils/theme";
 import {
@@ -630,7 +631,7 @@ export function App() {
               setActiveNote((prev) => (prev ? { ...prev, is_pinned: found.is_pinned } : prev));
             }
 
-            if (found.updated_at > currentActive.updated_at + 1500) {
+            if (hasExternalUpdate(found.updated_at, currentActive.updated_at)) {
               // File was modified externally
               if (!hasUnsavedChangesRef.current && saveStatus !== "saving") {
                 const fullNote = await api.readNote(currentActive.filename);

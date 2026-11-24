@@ -30,3 +30,19 @@ export function computeDocumentStats(
 
   return { charCount, wordCount, firstLineTitle };
 }
+
+/**
+ * Determines whether a note's on-disk `updated_at` timestamp (in Unix seconds)
+ * represents a newer external modification compared to the active in-memory timestamp.
+ * Uses a 2-second grace threshold to avoid reloading from local save jitter.
+ */
+export function hasExternalUpdate(
+  diskUpdatedAt: number,
+  localUpdatedAt: number,
+  thresholdSeconds = 2
+): boolean {
+  if (!Number.isFinite(diskUpdatedAt) || !Number.isFinite(localUpdatedAt)) {
+    return false;
+  }
+  return diskUpdatedAt > localUpdatedAt + thresholdSeconds;
+}

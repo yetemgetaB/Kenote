@@ -10,6 +10,7 @@ globalThis.localStorage = {
 };
 
 const { api } = await import("../src/utils/tauriBridge.ts");
+const { hasExternalUpdate } = await import("../src/utils/documentStats.ts");
 
 describe("In-Place Editing & External Notes Tests", () => {
   beforeEach(() => {
@@ -90,5 +91,15 @@ describe("In-Place Editing & External Notes Tests", () => {
     });
     assert.equal(typeof cleanup, "function");
     cleanup();
+  });
+
+  it("detects external disk updates using second-granularity timestamps", () => {
+    const base = 1763980000;
+    assert.equal(hasExternalUpdate(base, base), false);
+    assert.equal(hasExternalUpdate(base + 1, base), false);
+    assert.equal(hasExternalUpdate(base + 2, base), false);
+    assert.equal(hasExternalUpdate(base + 3, base), true);
+    assert.equal(hasExternalUpdate(base + 10, base), true);
+    assert.equal(hasExternalUpdate(Number.NaN, base), false);
   });
 });
