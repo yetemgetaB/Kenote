@@ -37,6 +37,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ isOpen, onClose, updat
 
   const handleUpdateNow = async () => {
     trackUpdateDownloadStarted(update.version, "automatic");
+    const phaseRef: { current: "downloading" | "installing" } = { current: "downloading" };
     setStatus("downloading");
     setErrorMessage(null);
     try {
@@ -49,6 +50,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ isOpen, onClose, updat
           }
         },
         () => {
+          phaseRef.current = "installing";
           setStatus("installing");
         }
       );
@@ -61,7 +63,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ isOpen, onClose, updat
       // Clean sensitive or local file paths from user-facing error message
       const sanitized = raw.replace(/([a-zA-Z]:\\[^\s]+)|(\/[^\s]+)/g, "[path]");
       setErrorMessage(sanitized || "Failed to download and install update.");
-      const category = status === "installing" ? "install_failed" : "download_failed";
+      const category = phaseRef.current === "installing" ? "install_failed" : "download_failed";
       trackUpdateFailed(category, "automatic");
     }
   };

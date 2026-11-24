@@ -421,6 +421,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const handleInstallUpdate = async () => {
     trackUpdateDownloadStarted(updateInfo?.version || "", "manual");
+    const phaseRef: { current: "downloading" | "installing" } = { current: "downloading" };
     setUpdateStatus("downloading");
     setDownloadProgress(0);
     setUpdateErrorMessage(null);
@@ -430,6 +431,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           setDownloadProgress(percent);
         },
         () => {
+          phaseRef.current = "installing";
           setUpdateStatus("installing");
         }
       );
@@ -441,7 +443,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       const raw = err?.message || String(err);
       const cleanError = raw.replace(/([a-zA-Z]:\\[^\s]+)|(\/[^\s]+)/g, "[path]");
       setUpdateErrorMessage(cleanError || "Failed to download and install update.");
-      const category = updateStatus === "installing" ? "install_failed" : "download_failed";
+      const category = phaseRef.current === "installing" ? "install_failed" : "download_failed";
       trackUpdateFailed(category, "manual");
     }
   };
