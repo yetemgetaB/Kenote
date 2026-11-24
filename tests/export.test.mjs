@@ -33,6 +33,7 @@ const {
   exportToPlainText,
   copyRichText,
   exportAllNotesToFolder,
+  buildUniqueBackupFilename,
 } = await import("../src/utils/exportNote.ts");
 const { api } = await import("../src/utils/tauriBridge.ts");
 
@@ -215,6 +216,34 @@ describe("Note Export Utilities Suite", () => {
       assert.equal(saved[0].name, "Meeting Notes.md");
       assert.equal(saved[1].name, "Project Spec.md");
       assert.equal(saved[2].name, "note-3.md");
+    });
+
+    it("deduplicates colliding note titles during bulk backup", async () => {
+      const saved = [];
+      api.saveFile = async (name, content) => {
+        saved.push({ name, content });
+        return name;
+      };
+
+      const mockNotes = [
+        { id: "1", title: "Untitled", filename: "note-1.md", content: "# First" },
+        { id: "2", title: "Untitled", filename: "note-2.md", content: "# Second" },
+        { id: "3", title: "untitled", filename: "note-3.md", content: "# Third" },
+      ];
+
+      const res = await exportAllNotesToFolder(mockNotes);
+      assert.deepEqual(res, { count: 3 });
+      assert.deepEqual(
+        saved.map((f) => f.name),
+        ["Untitled.md", "Untitled (2).md", "untitled (3).md"]
+      );
+    });
+
+    it("buildUniqueBackupFilename generates collision-free names", () => {
+      const used = new Set();
+      assert.equal(buildUniqueBackupFilename("Daily", "a.md", used), "Daily.md");
+      assert.equal(buildUniqueBackupFilename("Daily", "b.md", used), "Daily (2).md");
+      assert.equal(buildUniqueBackupFilename("Daily", "c.md", used), "Daily (3).md");
     });
   });
 });

@@ -150,13 +150,6 @@ fn get_trash_dir(custom_dir: Option<&str>) -> PathBuf {
     trash_dir
 }
 
-fn get_assets_dir(custom_dir: Option<&str>) -> PathBuf {
-    let notes_dir = get_resolved_notes_dir(custom_dir);
-    let assets_dir = notes_dir.join("assets");
-    let _ = fs::create_dir_all(&assets_dir);
-    assets_dir
-}
-
 /// Validates that an internal note filename is a safe single-segment relative filename
 /// without directory separators, drive prefixes, or parent-directory traversal.
 fn validate_internal_note_filename(filename: &str) -> Result<String, String> {
@@ -761,13 +754,33 @@ fn empty_trash() -> Result<(), String> {
     Ok(())
 }
 
+fn get_note_base_dir(note_path: Option<&str>, custom_dir: Option<&str>) -> PathBuf {
+    if let Some(raw) = note_path {
+        let trimmed = raw.trim();
+        if !trimmed.is_empty() {
+            let path = Path::new(trimmed);
+            if path.is_absolute() {
+                if let Some(parent) = path.parent() {
+                    if parent.is_dir() {
+                        return parent.to_path_buf();
+                    }
+                }
+            }
+        }
+    }
+    get_resolved_notes_dir(custom_dir)
+}
+
 #[tauri::command]
 fn save_image_attachment(
     filename: Option<String>,
     base64_data: String,
+    note_path: Option<String>,
 ) -> Result<String, String> {
     let settings = get_settings();
-    let assets_dir = get_assets_dir(settings.custom_notes_dir.as_deref());
+    let base_dir = get_note_base_dir(note_path.as_deref(), settings.custom_notes_dir.as_deref());
+    let assets_dir = base_dir.join("assets");
+    let _ = fs::create_dir_all(&assets_dir);
 
     // 1. Separate potential data URI prefix e.g. "data:image/png;base64,"
     let (mime_ext, clean_base64) = if let Some(idx) = base64_data.find(";base64,") {
@@ -852,9 +865,10 @@ fn save_image_attachment(
 #[tauri::command]
 fn read_image_attachment(
     relative_path: String,
+    note_path: Option<String>,
 ) -> Result<String, String> {
     let settings = get_settings();
-    let notes_dir = get_resolved_notes_dir(settings.custom_notes_dir.as_deref());
+    let base_dir = get_note_base_dir(note_path.as_deref(), settings.custom_notes_dir.as_deref());
 
     // Security check: reject directory traversal attempts
     let trimmed = relative_path.trim().replace('\\', "/");
@@ -862,7 +876,7 @@ fn read_image_attachment(
         return Err("Invalid image path: directory traversal prohibited".to_string());
     }
 
-    let full_path = notes_dir.join(&trimmed);
+    let full_path = base_dir.join(&trimmed);
     if !full_path.exists() || !full_path.is_file() {
         return Err(format!("Image attachment not found: {}", trimmed));
     }
@@ -1601,12 +1615,12 @@ mod tests {
         let sample_data = BASE64_STANDARD.encode(b"fake png image bytes");
         let sample_data_uri = format!("data:image/png;base64,{}", sample_data);
 
-        let saved_rel = save_image_attachment(Some("diagram.png".to_string()), sample_data_uri).expect("Should save image");
+        let saved_rel = save_image_attachment(Some("diagram.png".to_string()), sample_data_uri, None).expect("Should save image");
         assert!(saved_rel.starts_with("assets/"));
         assert!(saved_rel.ends_with(".png"));
         assert!(saved_rel.contains("diagram-"));
 
-        let read_result = read_image_attachment(saved_rel.clone());
+        let read_result = read_image_attachment(saved_rel.clone(), None);
         assert!(read_result.is_ok());
         let data_url = read_result.unwrap();
         assert!(data_url.starts_with("data:image/png;base64,"));
@@ -1620,10 +1634,41 @@ mod tests {
 
     #[test]
     fn test_read_image_attachment_traversal_protection() {
-        assert!(read_image_attachment("../secret.txt".to_string()).is_err());
-        assert!(read_image_attachment("..\\secret.txt".to_string()).is_err());
-        assert!(read_image_attachment("/etc/passwd".to_string()).is_err());
-        assert!(read_image_attachment("assets/../../etc/passwd".to_string()).is_err());
+        assert!(read_image_attachment("../secret.txt".to_string(), None).is_err());
+        assert!(read_image_attachment("..\\secret.txt".to_string(), None).is_err());
+        assert!(read_image_attachment("/etc/passwd".to_string(), None).is_err());
+        assert!(read_image_attachment("assets/../../etc/passwd".to_string(), None).is_err());
+    }
+
+    #[test]
+    fn test_external_note_image_attachment_resolution() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "kenote_test_ext_img_{}",
+            chrono::Local::now().timestamp_nanos_opt().unwrap_or(0)
+        ));
+        let _ = fs::create_dir_all(&temp_dir);
+        let external_note = temp_dir.join("external_doc.md");
+        fs::write(&external_note, "# Doc").expect("Should write external note");
+        let note_path_str = external_note.to_string_lossy().to_string();
+
+        let sample_data = BASE64_STANDARD.encode(b"external png bytes");
+        let sample_data_uri = format!("data:image/png;base64,{}", sample_data);
+
+        let saved_rel = save_image_attachment(
+            Some("ext-shot.png".to_string()),
+            sample_data_uri,
+            Some(note_path_str.clone()),
+        )
+        .expect("Should save image relative to external note");
+
+        assert!(saved_rel.starts_with("assets/"));
+        assert!(temp_dir.join(&saved_rel).is_file());
+
+        let read_res = read_image_attachment(saved_rel, Some(note_path_str));
+        assert!(read_res.is_ok());
+        assert!(read_res.unwrap().starts_with("data:image/png;base64,"));
+
+        let _ = fs::remove_dir_all(&temp_dir);
     }
 
     #[test]

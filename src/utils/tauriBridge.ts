@@ -85,6 +85,12 @@ console.log("Hello from Kenote!");
 
 let lastOpenedExternalUrl: string | null = null;
 let lastOpenedExternalTime = 0;
+let activeNoteFilePath: string | null = null;
+
+function isAbsoluteFilePath(value: string | null | undefined): value is string {
+  if (!value) return false;
+  return value.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(value);
+}
 
 export const api = {
   async getSettings(): Promise<AppSettings> {
@@ -466,6 +472,10 @@ export const api = {
     }
   },
 
+  setActiveNoteFilePath(filePath: string | null): void {
+    activeNoteFilePath = isAbsoluteFilePath(filePath) ? filePath : null;
+  },
+
   async saveImageAttachment(fileOrBlob: Blob | File, preferredName?: string): Promise<string> {
     const base64Data = await blobToBase64(fileOrBlob);
     const filename = preferredName || (fileOrBlob instanceof File ? fileOrBlob.name : undefined);
@@ -474,6 +484,7 @@ export const api = {
       return await invokeTauri<string>("save_image_attachment", {
         filename,
         base64Data,
+        notePath: activeNoteFilePath,
       });
     }
 
@@ -503,7 +514,10 @@ export const api = {
 
     if (isTauri()) {
       try {
-        return await invokeTauri<string>("read_image_attachment", { relativePath: src });
+        return await invokeTauri<string>("read_image_attachment", {
+          relativePath: src,
+          notePath: activeNoteFilePath,
+        });
       } catch (err) {
         console.warn("Failed to read image attachment via Tauri:", src, err);
         return src;

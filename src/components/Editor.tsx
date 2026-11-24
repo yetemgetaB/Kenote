@@ -439,11 +439,16 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(
       }
     }, [editor, noteId, onChange]);
 
+    useEffect(() => {
+      api.setActiveNoteFilePath(noteId ?? null);
+    }, [noteId]);
+
     // Set content and restore cursor safely during note switching
     useEffect(() => {
       if (!editor || !noteId) return;
 
       if (prevNoteIdRef.current !== noteId) {
+        api.setActiveNoteFilePath(noteId);
         cancelScheduledRestore();
         setContextMenu(null);
         if (cursorSaveTimeoutRef.current) {

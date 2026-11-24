@@ -16,6 +16,22 @@ export function sanitizeFilename(name: string, fallback = "Untitled"): string {
   return sanitized.length > 0 ? sanitized : fallback;
 }
 
+export function buildUniqueBackupFilename(
+  title: string,
+  fallbackFilename: string,
+  usedNames: Set<string>
+): string {
+  const baseName = sanitizeFilename(title || fallbackFilename.replace(/\.md$/i, ""));
+  let candidate = `${baseName}.md`;
+  let counter = 2;
+  while (usedNames.has(candidate.toLowerCase())) {
+    candidate = `${baseName} (${counter}).md`;
+    counter++;
+  }
+  usedNames.add(candidate.toLowerCase());
+  return candidate;
+}
+
 export function generateStandaloneHtml(title: string, bodyHtml: string): string {
   const safeTitle = escapeHtml(title || "KeNote Document");
   return `<!DOCTYPE html>
@@ -176,16 +192,21 @@ export async function copyRichText(editor: TiptapEditor): Promise<boolean> {
 export async function exportAllNotesToFolder(
   notes: NoteMetadata[]
 ): Promise<{ count: number } | null> {
+  const usedNames = new Set<string>();
+
   if (isTauri()) {
     const selected = await api.selectDirectory();
     if (!selected) return null;
 
     try {
-      const { writeTextFile } = await import("@tauri-apps/plugin-fs");
+      const [{ writeTextFile }, { join }] = await Promise.all([
+        import("@tauri-apps/plugin-fs"),
+        import("@tauri-apps/api/path"),
+      ]);
       let count = 0;
       for (const note of notes) {
-        const safeName = `${sanitizeFilename(note.title || note.filename.replace(/\.md$/, ""))}.md`;
-        const destPath = `${selected}/${safeName}`;
+        const uniqueName = buildUniqueBackupFilename(note.title, note.filename, usedNames);
+        const destPath = await join(selected, uniqueName);
         await writeTextFile(destPath, note.content || "");
         count++;
       }
@@ -199,8 +220,8 @@ export async function exportAllNotesToFolder(
   // Browser fallback: trigger bulk downloads
   let count = 0;
   for (const note of notes) {
-    const safeName = `${sanitizeFilename(note.title || note.filename.replace(/\.md$/, ""))}.md`;
-    await api.saveFile(safeName, note.content || "");
+    const uniqueName = buildUniqueBackupFilename(note.title, note.filename, usedNames);
+    await api.saveFile(uniqueName, note.content || "");
     count++;
   }
   return { count };
