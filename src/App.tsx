@@ -1418,6 +1418,13 @@ export function App() {
     },
   ];
 
+  const handleCloseWindow = useCallback(async () => {
+    editorRef.current?.flushCursor();
+    await flushPendingSave();
+    await api.saveWindowState().catch(() => {});
+    await api.closeWindow();
+  }, [flushPendingSave]);
+
   return (
     <div className="flex flex-col h-full w-full bg-[#16191E] text-[#E2E8F0] select-none overflow-hidden font-sans border border-[#262D38]/80 rounded-none shadow-2xl">
       {/* Titlebar Header */}
@@ -1433,7 +1440,7 @@ export function App() {
         onOpenExport={() => setIsExportModalOpen(true)}
         onCloseSettings={() => setIsSettingsOpen(false)}
         onMinimize={() => api.minimizeWindow()}
-        onClose={() => api.closeWindow()}
+        onClose={handleCloseWindow}
       />
 
       {/* Main View Area: Either SettingsView or Editor + Toolbar */}
