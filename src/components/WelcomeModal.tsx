@@ -68,7 +68,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({
               <span className="text-sm">👋</span>
             </h1>
             <p className="text-xs text-gray-400 max-w-[340px] leading-relaxed">
-              Your lightning-fast, local-first Raycast-style markdown notepad for Windows.
+              Your lightning-fast, local-first Raycast-style markdown notepad for Windows, macOS, and Linux.
             </p>
           </div>
         </div>
