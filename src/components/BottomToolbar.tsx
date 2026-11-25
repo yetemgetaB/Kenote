@@ -11,7 +11,7 @@ import {
   TableIcon,
   ImageIcon,
 } from "./Icons";
-import { api } from "../utils/tauriBridge";
+import { api, isValidExternalUrl } from "../utils/tauriBridge";
 import { toggleSmartBold, toggleSmartItalic, toggleSmartUnderline } from "./Editor";
 
 interface BottomToolbarProps {
@@ -35,6 +35,9 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
   const [showHeadingMenu, setShowHeadingMenu] = useState(false);
   const [showTextMenu, setShowTextMenu] = useState(false);
   const [showListMenu, setShowListMenu] = useState(false);
+  const [showLinkMenu, setShowLinkMenu] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkError, setLinkError] = useState<string | null>(null);
   const [showSaved, setShowSaved] = useState(false);
 
   const prevSaveStatusRef = useRef(saveStatus);
@@ -80,6 +83,8 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
   const headingRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const linkRef = useRef<HTMLDivElement>(null);
+  const linkInputRef = useRef<HTMLInputElement>(null);
 
   // Close menus when clicking outside
   useEffect(() => {
@@ -93,6 +98,9 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
       if (listRef.current && !listRef.current.contains(e.target as Node)) {
         setShowListMenu(false);
       }
+      if (linkRef.current && !linkRef.current.contains(e.target as Node)) {
+        setShowLinkMenu(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -100,15 +108,43 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
 
   if (!editor) return null;
 
-  const handleLink = () => {
-    const previousUrl = editor.getAttributes("link").href;
-    const url = window.prompt("URL", previousUrl);
-    if (url === null) return;
-    if (url === "") {
-      editor.chain().focus().extendMarkRange("link").unsetLink().run();
+  const handleToggleLinkMenu = () => {
+    if (showLinkMenu) {
+      setShowLinkMenu(false);
       return;
     }
-    editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
+    const previousUrl = editor.getAttributes("link").href || "";
+    setLinkUrl(previousUrl);
+    setLinkError(null);
+    setShowHeadingMenu(false);
+    setShowTextMenu(false);
+    setShowListMenu(false);
+    setShowLinkMenu(true);
+    setTimeout(() => {
+      linkInputRef.current?.focus();
+      linkInputRef.current?.select();
+    }, 20);
+  };
+
+  const handleApplyLink = () => {
+    const trimmed = linkUrl.trim();
+    if (!trimmed) {
+      editor.chain().focus().extendMarkRange("link").unsetLink().run();
+      setShowLinkMenu(false);
+      return;
+    }
+    const normalized = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed) ? trimmed : `https://${trimmed}`;
+    if (!isValidExternalUrl(normalized)) {
+      setLinkError("Enter a valid http(s), mailto, or tel URL.");
+      return;
+    }
+    editor.chain().focus().extendMarkRange("link").setLink({ href: normalized }).run();
+    setShowLinkMenu(false);
+  };
+
+  const handleRemoveLink = () => {
+    editor.chain().focus().extendMarkRange("link").unsetLink().run();
+    setShowLinkMenu(false);
   };
 
   return (
@@ -249,16 +285,80 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
           )}
         </div>
 
-        {/* Link Button */}
-        <button
-          onClick={handleLink}
-          title="Insert Link"
-          className={`p-1.5 rounded hover:text-white hover:bg-[#262E3B] transition-colors focus:outline-none ${
-            editor.isActive("link") ? "text-[var(--accent-color,#0399F7)] bg-[var(--accent-muted,rgba(3,153,247,0.15))]" : ""
-          }`}
-        >
-          <LinkIcon size={14} />
-        </button>
+        {/* Link Button & Popover */}
+        <div className="relative" ref={linkRef}>
+          <button
+            onClick={handleToggleLinkMenu}
+            title="Insert Link"
+            className={`p-1.5 rounded hover:text-white hover:bg-[#262E3B] transition-colors focus:outline-none ${
+              editor.isActive("link") || showLinkMenu
+                ? "text-[var(--accent-color,#0399F7)] bg-[var(--accent-muted,rgba(3,153,247,0.15))]"
+                : ""
+            }`}
+          >
+            <LinkIcon size={14} />
+          </button>
+
+          {showLinkMenu && (
+            <div className="absolute bottom-9 left-0 w-72 p-2.5 bg-[#1E242E] border border-[#2B3340] rounded-xl shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-100 space-y-2">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                {editor.isActive("link") ? "Edit Link" : "Insert Link"}
+              </div>
+              <input
+                ref={linkInputRef}
+                type="text"
+                value={linkUrl}
+                onChange={(e) => {
+                  setLinkUrl(e.target.value);
+                  if (linkError) setLinkError(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleApplyLink();
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    setShowLinkMenu(false);
+                    editor.commands.focus();
+                  }
+                }}
+                placeholder="https://example.com"
+                className="w-full bg-[#13171F] border border-[#2B3545] rounded-lg px-2.5 py-1.5 text-xs text-gray-100 placeholder-gray-500 focus:outline-none focus:border-[var(--accent-color,#0399F7)]"
+              />
+              {linkError && (
+                <p className="text-[10px] text-red-400">{linkError}</p>
+              )}
+              <div className="flex items-center justify-end space-x-1.5">
+                {editor.isActive("link") && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveLink}
+                    className="mr-auto px-2 py-1 rounded-md text-[11px] text-red-400 hover:bg-red-500/15 transition-colors focus:outline-none"
+                  >
+                    Remove
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowLinkMenu(false);
+                    editor.commands.focus();
+                  }}
+                  className="px-2.5 py-1 rounded-md text-[11px] text-gray-400 hover:text-white hover:bg-[#2A3240] transition-colors focus:outline-none"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleApplyLink}
+                  className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-[var(--accent-color,#0399F7)] hover:bg-[var(--accent-hover,#0284c7)] text-white transition-colors focus:outline-none"
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Inline Code Button */}
         <button
