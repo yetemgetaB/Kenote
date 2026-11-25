@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { NoteMetadata } from "../types/note";
 import { PinIcon, TrashIcon, RestoreIcon, FolderIcon, CloseIcon } from "./Icons";
 import { api } from "../utils/tauriBridge";
-import { getAllUniqueTags, filterNotesByTag, extractTagsFromMarkdown } from "../utils/tags";
+import { getAllUniqueTags, filterNotesByTag, getNoteTags } from "../utils/tags";
+import { formatRelativeTimestamp } from "../utils/documentStats";
 
 interface NoteSwitcherProps {
   isOpen: boolean;
@@ -82,7 +83,7 @@ export const NoteSwitcher: React.FC<NoteSwitcherProps> = ({
     const tagQuery = isTagQuery ? q.slice(1) : q;
 
     return baseList.filter((n) => {
-      const noteTags = n.tags && n.tags.length > 0 ? n.tags : extractTagsFromMarkdown(n.content || "");
+      const noteTags = getNoteTags(n);
       const matchesTags = noteTags.some((t) => t.toLowerCase().includes(tagQuery));
 
       if (isTagQuery) {
@@ -163,16 +164,6 @@ export const NoteSwitcher: React.FC<NoteSwitcherProps> = ({
     } catch (err) {
       console.error("Failed to empty trash:", err);
     }
-  };
-
-  const formatTimestamp = (ts: number) => {
-    const now = Math.floor(Date.now() / 1000);
-    const diff = now - ts;
-    if (diff < 60) return "Just now";
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-    return new Date(ts * 1000).toLocaleDateString();
   };
 
   return (
@@ -301,9 +292,7 @@ export const NoteSwitcher: React.FC<NoteSwitcherProps> = ({
             filteredNotes.map((note, index) => {
               const isSelected = index === selectedIndex;
               const isCurrent = note.id === activeNoteId && tab === "active";
-              const noteTags = note.tags && note.tags.length > 0
-                ? note.tags
-                : extractTagsFromMarkdown(note.content || "");
+              const noteTags = getNoteTags(note);
 
               return (
                 <div
@@ -379,7 +368,7 @@ export const NoteSwitcher: React.FC<NoteSwitcherProps> = ({
                           <span className="text-[var(--accent-color,#0399F7)] font-medium shrink-0">Current</span>
                         </>
                       ) : (
-                        <span className="shrink-0">{formatTimestamp(note.updated_at)}</span>
+                        <span className="shrink-0">{formatRelativeTimestamp(note.updated_at)}</span>
                       )}
                       <span className="shrink-0">•</span>
                       <span className="shrink-0">{note.character_count} characters</span>

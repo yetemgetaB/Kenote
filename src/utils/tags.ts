@@ -69,6 +69,15 @@ export interface TagCount {
 }
 
 /**
+ * Returns a note's tags, falling back to parsing its markdown content when `tags` is absent or empty.
+ */
+export function getNoteTags(note: Pick<NoteMetadata, "tags" | "content">): string[] {
+  return note.tags && note.tags.length > 0
+    ? note.tags
+    : extractTagsFromMarkdown(note.content || "");
+}
+
+/**
  * Aggregates all unique tags across an array of notes,
  * returning tags sorted by occurrence count descending, then alphabetically.
  */
@@ -76,9 +85,7 @@ export function getAllUniqueTags(notes: NoteMetadata[]): TagCount[] {
   const countMap = new Map<string, number>();
 
   for (const note of notes) {
-    const noteTags = note.tags && note.tags.length > 0
-      ? note.tags
-      : extractTagsFromMarkdown(note.content || "");
+    const noteTags = getNoteTags(note);
 
     const seenInNote = new Set<string>();
     for (const t of noteTags) {
@@ -115,9 +122,7 @@ export function filterNotesByTag(
   const target = selectedTag.toLowerCase().replace(/^#/, "");
 
   return notes.filter((note) => {
-    const noteTags = note.tags && note.tags.length > 0
-      ? note.tags
-      : extractTagsFromMarkdown(note.content || "");
+    const noteTags = getNoteTags(note);
 
     return noteTags.some((t) => t.toLowerCase() === target);
   });

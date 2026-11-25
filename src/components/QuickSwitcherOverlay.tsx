@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from "react";
 import { NoteMetadata } from "../types/note";
 import { PinIcon } from "./Icons";
-import { extractTagsFromMarkdown } from "../utils/tags";
+import { getNoteTags } from "../utils/tags";
+import { formatRelativeTimestamp } from "../utils/documentStats";
 
 interface QuickSwitcherOverlayProps {
   isOpen: boolean;
@@ -31,16 +32,6 @@ export const QuickSwitcherOverlay: React.FC<QuickSwitcherOverlayProps> = ({
   }, [selectedIndex, isOpen]);
 
   if (!isOpen || notes.length === 0) return null;
-
-  const formatTimestamp = (ts: number) => {
-    const now = Math.floor(Date.now() / 1000);
-    const diff = now - ts;
-    if (diff < 60) return "Just now";
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-    return new Date(ts * 1000).toLocaleDateString();
-  };
 
   // Strip Markdown syntax for clean card snippet preview
   const getCleanSnippet = (content: string) => {
@@ -107,10 +98,7 @@ export const QuickSwitcherOverlay: React.FC<QuickSwitcherOverlayProps> = ({
                   </div>
 
                   {(() => {
-                    const noteTags =
-                      note.tags && note.tags.length > 0
-                        ? note.tags
-                        : extractTagsFromMarkdown(note.content || "");
+                    const noteTags = getNoteTags(note);
                     if (noteTags.length === 0) return null;
                     return (
                       <div className="flex flex-wrap gap-1 mb-1.5">
@@ -134,7 +122,7 @@ export const QuickSwitcherOverlay: React.FC<QuickSwitcherOverlayProps> = ({
 
                 {/* Card Footer */}
                 <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[10px] text-gray-400">
-                  <span>{formatTimestamp(note.updated_at)}</span>
+                  <span>{formatRelativeTimestamp(note.updated_at)}</span>
                   <span>{note.character_count} chars</span>
                 </div>
               </div>

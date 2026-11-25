@@ -4,7 +4,9 @@ import {
   extractTagsFromMarkdown,
   getAllUniqueTags,
   filterNotesByTag,
+  getNoteTags,
 } from "../src/utils/tags.ts";
+import { formatRelativeTimestamp } from "../src/utils/documentStats.ts";
 
 describe("Note Tags & Categorization Tests", () => {
   describe("1. extractTagsFromMarkdown", () => {
@@ -207,6 +209,21 @@ After code block #another_valid`;
 
     it("returns empty array when no notes match tag", () => {
       assert.deepEqual(filterNotesByTag(notes, "nonexistent"), []);
+    });
+  });
+
+  describe("4. Shared Tag & Timestamp Helpers", () => {
+    it("getNoteTags prefers precomputed tags and falls back to markdown extraction", () => {
+      assert.deepEqual(getNoteTags({ tags: ["preset"], content: "#ignored" }), ["preset"]);
+      assert.deepEqual(getNoteTags({ content: "Hello #world" }), ["world"]);
+    });
+
+    it("formatRelativeTimestamp formats recent and older Unix-second timestamps", () => {
+      const now = Math.floor(Date.now() / 1000);
+      assert.equal(formatRelativeTimestamp(now - 10), "Just now");
+      assert.equal(formatRelativeTimestamp(now - 300), "5m ago");
+      assert.equal(formatRelativeTimestamp(now - 7200), "2h ago");
+      assert.equal(formatRelativeTimestamp(now - 172800), "2d ago");
     });
   });
 });

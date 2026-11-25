@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { NoteMetadata } from "../types/note";
 import { PinIcon, NoteSwitcherIcon } from "./Icons";
 import { trackCommandUsed, CommandActionId } from "../utils/analytics";
-import { extractTagsFromMarkdown } from "../utils/tags";
+import { getNoteTags } from "../utils/tags";
 
 const COMMAND_MAP: Record<string, CommandActionId> = {
   new_note: "new_note",
@@ -54,10 +54,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     ? notes.filter((note) => {
         const q = search.toLowerCase();
         const tagQuery = q.startsWith("#") ? q.slice(1) : q;
-        const noteTags =
-          note.tags && note.tags.length > 0
-            ? note.tags
-            : extractTagsFromMarkdown(note.content || "");
+        const noteTags = getNoteTags(note);
         const matchesTags = noteTags.some((t) => t.toLowerCase().includes(tagQuery));
 
         return (
@@ -207,10 +204,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                               </span>
                             )}
                             {(() => {
-                              const noteTags =
-                                note.tags && note.tags.length > 0
-                                  ? note.tags
-                                  : extractTagsFromMarkdown(note.content || "");
+                              const noteTags = getNoteTags(note);
                               if (noteTags.length === 0) return null;
                               return (
                                 <div className="flex flex-wrap gap-1 mt-0.5">
