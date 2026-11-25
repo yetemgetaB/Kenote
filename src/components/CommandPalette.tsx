@@ -6,10 +6,15 @@ import { getNoteTags } from "../utils/tags";
 
 const COMMAND_MAP: Record<string, CommandActionId> = {
   new_note: "new_note",
+  save_note: "save_note",
   browse_notes: "note_switcher",
   note_switcher: "note_switcher",
+  open_file: "open_file",
   toggle_pin: "toggle_pin",
   copy_markdown: "copy_markdown",
+  export_note: "export_note",
+  find_in_note: "find_in_note",
+  find_replace_in_note: "find_replace_in_note",
   open_folder: "reveal_in_explorer",
   reveal_in_explorer: "reveal_in_explorer",
   settings: "settings",
@@ -17,6 +22,7 @@ const COMMAND_MAP: Record<string, CommandActionId> = {
   delete_active_note: "delete_note",
   delete_note: "delete_note",
   insert_section: "insert_section",
+  insert_table: "insert_table",
   collapse_all_sections: "collapse_all_sections",
   expand_all_sections: "expand_all_sections",
 };

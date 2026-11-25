@@ -204,14 +204,20 @@ describe("Phase B1: Privacy-Safe Analytics Telemetry Tests", () => {
     it("command action ids match allowlist", () => {
       const expected = [
         "new_note",
+        "save_note",
         "note_switcher",
+        "open_file",
         "toggle_pin",
         "copy_markdown",
+        "export_note",
+        "find_in_note",
+        "find_replace_in_note",
         "reveal_in_explorer",
         "settings",
         "check_for_updates",
         "delete_note",
         "insert_section",
+        "insert_table",
         "collapse_all_sections",
         "expand_all_sections",
       ];
