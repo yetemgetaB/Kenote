@@ -38,11 +38,13 @@
 - 📂 **Collapsible Sections & Outlines**: Structure long notes into collapsible sections (`:::kenote-section` or `Ctrl + Shift + S`) with custom colors, task completion badges (`[2/4]`), and smooth fold/unfold toggles.
 - 🔁 **Quick Switcher HUD (MRU)**: Cycle through recently visited notes with a Raycast-style floating HUD overlay using `Ctrl + Tab` or `Alt + Tab`.
 - 🖱️ **Refined Native Context Menu**: Clean right-click menu with spelling suggestions, word actions (lookup, synonyms), text formatting, and quick clipboard actions.
-- 🌐 **Global Launch Shortcut**: Summon or hide KeNote from anywhere across your OS with customizable global hotkeys (`Alt + Shift + K` by default) with an interactive keycap shortcut recorder.
+- 🌐 **Global Launch Shortcut**: Summon or hide KeNote from anywhere across your OS with customizable global hotkeys (`Ctrl + Space` by default) with an interactive keycap shortcut recorder.
 - 🗂️ **Note Switcher & Fast Search**: Browse, filter, pin, and manage all your notes instantly with `Ctrl + O`.
-- 📂 **In-Place External File Editing**: Open and edit any Markdown or text file on your drive directly with `Ctrl + Shift + O` or via Windows "Open with KeNote", auto-saving directly in place.
+- 📂 **In-Place External File Editing**: Open and edit any Markdown or text file on your drive directly with `Ctrl + Shift + O` or via OS "Open with KeNote", auto-saving directly in place.
 - 🔍 **In-Note Find & Replace**: Fast search and replace (`Ctrl + F` / `Ctrl + H`) with floating Raycast HUD, match highlights, and whole-word / case toggles.
 - 🏷️ **Tags & Categorization**: Organize notes with inline `#tag` labels and filter instantly with interactive tag pills in the note switcher.
+- 🖼️ **Image Attachments & Tables**: Paste or drag-and-drop images directly into `assets/`, and insert resizable Markdown tables with `/table`.
+- 📤 **Document Export Suite**: Export notes as PDF, standalone HTML, Markdown, Plain Text, formatted Rich Text, or bulk Vault backups (`Ctrl + Shift + E`).
 - 📌 **Always-On-Top Pinning**: Keep your notes floating over active apps, code editors, and browsers with a single click or `Ctrl + P`.
 - 💾 **100% Local-First Storage**: Your notes belong to you — stored directly as standard `.md` markdown files on your drive with automatic debounce saving, custom folder selection, and live disk sync.
 - ⚡ **Command Actions Palette**: Quick-access all commands, actions, and settings with `Ctrl + K`.
@@ -54,16 +56,38 @@
 
 ---
 
+## 📦 Installation & Download
+
+Pre-built binaries and installers for all platforms are available on the **[Latest Releases](https://github.com/yetemgetaB/Kenote/releases/latest)** page.
+
+### 🐧 Linux (One-Line Installer)
+Install or update KeNote automatically on Fedora, Ubuntu, Debian, or any Linux distro:
+```bash
+curl -fsSL https://raw.githubusercontent.com/yetemgetaB/Kenote/main/install.sh | bash
+```
+> *This detects your distribution, installs the appropriate `.rpm`, `.deb`, or `.AppImage`, configures desktop launcher search, and sets up Markdown file associations.*
+
+### 🪟 Windows
+Download and run the `.msi` or `-setup.exe` installer from [Releases](https://github.com/yetemgetaB/Kenote/releases/latest).
+
+### 🍎 macOS
+Download the `.dmg` disk image from [Releases](https://github.com/yetemgetaB/Kenote/releases/latest) and drag KeNote to your Applications folder.
+
+---
+
 ## ⌨️ Keyboard Shortcuts
 
 | Shortcut | Action |
 | --- | --- |
-| `Alt + Shift + K` | Global Summon / Hide KeNote (Customizable) |
-| `/` | Open Slash Commands Menu (Headings, Checklists, Code, Callouts) |
+| `Ctrl + Space` | Global Summon / Hide KeNote (Customizable) |
+| `/` | Open Slash Commands Menu (Headings, Checklists, Code, Callouts, Tables, Images) |
 | `Ctrl + N` | Create New Note |
 | `Ctrl + O` | Browse Notes Switcher & Search |
+| `Ctrl + Shift + O` | Open External Markdown / Text File |
 | `Ctrl + K` | Open Actions / Command Palette |
 | `Ctrl + Tab` / `Alt + Tab` | Quick Switcher HUD (Cycle Recent Notes) |
+| `Ctrl + F` / `Ctrl + H` | Find / Find & Replace in Note |
+| `Ctrl + Shift + E` | Export Note (PDF, HTML, Markdown, Backup) |
 | `Ctrl + P` | Toggle Pin Always On Top |
 | `Ctrl + S` | Force Save Note to Disk |
 | `Ctrl + Shift + S` | Insert Collapsible Section |

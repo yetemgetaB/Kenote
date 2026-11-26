@@ -5,6 +5,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.6.7] - 2026-11-26
+
+### 🐛 Bug Fixes & Reliability
+- **External Disk Sync Fix**: Corrected external file modification detection to use a 2-second threshold instead of a 1500-second (25-minute) offset.
+- **Safe Save-on-Close**: Flushed cursor position, pending debounced note saves, and window bounds before closing the window from the titlebar.
+- **External Note Image Attachments**: Resolved and saved relative `assets/` images against the external note's parent directory when editing files outside the default vault.
+- **Bulk Export Deduplication**: Prevented filename collisions when backing up notes with duplicate titles (e.g., `Untitled.md`, `Untitled (2).md`) and used cross-platform path joining.
+- **Updater Telemetry Accuracy**: Fixed stale closure phase tracking so `install_failed` vs `download_failed` errors are reported accurately.
+- **Storage & Test Hardening**: Added path traversal validation for internal note filenames and restored `AppLaunchState` Rust unit tests.
+
+### ✨ UI & Packaging Improvements
+- **Inline Link Popover**: Replaced the native browser `window.prompt` in the bottom toolbar with a Raycast-styled dark link editor popover with URL validation.
+- **Settings & Keybindings Parity**: Added `Alt + Tab` and `Disabled` Quick Switcher options, updated the keybindings reference dynamically, modularized Settings tabs, and generalized cross-platform copy.
+- **Linux Packaging & Installer**: Added `.deb`/`.rpm` bundle metadata and a universal `install.sh` installer script for Linux distributions.
+
+---
+
 ## [0.6.6] - 2026-11-01
 
 ### ✨ New Features & Polish
