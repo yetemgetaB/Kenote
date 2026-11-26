@@ -44,10 +44,33 @@ jobs:
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev rpm
 
       - name: Install frontend dependencies
         run: pnpm install
+
+      - name: Extract release notes from CHANGELOG
+        run: |
+          node -e '
+            const fs = require("fs");
+            const { version } = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            const changelog = fs.readFileSync("CHANGELOG.md", "utf8");
+            const escaped = version.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const re = new RegExp(`(?:^|\\r?\\n)## \\[${escaped}\\][^\\r\\n]*\\r?\\n([\\s\\S]*?)(?=\\r?\\n## \\[|$)`);
+            const match = changelog.match(re);
+            const notes = match ? match[1].trim() : `Release v${version}`;
+            const body = [
+              `## KeNote v${version}`,
+              "",
+              notes,
+              "",
+              "### Download & Install",
+              "- **Windows**: Download the `.msi` or `-setup.exe` installer below.",
+              "- **macOS**: Download the `.dmg` installer.",
+              "- **Linux**: Download the `.rpm`, `.deb`, or `.AppImage` package."
+            ].join("\n");
+            fs.writeFileSync("release-notes.md", body);
+          '
 
       - name: Build and Release Tauri App
         uses: tauri-apps/tauri-action@v0
@@ -57,25 +80,7 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: "Kenote v__VERSION__"
-          releaseBody: |
-            ## KeNote v__VERSION__
-
-            KeNote `v__VERSION__` is a patch release fixing the global launcher shortcut reliability on Windows, eliminating silent fallback conflicts, and setting `Ctrl+Space` as the new default launcher hotkey.
-
-            ### 🐛 Bug Fixes & Reliability
-            - **Windows Extended Key Fix (`F13`–`F24` & Custom Hotkeys)**: Deferred global hotkey registration to ensure the Windows message loop is active before registering hooks, resolving issues where custom shortcuts like `Ctrl+Alt+F13` failed to trigger.
-            - **Eliminated Silent Fallback**: Removed the silent fallback that secretly reverted to `Alt+Shift+K` when custom shortcut registration encountered startup timing delays.
-            - **Ergonomic Default Hotkey (`Ctrl+Space`)**: Updated default launcher shortcut from `Alt+Shift+K` to `Ctrl+Space` across all settings, UI previews, and backend registration.
-
-            ### 🗂️ Features from v0.6.0
-            - **Collapsible Stacks (Sections)**: Create collapsible blocks with `/stack [title]`, `Ctrl+Shift+S`, or the toolbar stack icon.
-            - **Offline Spellcheck & Suggestions**: Built-in morphological spelling checker with instant right-click word selection and custom user dictionary.
-            - **Expanded Slash Commands**: Numbered lists, date & time suite (`/today`, `/now`, etc.), and live GitHub-style callouts (`[!NOTE]`, `[!WARNING]`, etc.).
-
-            ### 📦 Download & Install
-            - **Windows**: Download the `.msi` or `-setup.exe` installer below.
-            - **macOS**: Download the `.dmg` installer.
-            - **Linux**: Download the `.AppImage` or `.deb` package.
+          releaseBodyPath: release-notes.md
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
